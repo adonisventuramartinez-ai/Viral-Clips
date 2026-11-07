@@ -13,5 +13,7 @@ export function browserClient(): SupabaseClient | null {
 
 /** Cliente de servidor (rutas /api). Salta RLS: nunca lo importes en componentes cliente. */
 export function serverClient(): SupabaseClient | null {
-  return url && service ? createClient(url, service, { auth: { persistSession: false } }) : null;
+  // SUPABASE_URL se lee al ejecutar (no se graba en el build como NEXT_PUBLIC_*), así que siempre es la actual.
+  const serverUrl = process.env.SUPABASE_URL || url;
+  return serverUrl && service ? createClient(serverUrl, service, { auth: { persistSession: false } }) : null;
 }

@@ -75,7 +75,7 @@ export default function Biblioteca() {
       if (!res.ok) {
         setErr(j.error ?? "No se pudo limpiar");
       } else {
-        const parts = [`${j.removed} quitado(s)`];
+        const parts = [`${j.removed} quitado(s) (encontré ${j.found ?? 0})`];
         if (j.kept) parts.push(`${j.kept} se conservó porque ya tenía clips`);
         if (j.stopping) parts.push(`${j.stopping} directo(s) en proceso de parar`);
         if (j.more) parts.push("quedan más: vuelve a tocar el botón");

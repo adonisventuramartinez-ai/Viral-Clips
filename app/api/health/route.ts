@@ -37,5 +37,15 @@ export async function GET() {
   const ok = Object.values(tablas).every((v) => v === "ok") && bucketClips === "ok";
   const { data: ws } = await db.from("worker_status").select("seen_at").eq("id", 1).maybeSingle();
   const workerVisto = ws?.seen_at ?? "nunca (worker apagado o sin migración 0003)";
-  return NextResponse.json({ ok, workerVisto, env, tablas, bucketClips, jobsPorEstado, ultimosErrores: errores ?? [] });
+  const workerHaceSeg = ws?.seen_at ? Math.round((Date.now() - new Date(ws.seen_at as string).getTime()) / 1000) : null;
+
+  // Qué base de datos está leyendo ESTA web (solo el host, no es secreto). Compáralo con el SUPABASE_URL de worker/.env.
+  let proyecto = "?";
+  try { proyecto = new URL(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "").host; } catch { /* vacío */ }
+
+  // Últimas fuentes con el estado de su trabajo: si job es null, ese video quedó sin trabajo y el worker no lo puede tomar.
+  const { data: src } = await db.from("sources").select("id,kind,status,created_at,jobs(status,type)").order("created_at", { ascending: false }).limit(5);
+  const fuentes = (src ?? []).map((x) => ({ id: String(x.id).slice(0, 8), kind: x.kind, status: x.status, jobs: x.jobs }));
+
+  return NextResponse.json({ ok, proyecto, workerHaceSeg, workerVisto, env, tablas, bucketClips, jobsPorEstado, fuentes, ultimosErrores: errores ?? [] });
 }

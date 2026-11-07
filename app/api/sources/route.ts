@@ -29,7 +29,7 @@ export async function DELETE(req: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const rows = data ?? [];
-  if (!rows.length) return NextResponse.json({ ok: true, removed: 0, kept: 0, stopping: 0, more: false });
+  if (!rows.length) return NextResponse.json({ ok: true, found: 0, removed: 0, kept: 0, stopping: 0, more: false });
 
   // 1) Directos grabando: pedir paro en vez de borrar
   const stopIds = rows.filter((r) => r.kind === "live" && LIVE_RUNNING.includes(r.status)).map((r) => r.id as string);
@@ -62,6 +62,7 @@ export async function DELETE(req: Request) {
 
   return NextResponse.json({
     ok: true,
+    found: rows.length,
     removed: deleteIds.length,
     kept: keepIds.length,
     stopping: stopIds.length,
