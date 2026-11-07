@@ -11,7 +11,10 @@ import config
 
 
 def _run(cmd):
-    subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    r = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+    if r.returncode != 0:
+        tail = (r.stderr or "").strip().splitlines()[-3:]
+        raise RuntimeError(f"ffmpeg falló: {' | '.join(tail)[:300]}")
 
 
 def transcribe(video: Path, workdir: Path):
@@ -67,7 +70,8 @@ def _groq(video: Path, workdir: Path, chunk_sec: int = 600):
                 ],
                 timeout=600,
             )
-        r.raise_for_status()
+        if not r.ok:
+            raise RuntimeError(f"Groq transcripción {r.status_code}: {r.text[:200]}")
         j = r.json()
         for s in j.get("segments", []):
             segments.append({"start": s["start"] + t, "end": s["end"] + t, "text": s["text"].strip()})

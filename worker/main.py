@@ -14,6 +14,10 @@ from render import render_clip
 from transcribe import transcribe
 
 
+class Cancelled(Exception):
+    """La fuente se quitó desde la web (botón Limpiar) mientras se procesaba."""
+
+
 def process(job):
     sid = job["source_id"]
     src = db.get_source(sid)
@@ -22,11 +26,16 @@ def process(job):
     secs = int(payload.get("clip_seconds", 45))
     quality = payload.get("quality", "1080p")
 
+    def alive():
+        if not db.source_exists(sid):
+            raise Cancelled()
+
     work = config.WORK_DIR / sid
     work.mkdir(parents=True, exist_ok=True)
     try:
         db.set_source(sid, status="downloading", error=None)
         video, title, offset = download(src["url"], work, quality, src.get("range_from"), src.get("range_to"))
+        alive()
         db.set_source(sid, title=title, status="transcribing")
 
         segments, words = transcribe(video, work)
@@ -35,6 +44,7 @@ def process(job):
         # tiempos del archivo -> tiempos del video original, para guardar en la base
         db.save_transcript(sid, [{**s, "start": s["start"] + offset, "end": s["end"] + offset} for s in segments])
 
+        alive()
         db.set_source(sid, status="analyzing")
         chosen, rejected = find_moments(segments, n_clips, secs)
         db.save_rejected(sid, rejected)
@@ -43,6 +53,7 @@ def process(job):
 
         db.set_source(sid, status="clipping")
         for m in sorted(chosen, key=lambda x: x["start"]):
+            alive()
             cid = str(uuid.uuid4())
             out = work / f"{cid}.mp4"
             render_clip(video, words, m["start"], m["end"], out, work)
@@ -57,9 +68,11 @@ def process(job):
 
         db.set_source(sid, status="done")
         db.finish_job(job["id"], ok=True)
+    except Cancelled:
+        print(f"  fuente {sid} quitada desde la web, cancelo.", flush=True)
     except Exception as e:  # noqa: BLE001
         traceback.print_exc()
-        db.set_source(sid, status="error", error=str(e)[:500])
+        db.set_source(sid, status="error", error=f"{type(e).__name__}: {e}"[:500])
         db.finish_job(job["id"], ok=False)
     finally:
         shutil.rmtree(work, ignore_errors=True)

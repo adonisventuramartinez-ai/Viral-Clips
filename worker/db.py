@@ -37,6 +37,11 @@ def get_source(source_id):
     return sb.table("sources").select("*").eq("id", source_id).single().execute().data
 
 
+def source_exists(source_id) -> bool:
+    res = sb.table("sources").select("id").eq("id", source_id).limit(1).execute()
+    return bool(res.data)
+
+
 def set_source(source_id, **fields):
     sb.table("sources").update(fields).eq("id", source_id).execute()
 

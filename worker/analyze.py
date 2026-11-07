@@ -86,7 +86,8 @@ def _ask_groq(prompt, retries=5):
         if r.status_code == 429:
             time.sleep(float(r.headers.get("retry-after", 15)) + 1)
             continue
-        r.raise_for_status()
+        if not r.ok:
+            raise RuntimeError(f"Groq IA {r.status_code}: {r.text[:200]}")
         return r.json()["choices"][0]["message"]["content"]
     raise RuntimeError("Groq: límite de uso alcanzado, intenta de nuevo en unos minutos")
 

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ClipCard from "@/components/ClipCard";
 import { ACTIVE, STATUS_LABEL } from "@/lib/format";
 import type { Clip, SourceRow } from "@/lib/types";
@@ -12,12 +12,16 @@ export default function Biblioteca() {
   const [err, setErr] = useState("");
   const [worker, setWorker] = useState<boolean | null>(null);
   const [sort, setSort] = useState<"viral" | "new">("viral");
+  const [cleaning, setCleaning] = useState(false);
+  const [note, setNote] = useState("");
+  const reload = useRef<() => void>(() => {});
 
   useEffect(() => {
     let alive = true;
     let timer: ReturnType<typeof setTimeout>;
 
     async function load() {
+      clearTimeout(timer);
       let active = false;
       try {
         const r = await fetch("/api/clips", { cache: "no-store" });
@@ -48,6 +52,7 @@ export default function Biblioteca() {
       if (alive && active) timer = setTimeout(load, 5000);
     }
 
+    reload.current = load;
     load();
     return () => {
       alive = false;
@@ -55,8 +60,38 @@ export default function Biblioteca() {
     };
   }, []);
 
+  /** Quita una fuente (id) o todas las pegadas/con error (sin id). */
+  async function clean(id?: string) {
+    if (!id && !confirm("¿Limpiar todo lo que está en cola, con error o detenido?\n\nLos clips ya creados NO se borran.")) return;
+    setCleaning(true);
+    setNote("");
+    try {
+      const res = await fetch("/api/sources", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(id ? { id } : {}),
+      });
+      const j = await res.json();
+      if (!res.ok) {
+        setErr(j.error ?? "No se pudo limpiar");
+      } else {
+        const parts = [`${j.removed} quitado(s)`];
+        if (j.kept) parts.push(`${j.kept} se conservó porque ya tenía clips`);
+        if (j.stopping) parts.push(`${j.stopping} directo(s) en proceso de parar`);
+        if (j.more) parts.push("quedan más: vuelve a tocar el botón");
+        setNote(parts.join(" · "));
+      }
+    } catch {
+      setErr("No se pudo conectar con el servidor");
+    }
+    setCleaning(false);
+    reload.current();
+  }
+
   const working = sources.filter((s) => ACTIVE.includes(s.status));
-  const failed = sources.filter((s) => s.status === "error").slice(0, 3);
+  const failed = sources.filter((s) => s.status === "error");
+  const stuck = sources.filter((s) => s.status === "queued");
+  const cleanable = sources.filter((s) => s.status === "error" || s.status === "stopped" || ACTIVE.includes(s.status));
   const shown = sort === "viral" ? [...clips].sort((a, b) => b.score - a.score) : clips;
 
   return (
@@ -66,23 +101,42 @@ export default function Biblioteca() {
 
       {demo && <div className="banner">Supabase no está conectado, no hay clips reales que mostrar.</div>}
       {err && <div className="banner">{err}</div>}
-      {worker === false && sources.some((s) => s.status === "queued") && (
+      {note && <div className="banner ok">{note}</div>}
+      {worker === false && stuck.length > 0 && (
         <div className="banner">Hay trabajos en cola pero el worker está apagado. Enciéndelo en tu PC (docker run …) y empezará solo.</div>
       )}
 
+      {cleanable.length > 0 && (
+        <div style={{ margin: "0 0 14px" }}>
+          <button className="btn" onClick={() => clean()} disabled={cleaning}>
+            {cleaning ? "Limpiando…" : `🧹 Limpiar cola y errores (${cleanable.length})`}
+          </button>
+        </div>
+      )}
+
       {working.map((s) => (
-        <div key={s.id} className="step active" style={{ marginBottom: 10 }}>
-          <i className="dot" />
-          <div>
-            <b>{STATUS_LABEL[s.status] ?? s.status}…</b>
-            <span>{s.title ?? s.url}</span>
+        <div key={s.id} className="step active" style={{ marginBottom: 10, justifyContent: "space-between" }}>
+          <div style={{ display: "flex", gap: 12, alignItems: "center", minWidth: 0 }}>
+            <i className="dot" />
+            <div style={{ minWidth: 0 }}>
+              <b>{STATUS_LABEL[s.status] ?? s.status}…</b>
+              <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis" }}>{s.title ?? s.url}</span>
+            </div>
           </div>
+          <button className="btn ghost sm" onClick={() => clean(s.id)} disabled={cleaning}>
+            Quitar
+          </button>
         </div>
       ))}
       {failed.map((s) => (
         <div key={s.id} className="banner">
           <b>Falló:</b> {s.title ?? s.url}<br />
-          <span style={{ color: "var(--muted)", fontSize: 13 }}>{s.error}</span>
+          <span style={{ color: "var(--muted)", fontSize: 13, wordBreak: "break-word" }}>{s.error}</span>
+          <div style={{ marginTop: 8 }}>
+            <button className="btn ghost sm" onClick={() => clean(s.id)} disabled={cleaning}>
+              Quitar
+            </button>
+          </div>
         </div>
       ))}
 
@@ -97,7 +151,7 @@ export default function Biblioteca() {
 
       <div className="clips">{shown.map((c) => <ClipCard key={c.id} clip={c} />)}</div>
 
-      {loaded && !demo && clips.length === 0 && working.length === 0 && (
+      {loaded && !demo && clips.length === 0 && working.length === 0 && failed.length === 0 && (
         <div className="card" style={{ marginTop: 16 }}>
           Aún no hay clips. Ve a <b>Crear clips</b>, pega un link y toca Analizar video (con el worker encendido).
         </div>
