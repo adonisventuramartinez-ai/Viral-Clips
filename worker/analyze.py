@@ -1,9 +1,9 @@
-"""Claude elige los momentos virales a partir de la transcripción."""
+"""La IA elige los momentos virales a partir de la transcripción (con rotación de proveedores en llm.py)."""
 import json
 import math
-import time
 
 import config
+import llm
 
 WINDOW = 900  # segundos de transcripción por llamada
 
@@ -40,14 +40,17 @@ def _chunks(segments):
     return out
 
 
-def _parse_json(txt):
+def _parse_moments(txt):
+    """Devuelve la lista de momentos, o None si la respuesta no es un JSON válido (para probar otro proveedor)."""
     a, b = txt.find("{"), txt.rfind("}")
     if a < 0 or b < 0:
-        return {"moments": []}
+        return None
     try:
-        return json.loads(txt[a : b + 1])
+        data = json.loads(txt[a : b + 1])
     except json.JSONDecodeError:
-        return {"moments": []}
+        return None
+    moments = data.get("moments") if isinstance(data, dict) else None
+    return moments if isinstance(moments, list) else None
 
 
 def _build_prompt(chunk, want, secs):
@@ -55,47 +58,9 @@ def _build_prompt(chunk, want, secs):
     return PROMPT.format(want=want, secs=secs, lo=int(secs * 0.6), hi=int(secs * 1.5), text=text)
 
 
-def _ask_anthropic(prompt):
-    import anthropic
-
-    client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
-    msg = client.messages.create(
-        model=config.CLAUDE_MODEL, max_tokens=4000,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    return "".join(b.text for b in msg.content if getattr(b, "type", "") == "text")
-
-
-def _ask_groq(prompt, retries=5):
-    """Llama en Groq (gratis). Reintenta si choca con el límite por minuto (429)."""
-    import requests
-
-    for attempt in range(retries):
-        r = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {config.GROQ_API_KEY}"},
-            json={
-                "model": config.GROQ_MODEL,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.3,
-                "max_tokens": 3000,
-                "response_format": {"type": "json_object"},
-            },
-            timeout=120,
-        )
-        if r.status_code == 429:
-            time.sleep(float(r.headers.get("retry-after", 15)) + 1)
-            continue
-        if not r.ok:
-            raise RuntimeError(f"Groq IA {r.status_code}: {r.text[:200]}")
-        return r.json()["choices"][0]["message"]["content"]
-    raise RuntimeError("Groq: límite de uso alcanzado, intenta de nuevo en unos minutos")
-
-
 def _ask_llm(chunk, want, secs):
-    prompt = _build_prompt(chunk, want, secs)
-    raw = _ask_anthropic(prompt) if config.LLM_PROVIDER == "anthropic" else _ask_groq(prompt)
-    return _parse_json(raw).get("moments", [])
+    """Pregunta a la IA. Si un proveedor se queda sin cupo, llm.py pasa solo al siguiente."""
+    return llm.ask(_build_prompt(chunk, want, secs), check=_parse_moments)
 
 
 def _overlap(a, b):

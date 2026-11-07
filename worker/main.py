@@ -81,12 +81,10 @@ def process(job):
 def main():
     if not (config.SUPABASE_URL and config.SUPABASE_KEY):
         raise SystemExit("Falta SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY")
-    if config.LLM_PROVIDER == "anthropic" and not config.ANTHROPIC_API_KEY:
-        raise SystemExit("Falta ANTHROPIC_API_KEY")
-    if config.LLM_PROVIDER == "groq" and not config.GROQ_API_KEY:
-        raise SystemExit("Falta GROQ_API_KEY (es gratis: console.groq.com)")
     selfcheck.run()
     config.WORK_DIR.mkdir(parents=True, exist_ok=True)
+    import llm
+    print(f"IA en orden de uso: {' → '.join(llm.configured())}", flush=True)
     print("Worker listo, esperando trabajos…", flush=True)
     last_clean = 0.0
     while True:

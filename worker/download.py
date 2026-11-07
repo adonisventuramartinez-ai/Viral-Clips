@@ -18,7 +18,9 @@ def download(url: str, workdir: Path, quality: str, range_from, range_to):
     import yt_dlp
     from yt_dlp.utils import download_range_func
 
-    height = 1080 if quality == "1080p" else 720
+    # "2160p" (Máxima 4K), "1440p", "1080p", "720p". Si el video no llega a esa calidad, baja solo a la mejor que haya.
+    digits = "".join(ch for ch in str(quality) if ch.isdigit())
+    height = int(digits) if digits else 1080
     base = {
         "quiet": True,
         "noplaylist": True,

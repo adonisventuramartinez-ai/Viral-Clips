@@ -47,27 +47,77 @@ def build_ass(words, start, end, group=3):
     return "".join(lines)
 
 
+def _probe(path: Path):
+    """(ancho, alto) del video."""
+    r = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height",
+         "-of", "csv=p=0:s=x", str(path)], capture_output=True, text=True)
+    try:
+        w, h = r.stdout.strip().split("x")[:2]
+        return int(w), int(h)
+    except ValueError:
+        raise RuntimeError("No pude leer el tamaño del video: " + (r.stderr or "")[-200:])
+
+
+def _bitrate(dur: float) -> int:
+    """Bitrate de video más alto posible sin pasar ~44 MB por clip (límite de 50 MB del plan gratis de Supabase)."""
+    total = 44_000_000 * 8 / max(dur, 1.0)
+    return int(min(12_000_000, max(3_000_000, total - 192_000)))
+
+
+def _crop_filter(source: Path, start: float, dur: float):
+    """Recorte 9:16 hecho en la resolución ORIGINAL (sin agrandar nada) y después un solo escalado nítido."""
+    sw, sh = _probe(source)
+    if sw / sh > 9 / 16:                     # video horizontal (lo normal): se recorta el ancho
+        cw, ch = int(sh * 9 / 16) // 2 * 2, sh
+        crop_frac = cw / sw
+        keys = None
+        if config.CLIP_FRAMING == "auto":
+            import framing
+            keys = framing.camera_keys(source, start, dur, sw, sh, crop_frac)
+            if keys:
+                moves = max(0, len(keys) - 1) // 2
+                print(f"  Encuadre: sigo a la persona ({moves} cambio(s) de cámara)", flush=True)
+        if keys:
+            import framing
+            xexpr = framing.x_expression(keys)
+        else:
+            xexpr = f"(iw-ow)*{config.CLIP_FOCUS_X:.3f}"
+        return f"crop=w={cw}:h={ch}:x='{xexpr}':y=0"
+    ch, cw = int(sw * 16 / 9) // 2 * 2, sw   # video ya vertical o cuadrado: se recorta el alto, centrado
+    return f"crop=w={cw}:h={min(ch, sh)}:x=0:y='(ih-oh)/2'"
+
+
 def render_clip(source: Path, words, start: float, end: float, out: Path, workdir: Path):
     ass = workdir / f"{out.stem}.ass"
     ass.write_text(build_ass(words, start, end), encoding="utf-8")
+    dur = end - start
 
-    if config.CLIP_LAYOUT == "crop":
-        vf = "scale=-2:1920,crop=1080:1920,subtitles={sub}"
-    else:
+    if config.CLIP_LAYOUT == "blur":
         vf = (
             "split=2[bg][fg];"
             "[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=30:5[b];"
-            "[fg]scale=1080:-2[f];"
+            "[fg]scale=1080:-2:flags=lanczos[f];"
             "[b][f]overlay=(W-w)/2:(H-h)/2,subtitles={sub}"
+        )
+    else:
+        sharpen = f"unsharp=5:5:{config.CLIP_SHARPEN:.2f}:5:5:0.0," if config.CLIP_SHARPEN > 0 else ""
+        vf = (
+            _crop_filter(source, start, dur)
+            + ",scale=1080:1920:flags=lanczos+accurate_rnd+full_chroma_int,"
+            + sharpen
+            + "setsar=1,subtitles={sub}"
         )
     vf = vf.format(sub=ass.name)
 
+    vb = _bitrate(dur)
     cmd = [
-        "ffmpeg", "-y", "-ss", f"{start:.2f}", "-t", f"{end - start:.2f}", "-i", str(source.resolve()),
+        "ffmpeg", "-y", "-ss", f"{start:.2f}", "-t", f"{dur:.2f}", "-i", str(source.resolve()),
         "-vf", vf,
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
-        "-maxrate", "6M", "-bufsize", "12M",  # mantiene cada clip bajo ~50 MB (límite del plan gratis de Supabase)
-        "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart",
+        "-c:v", "libx264", "-preset", config.CLIP_PRESET, "-crf", str(config.CLIP_CRF),
+        "-profile:v", "high", "-level", "4.2",
+        "-maxrate", str(vb), "-bufsize", str(vb * 2),   # calidad máxima que cabe bajo ~44 MB por clip
+        "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart",
         str(out.resolve()),
     ]
     # cwd=workdir para que el filtro subtitles encuentre el .ass sin escapar rutas

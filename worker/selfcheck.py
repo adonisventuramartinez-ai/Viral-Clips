@@ -30,18 +30,33 @@ def run():
         except Exception:  # noqa: BLE001
             fatal.append("Falta la migración 0003_live.sql: pégala en Supabase > SQL Editor y ejecútala.")
 
-    if config.GROQ_API_KEY:
-        if not config.GROQ_API_KEY.startswith("gsk_"):
-            warn.append("Tu GROQ_API_KEY no empieza con 'gsk_': probablemente no es una llave de Groq.")
-        try:
-            import requests
+    if config.GROQ_API_KEY and not config.GROQ_API_KEY.startswith("gsk_"):
+        warn.append("Tu GROQ_API_KEY no empieza con 'gsk_': probablemente no es una llave de Groq.")
 
-            r = requests.get("https://api.groq.com/openai/v1/models",
-                             headers={"Authorization": f"Bearer {config.GROQ_API_KEY}"}, timeout=15)
-            if r.status_code in (401, 403):
-                fatal.append("Groq rechazó tu GROQ_API_KEY (inválida). Crea una nueva en console.groq.com.")
+    if config.CLIP_LAYOUT == "crop" and config.CLIP_FRAMING == "auto":
+        try:
+            import framing
+            framing._load()
         except Exception as e:  # noqa: BLE001
-            warn.append(f"No pude comprobar Groq (¿sin internet?): {str(e)[:100]}")
+            warn.append(f"El encuadre automatico no esta disponible ({type(e).__name__}); los clips saldran centrados. "
+                        "Reconstruye el worker (docker build) para instalar scikit-image.")
+
+    import llm
+
+    names = llm.configured()
+    if not names:
+        fatal.append("No hay ninguna llave de IA en worker/.env. Pon al menos una: GROQ_API_KEY (console.groq.com), "
+                     "CEREBRAS_API_KEY, GEMINI_API_KEY, MISTRAL_API_KEY, OPENROUTER_API_KEY o GITHUB_MODELS_TOKEN.")
+    else:
+        print("Probando las llaves de IA (una petición mínima a cada una)…", flush=True)
+        results = llm.check_all()
+        for name, state, detail in results:
+            mark = {"ok": "✓", "cupo": "⏳", "mala": "✗"}[state]
+            print(f"  {mark} {name}: {detail}", flush=True)
+        if not any(st in ("ok", "cupo") for _, st, _ in results):
+            fatal.append("Ninguna llave de IA funciona (mira la lista de arriba). Corrige al menos una en worker/.env.")
+        elif sum(1 for _, st, _ in results if st == "ok") == 1:
+            warn.append("Solo 1 proveedor de IA funciona: si se queda sin cupo no habrá a quién cambiar. Agrega otra llave (ver .env.example).")
 
     for w in warn:
         print("⚠ ", w, flush=True)
@@ -50,4 +65,4 @@ def run():
         for f in fatal:
             print("  -", f, flush=True)
         raise SystemExit(1)
-    print("✓ Revisión inicial correcta (Supabase, bucket, ffmpeg, llaves).", flush=True)
+    print("✓ Revisión inicial correcta (Supabase, bucket, ffmpeg, IA).", flush=True)

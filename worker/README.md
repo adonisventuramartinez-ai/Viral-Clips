@@ -6,7 +6,19 @@ Toma los trabajos de la tabla `jobs` en Supabase y hace: descargar → transcrib
 Ejecuta `supabase/migrations/0002_worker.sql` en Supabase (SQL Editor).
 
 ## 2. Variables
-Copia `.env.example` a `.env` y rellena `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` y `GROQ_API_KEY` (gratis en console.groq.com; sirve para transcribir y para elegir los clips). `ANTHROPIC_API_KEY` es opcional y de pago.
+Copia `.env.example` a `.env` y rellena `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` y `GROQ_API_KEY` (gratis en console.groq.com; sirve para transcribir y para elegir los clips). Para que no se corte cuando se acabe el cupo, agrega más llaves gratis (Cerebras, Gemini, Mistral, OpenRouter, GitHub Models): ver `.env.example`.
+
+## 2b. Cambio automático de IA
+`llm.py` prueba los proveedores en orden. Si uno se queda sin cupo (429), tiene la llave mala o se cae, lo aparta y sigue con el siguiente; el trabajo no falla.
+Al arrancar prueba cada llave y te dice cuál sirve. Si TODOS se quedan sin cupo espera hasta `LLM_MAX_WAIT` segundos y, si no vuelve ninguno, da un error claro.
+La transcripción usa Whisper de Groq; si Groq se queda sin cupo, sigue con Whisper local (más lento, pero no se detiene).
+Prueba sin gastar cupo: `python test_llm.py`.
+
+## 2c. Calidad y encuadre de los clips
+- Los clips salen a pantalla completa 1080x1920. El recorte se hace en la resolución ORIGINAL y luego se escala una sola vez (Lanczos + nitidez suave), por eso conviene bajar el video en **Máxima (4K)** en Crear clips.
+- `CLIP_FRAMING=auto` detecta las caras y sigue a quien habla (con 2 personas lejos, paneo suave al que mueve la boca). Si no encuentra caras usa el centro (`CLIP_FOCUS_X`).
+- El bitrate se calcula por clip para que nunca pase de ~44 MB (límite de 50 MB de Supabase gratis).
+- Pruebas: `python test_framing.py`.
 
 ## 3. Correrlo
 **En tu PC con Docker (recomendado para empezar):**
