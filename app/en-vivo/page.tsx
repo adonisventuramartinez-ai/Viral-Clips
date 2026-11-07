@@ -7,6 +7,7 @@ export default function EnVivo() {
     <>
       <h1>En vivo</h1>
       <p className="sub">Graba un directo y va sacando clips mientras ocurre. Puedes dejar esta pantalla abierta.</p>
+      <div className="banner">Vista previa con datos de ejemplo. El modo En vivo funcional llega en la Parte 4.</div>
 
       <div className="card" style={{ marginBottom: 16, display: "flex", gap: 10, flexWrap: "wrap" }}>
         <input style={{ flex: 1, minWidth: 240 }} placeholder="Link del directo de YouTube" />

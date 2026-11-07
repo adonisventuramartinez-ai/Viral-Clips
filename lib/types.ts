@@ -5,9 +5,21 @@ export type Clip = {
   end: string;
   score: number; // 0-100 probabilidad viral
   sizeMb: number;
-  captions: string;
-  thumb: string; // css gradient de demo; luego URL de Supabase Storage
+  captions: string; // solo demo: texto superpuesto
+  thumb: string; // solo demo: gradiente
+  videoUrl?: string; // clips reales: URL firmada de Supabase Storage
+  downloadUrl?: string;
+  reason?: string;
   narrated?: boolean;
+};
+
+export type SourceRow = {
+  id: string;
+  title: string | null;
+  url: string | null;
+  status: string;
+  error: string | null;
+  created_at: string;
 };
 
 export type Rejected = { title: string; score: number; reason: string };

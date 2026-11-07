@@ -13,6 +13,7 @@ const tabs = [
 
 export default function Nav() {
   const path = usePathname();
+  if (path === "/login") return null;
   return (
     <header className="top">
       <div className="logo">Clip<b>Forge</b></div>

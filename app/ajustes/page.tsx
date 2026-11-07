@@ -1,18 +1,25 @@
 export default function Ajustes() {
+  const rows: [string, string, string][] = [
+    ["Quién elige los clips", "LLM_PROVIDER", "groq (gratis) o anthropic"],
+    ["Modelo de Groq", "GROQ_MODEL", "llama-3.3-70b-versatile"],
+    ["Idioma del video", "LANGUAGE", "es"],
+    ["Formato vertical", "CLIP_LAYOUT", "blur (fondo difuminado) o crop (recorte)"],
+    ["Transcripción local", "WHISPER_MODEL", "small (solo si no usas Groq)"],
+  ];
   return (
     <>
       <h1>Ajustes de IA</h1>
-      <p className="sub">Controla cómo la IA elige y presenta los clips.</p>
-      <div className="card neon" style={{ maxWidth: 640 }}>
-        <label>Estilo de clips</label>
-        <select defaultValue="viral"><option value="viral">Viral (polémico, gracioso, impactante)</option><option value="edu">Educativo</option><option value="storytelling">Historias</option></select>
-        <label>Idioma</label>
-        <select defaultValue="es"><option value="es">Español</option><option value="en">English</option></select>
-        <label>Cada cuánto revisa en vivo</label>
-        <select defaultValue="2"><option value="1">1 min</option><option value="2">2 min</option><option value="5">5 min</option></select>
-        <label>Llave de Claude (opcional, si usas la tuya)</label>
-        <input type="password" placeholder="sk-ant-..." />
-        <div style={{ marginTop: 18 }}><button className="btn">Guardar</button></div>
+      <p className="sub">Por ahora estos ajustes se cambian en el archivo <code>worker/.env</code> y se aplican al reiniciar el worker.</p>
+      <div className="card neon" style={{ maxWidth: 720 }}>
+        {rows.map(([label, key, hint]) => (
+          <div key={key} style={{ padding: "10px 0", borderBottom: "1px solid var(--line)" }}>
+            <b>{label}</b><br />
+            <code>{key}</code> <span style={{ color: "var(--muted)", fontSize: 13 }}>· {hint}</span>
+          </div>
+        ))}
+        <p className="sub" style={{ marginTop: 14, marginBottom: 0, fontSize: 13 }}>
+          La cantidad de clips, la duración y la calidad se eligen en “Crear clips”.
+        </p>
       </div>
     </>
   );

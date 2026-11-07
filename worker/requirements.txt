@@ -1,0 +1,6 @@
+supabase>=2.9
+anthropic>=0.40
+yt-dlp
+faster-whisper>=1.0
+requests
+python-dotenv

@@ -1,0 +1,22 @@
+[33m1615d7f[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m ClipForge
+[33ma295a9c[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Create Ayuda component with FAQ section
+[33mc8b46a8[m Add Almacenamiento component for storage display
+[33m30d6bc4[m Create Ajustes component for AI settings
+[33m17df054[m Create Biblioteca page to display sorted clips
+[33mac5409d[m Create EnVivo component for live recording interface
+[33m02c0351[m Add Crear component for video clip creation
+[33m817398d[m Add POST endpoint for job creation
+[33mfd4e77c[m Redirect Home component to '/crear'
+[33mefc7df1[m Add RootLayout component with metadata and Nav
+[33ma7c4cf3[m Add global CSS styles for application
+[33m4a25962[m Add Ring component for displaying time and label
+[33m5281415[m Implement ClipCard component for displaying clips
+[33m03e834e[m Add navigation component with tab links
+[33m473e563[m Implement Supabase client setup in supabase.ts
+[33m9fd4d13[m Add demoClips, demoRejected, and demoSteps data
+[33md2756ee[m Add types for Clip, Rejected, and LiveStep
+[33mfb72dff[m Add .gitignore file for Node.js project
+[33mbbe9f26[m Add example environment variables for Supabase
+[33mbebf166[m Initialize next.config.mjs with default config
+[33m0d44348[m Add TypeScript configuration file tsconfig.json
+[33m9ec09bd[m Initialize package.json with project dependencies

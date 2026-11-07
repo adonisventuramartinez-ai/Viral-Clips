@@ -24,7 +24,11 @@ export default function Crear() {
       }),
     });
     const data = await res.json();
-    setMsg(res.ok ? { ok: true, text: data.message ?? "Listo, en cola. Mira el progreso en la Biblioteca." } : { ok: false, text: data.error });
+    if (res.ok && !data.demo) {
+      window.location.href = "/biblioteca"; // ahí se ve el progreso y los clips
+      return;
+    }
+    setMsg(res.ok ? { ok: true, text: data.message } : { ok: false, text: data.error });
     setBusy(false);
   }
 
