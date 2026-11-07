@@ -1,4 +1,6 @@
+node_modules
+.next
 .env
-work/
-__pycache__/
-cookies.txt
+.env.local
+next-env.d.ts
+*.tsbuildinfo
