@@ -17,7 +17,7 @@ def requeue_stale(hours=3):
     sb.table("jobs").update({"status": "queued"}).eq("status", "running").lt("locked_at", limit).execute()
 
 
-def claim_job(types=("download",)):
+def claim_job(types=("download", "record")):
     res = (sb.table("jobs").select("*").eq("status", "queued").in_("type", list(types))
            .order("created_at").limit(1).execute())
     if not res.data:
@@ -66,3 +66,31 @@ def save_clip(source, user_id, m, storage_path, size_bytes, words_in_clip):
         "reason": m["reason"], "captions": words_in_clip,
         "storage_path": storage_path, "size_bytes": size_bytes,
     }).execute()
+
+
+_hb_warned = False
+
+
+def heartbeat(info=None):
+    """Avisa a la web que el worker está vivo (tabla worker_status). Nunca tumba al worker."""
+    global _hb_warned
+    try:
+        sb.table("worker_status").upsert({"id": 1, "seen_at": now(), "info": info or {}}).execute()
+    except Exception as e:  # noqa: BLE001
+        if not _hb_warned:
+            print(f"Aviso: no pude escribir worker_status ({e}). ¿Corriste 0003_live.sql?", flush=True)
+            _hb_warned = True
+
+
+def touch_job(job_id):
+    """Renueva locked_at para que un directo largo no se considere 'muerto'."""
+    sb.table("jobs").update({"locked_at": now()}).eq("id", job_id).execute()
+
+
+def stop_requested(source_id) -> bool:
+    res = sb.table("sources").select("stop_requested").eq("id", source_id).maybe_single().execute()
+    return bool(res and res.data and res.data.get("stop_requested"))
+
+
+def set_progress(source_id, **p):
+    sb.table("sources").update({"progress": p}).eq("id", source_id).execute()

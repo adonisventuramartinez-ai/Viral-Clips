@@ -10,6 +10,7 @@ export default function Biblioteca() {
   const [demo, setDemo] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [err, setErr] = useState("");
+  const [worker, setWorker] = useState<boolean | null>(null);
   const [sort, setSort] = useState<"viral" | "new">("viral");
 
   useEffect(() => {
@@ -34,6 +35,7 @@ export default function Biblioteca() {
           );
           setSources(j.sources);
           setDemo(!!j.demo);
+          setWorker(j.worker ?? null);
           setErr("");
           active = (j.sources as SourceRow[]).some((s) => ACTIVE.includes(s.status));
         }
@@ -64,6 +66,9 @@ export default function Biblioteca() {
 
       {demo && <div className="banner">Supabase no está conectado, no hay clips reales que mostrar.</div>}
       {err && <div className="banner">{err}</div>}
+      {worker === false && sources.some((s) => s.status === "queued") && (
+        <div className="banner">Hay trabajos en cola pero el worker está apagado. Enciéndelo en tu PC (docker run …) y empezará solo.</div>
+      )}
 
       {working.map((s) => (
         <div key={s.id} className="step active" style={{ marginBottom: 10 }}>

@@ -1,4 +1,4 @@
-"""Worker de ClipForge: toma jobs 'download' de Supabase y produce clips verticales."""
+"""Worker de ClipForge: toma jobs 'download' (videos) y 'record' (directos) y produce clips verticales."""
 import shutil
 import time
 import traceback
@@ -8,6 +8,8 @@ import config
 import db
 from analyze import find_moments
 from download import download
+import live
+import selfcheck
 from render import render_clip
 from transcribe import transcribe
 
@@ -70,17 +72,22 @@ def main():
         raise SystemExit("Falta ANTHROPIC_API_KEY")
     if config.LLM_PROVIDER == "groq" and not config.GROQ_API_KEY:
         raise SystemExit("Falta GROQ_API_KEY (es gratis: console.groq.com)")
+    selfcheck.run()
     config.WORK_DIR.mkdir(parents=True, exist_ok=True)
     print("Worker listo, esperando trabajos…", flush=True)
     last_clean = 0.0
     while True:
+        db.heartbeat()
         if time.time() - last_clean > 600:
             db.requeue_stale()
             last_clean = time.time()
         job = db.claim_job()
         if job:
             print(f"Trabajo {job['id']} → fuente {job['source_id']}", flush=True)
-            process(job)
+            if job["type"] == "record":
+                live.process_live(job)
+            else:
+                process(job)
         else:
             time.sleep(config.POLL_SECONDS)
 

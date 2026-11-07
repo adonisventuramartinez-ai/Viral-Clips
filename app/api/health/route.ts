@@ -17,10 +17,13 @@ export async function GET() {
   }
 
   const tablas: Record<string, string> = {};
-  for (const t of ["sources", "clips", "jobs", "rejected_moments", "transcript_segments"]) {
+  for (const t of ["sources", "clips", "jobs", "rejected_moments", "transcript_segments", "worker_status"]) {
     const { error } = await db.from(t).select("*", { head: true, count: "exact" }).limit(1);
     tablas[t] = error ? `ERROR: ${error.message}` : "ok";
   }
+
+  const { error: colErr } = await db.from("sources").select("stop_requested,progress", { head: true, count: "exact" }).limit(1);
+  tablas["sources (columnas 0003)"] = colErr ? `ERROR: ${colErr.message} → corre 0003_live.sql` : "ok";
 
   const { data: buckets, error: bErr } = await db.storage.listBuckets();
   const bucketClips = bErr ? `ERROR: ${bErr.message}` : buckets?.some((b) => b.name === "clips") ? "ok" : "NO EXISTE el bucket 'clips'";
@@ -32,5 +35,7 @@ export async function GET() {
   const { data: errores } = await db.from("sources").select("url,error,created_at").eq("status", "error").order("created_at", { ascending: false }).limit(3);
 
   const ok = Object.values(tablas).every((v) => v === "ok") && bucketClips === "ok";
-  return NextResponse.json({ ok, env, tablas, bucketClips, jobsPorEstado, ultimosErrores: errores ?? [] });
+  const { data: ws } = await db.from("worker_status").select("seen_at").eq("id", 1).maybeSingle();
+  const workerVisto = ws?.seen_at ?? "nunca (worker apagado o sin migración 0003)";
+  return NextResponse.json({ ok, workerVisto, env, tablas, bucketClips, jobsPorEstado, ultimosErrores: errores ?? [] });
 }

@@ -4,6 +4,8 @@ export default function Ajustes() {
     ["Modelo de Groq", "GROQ_MODEL", "llama-3.3-70b-versatile"],
     ["Idioma del video", "LANGUAGE", "es"],
     ["Formato vertical", "CLIP_LAYOUT", "blur (fondo difuminado) o crop (recorte)"],
+    ["Segundos por trozo (En vivo)", "SEGMENT_SECONDS", "120"],
+    ["Puntaje mínimo En vivo", "LIVE_MIN_SCORE", "55"],
     ["Transcripción local", "WHISPER_MODEL", "small (solo si no usas Groq)"],
   ];
   return (

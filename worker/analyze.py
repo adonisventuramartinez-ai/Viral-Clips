@@ -145,3 +145,29 @@ def find_moments(segments, n_clips, secs):
             if c:
                 cands.append(c)
     return select_moments(cands, n_clips)
+
+
+def review_window(segments, secs, existing, duration, min_score=None, max_new=2):
+    """Revisión en vivo: mira la ventana reciente y devuelve (nuevos_clips, descartados).
+
+    existing = clips ya creados (para no repetir el mismo momento).
+    duration = hasta dónde hay transcripción (ningún clip puede pasarse de ahí).
+    """
+    min_score = config.LIVE_MIN_SCORE if min_score is None else min_score
+    cands = []
+    for ch in _chunks(segments):
+        for m in _ask_llm(ch, 4, secs):
+            c = _clean(m, secs, duration)
+            if c:
+                cands.append(c)
+    chosen, rejected = [], []
+    for m in sorted(cands, key=lambda x: x["score"], reverse=True):
+        if any(_overlap(m, c) > 0.3 for c in existing + chosen):
+            rejected.append({"title": m["title"], "score": m["score"], "reason": "Ese momento o tema ya tiene clip"})
+        elif m["score"] < min_score:
+            rejected.append({"title": m["title"], "score": m["score"], "reason": f"Puntaje bajo (mínimo {min_score})"})
+        elif len(chosen) >= max_new:
+            rejected.append({"title": m["title"], "score": m["score"], "reason": f"Ya se eligieron {max_new} mejores en esta revisión"})
+        else:
+            chosen.append(m)
+    return chosen, rejected
