@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { serverClient } from "@/lib/supabase";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
+
 const ACTIVE = ["queued", "downloading", "recording", "transcribing", "analyzing", "clipping"];
 
 // Crea una fuente + un trabajo en cola. El worker lo toma desde la tabla `jobs`.

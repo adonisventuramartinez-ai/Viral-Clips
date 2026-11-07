@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { serverClient } from "@/lib/supabase";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
+
 export async function POST(req: Request) {
   const { source_id } = await req.json().catch(() => ({ source_id: "" }));
   if (!source_id) return NextResponse.json({ error: "Falta source_id" }, { status: 400 });

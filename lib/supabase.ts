@@ -15,5 +15,10 @@ export function browserClient(): SupabaseClient | null {
 export function serverClient(): SupabaseClient | null {
   // SUPABASE_URL se lee al ejecutar (no se graba en el build como NEXT_PUBLIC_*), así que siempre es la actual.
   const serverUrl = process.env.SUPABASE_URL || url;
-  return serverUrl && service ? createClient(serverUrl, service, { auth: { persistSession: false } }) : null;
+  if (!serverUrl || !service) return null;
+  return createClient(serverUrl, service, {
+    auth: { persistSession: false },
+    // Next.js 14 guarda en caché los fetch del servidor y devolvía datos viejos (clips, cola, estado del worker).
+    global: { fetch: (input, init) => fetch(input, { ...init, cache: "no-store" }) },
+  });
 }

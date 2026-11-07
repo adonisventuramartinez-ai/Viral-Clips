@@ -3,6 +3,8 @@ import { serverClient } from "@/lib/supabase";
 import { loadClips, workerOnline } from "@/lib/clips";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
 
 // Estado del último directo: fuente, progreso, clips y momentos descartados.
 export async function GET() {

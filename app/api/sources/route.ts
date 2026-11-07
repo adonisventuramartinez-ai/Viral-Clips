@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { serverClient } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
 
 // Estados que se pueden limpiar (todo menos "done").
 const CLEARABLE = ["queued", "downloading", "recording", "transcribing", "analyzing", "clipping", "error", "stopped"];

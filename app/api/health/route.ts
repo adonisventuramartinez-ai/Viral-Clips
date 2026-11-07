@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { serverClient } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
 
 // Diagnóstico: abre /api/health (ya logueado) y te dice qué falta. No muestra ninguna llave.
 export async function GET() {
