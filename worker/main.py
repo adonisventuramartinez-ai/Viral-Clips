@@ -25,6 +25,9 @@ def process(job):
     n_clips = int(payload.get("clips", 15))
     secs = int(payload.get("clip_seconds", 45))
     quality = payload.get("quality", "1080p")
+    
+    # --- NUEVO: Leer el layout que el usuario eligió en la web ---
+    clip_layout = src.get("layout") or config.CLIP_LAYOUT
 
     def alive():
         if not db.source_exists(sid):
@@ -56,6 +59,10 @@ def process(job):
             alive()
             cid = str(uuid.uuid4())
             out = work / f"{cid}.mp4"
+            
+            # --- NUEVO: Forzar el layout elegido para este video ---
+            config.CLIP_LAYOUT = clip_layout
+            
             render_clip(video, words, m["start"], m["end"], out, work)
             path = f"{sid}/{cid}.mp4"
             db.upload_clip(path, out)
