@@ -10,7 +10,19 @@ const ACTIVE = ["queued", "downloading", "recording", "transcribing", "analyzing
 // Crea una fuente + un trabajo en cola. El worker lo toma desde la tabla `jobs`.
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
-  const { kind = "vod_url", url, range_from, range_to, clip_seconds = 45, clips = 15, quality = "1080p", review_minutes = 2 } = body;
+  
+  // --- NUEVO: Recibimos el layout ---
+  const { 
+    kind = "vod_url", 
+    url, 
+    range_from, 
+    range_to, 
+    clip_seconds = 45, 
+    clips = 15, 
+    quality = "1080p", 
+    review_minutes = 2,
+    layout = "crop" 
+  } = body;
 
   if (!url) return NextResponse.json({ error: kind === "live" ? "Falta el link del directo" : "Falta el link del video" }, { status: 400 });
 
@@ -24,9 +36,17 @@ export async function POST(req: Request) {
     }
   }
 
+  // --- NUEVO: Guardamos el layout en la tabla sources ---
   const { data: source, error } = await db
     .from("sources")
-    .insert({ kind, url, range_from: range_from || null, range_to: range_to || null, status: "queued" })
+    .insert({ 
+      kind, 
+      url, 
+      range_from: range_from || null, 
+      range_to: range_to || null, 
+      status: "queued",
+      layout: layout // <--- Aquí se guarda la elección
+    })
     .select("id")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -34,7 +54,7 @@ export async function POST(req: Request) {
   const { error: jobErr } = await db.from("jobs").insert({
     source_id: source.id,
     type: kind === "live" ? "record" : "download",
-    payload: { clip_seconds, clips, quality, review_minutes },
+    payload: { clip_seconds, clips, quality, review_minutes }, // El payload no necesita el layout si lo leemos de sources
   });
   if (jobErr) return NextResponse.json({ error: jobErr.message }, { status: 500 });
 
