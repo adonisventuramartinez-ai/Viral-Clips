@@ -59,7 +59,6 @@ def _probe(path: Path):
         w, h = r.stdout.strip().split("x")[:2]
         return int(w), int(h)
     except (ValueError, IndexError):
-        # Si no puede leer el tamaño (típico en modo en vivo), usa Full HD por defecto
         print(f"  Aviso: no pude leer el tamaño de {path.name}, usando 1920x1080 por defecto.", flush=True)
         return 1920, 1080
 
@@ -108,12 +107,13 @@ def render_clip(source: Path, words, start: float, end: float, out: Path, workdi
     elif config.CLIP_LAYOUT == "split":
         ass = workdir / f"{out.stem}.ass"
         ass.write_text(build_ass(words, start, end, is_split=True), encoding="utf-8")
-        # MODO SPLIT SCREEN (Pantalla dividida)
+        # MODO SPLIT SCREEN CORREGIDO (Une las mitades y luego pone subtítulos)
         vf = (
             "split=2[top][bottom];"
             "[top]crop=iw:ih/2:0:0,scale=1080:960:force_original_aspect_ratio=increase,crop=1080:960[t];"
             "[bottom]crop=iw:ih/2:0:ih/2,scale=1080:960:force_original_aspect_ratio=increase,crop=1080:960[b];"
-            "[t][b]vstack,subtitles={sub}"
+            "[t][b]vstack[v];"
+            "[v]subtitles={sub}[out]"
         )
     else:
         # MODO CROP
@@ -129,9 +129,15 @@ def render_clip(source: Path, words, start: float, end: float, out: Path, workdi
     vf = vf.format(sub=ass.name)
 
     vb = _bitrate(dur)
+    
+    if config.CLIP_LAYOUT == "split":
+        vf_cmd = ["-filter_complex", vf, "-map", "[out]", "-map", "0:a?"]
+    else:
+        vf_cmd = ["-vf", vf, "-map", "0:v", "-map", "0:a?"]
+
     cmd = [
         "ffmpeg", "-y", "-ss", f"{start:.2f}", "-t", f"{dur:.2f}", "-i", str(source.resolve()),
-        "-vf", vf,
+    ] + vf_cmd + [
         "-c:v", "libx264", "-preset", config.CLIP_PRESET, "-crf", str(config.CLIP_CRF),
         "-profile:v", "high", "-level", "4.2",
         "-maxrate", str(vb), "-bufsize", str(vb * 2),
