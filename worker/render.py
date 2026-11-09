@@ -17,6 +17,9 @@ Style: Cap,DejaVu Sans,86,&H00FFFFFF,&H00FFFFFF,&H00000000,&H80000000,-1,0,0,0,1
 Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
 """
 
+# En modo pantalla dividida los subtítulos se suben (MargenV 820) para que no tapen la cara de abajo
+ASS_HEADER_SPLIT = ASS_HEADER.replace("60,60,520,1", "60,60,820,1")
+
 YELLOW = "{\\c&H00E0FF&}"  # ASS usa BGR
 WHITE = "{\\c&HFFFFFF&}"
 
@@ -28,10 +31,10 @@ def _t(sec: float) -> str:
     return f"{int(h)}:{int(m):02d}:{s:05.2f}"
 
 
-def build_ass(words, start, end, group=3):
+def build_ass(words, start, end, group=3, is_split=False):
     """words: lista global [{w,start,end}]. Genera eventos relativos al inicio del clip."""
     ws = [w for w in words if w["start"] >= start - 0.05 and w["end"] <= end + 0.3]
-    lines = [ASS_HEADER]
+    lines = [ASS_HEADER_SPLIT if is_split else ASS_HEADER]
     for i in range(0, len(ws), group):
         g = ws[i : i + group]
         for j, w in enumerate(g):
@@ -89,18 +92,31 @@ def _crop_filter(source: Path, start: float, dur: float):
 
 
 def render_clip(source: Path, words, start: float, end: float, out: Path, workdir: Path):
-    ass = workdir / f"{out.stem}.ass"
-    ass.write_text(build_ass(words, start, end), encoding="utf-8")
     dur = end - start
 
     if config.CLIP_LAYOUT == "blur":
+        ass = workdir / f"{out.stem}.ass"
+        ass.write_text(build_ass(words, start, end), encoding="utf-8")
         vf = (
             "split=2[bg][fg];"
             "[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=30:5[b];"
             "[fg]scale=1080:-2:flags=lanczos[f];"
             "[b][f]overlay=(W-w)/2:(H-h)/2,subtitles={sub}"
         )
+    elif config.CLIP_LAYOUT == "split":
+        ass = workdir / f"{out.stem}.ass"
+        ass.write_text(build_ass(words, start, end, is_split=True), encoding="utf-8")
+        # MODO SPLIT SCREEN (Pantalla dividida)
+        vf = (
+            "split=2[top][bottom];"
+            "[top]crop=iw:ih/2:0:0,scale=1080:960:force_original_aspect_ratio=increase,crop=1080:960[t];"
+            "[bottom]crop=iw:ih/2:0:ih/2,scale=1080:960:force_original_aspect_ratio=increase,crop=1080:960[b];"
+            "[t][b]vstack,subtitles={sub}"
+        )
     else:
+        # MODO CROP
+        ass = workdir / f"{out.stem}.ass"
+        ass.write_text(build_ass(words, start, end), encoding="utf-8")
         sharpen = f"unsharp=5:5:{config.CLIP_SHARPEN:.2f}:5:5:0.0," if config.CLIP_SHARPEN > 0 else ""
         vf = (
             _crop_filter(source, start, dur)
@@ -116,11 +132,10 @@ def render_clip(source: Path, words, start: float, end: float, out: Path, workdi
         "-vf", vf,
         "-c:v", "libx264", "-preset", config.CLIP_PRESET, "-crf", str(config.CLIP_CRF),
         "-profile:v", "high", "-level", "4.2",
-        "-maxrate", str(vb), "-bufsize", str(vb * 2),   # calidad máxima que cabe bajo ~44 MB por clip
+        "-maxrate", str(vb), "-bufsize", str(vb * 2),
         "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart",
         str(out.resolve()),
     ]
-    # cwd=workdir para que el filtro subtitles encuentre el .ass sin escapar rutas
     r = subprocess.run(cmd, cwd=workdir, capture_output=True, text=True)
     if r.returncode != 0:
         raise RuntimeError("ffmpeg falló: " + r.stderr[-600:])
