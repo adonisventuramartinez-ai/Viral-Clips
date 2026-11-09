@@ -24,7 +24,8 @@ if (-not (Test-Path ".env")) {
 }
 
 Write-Host "Construyendo el worker (la primera vez tarda unos minutos)..." -ForegroundColor Cyan
-docker build -t clipforge-worker .
+$bust = Get-Date -Format "yyyyMMddHH"   # cambia cada hora: fuerza a Docker a bajar el yt-dlp mas nuevo
+docker build --build-arg YTDLP_BUST=$bust -t clipforge-worker .
 if ($LASTEXITCODE -ne 0) { Write-Host "Fallo la construccion de Docker." -ForegroundColor Red; exit 1 }
 
 Write-Host ""

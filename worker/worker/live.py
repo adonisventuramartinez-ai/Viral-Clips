@@ -23,33 +23,66 @@ def _duration(path) -> float:
         return 0.0
 
 
+def _has(f, kind):
+    """True si el formato de yt-dlp tiene video ('v') o audio ('a')."""
+    c = f.get("vcodec" if kind == "v" else "acodec")
+    return c not in (None, "none")
+
+
 def _resolve(url, quality):
-    """Pide a yt-dlp la URL directa del stream. Devuelve (url, título, headers)."""
+    """Pide a yt-dlp el stream del directo. Devuelve (entradas, mapas_ffmpeg, título).
+
+    Si YouTube separa video y audio, devuelve las DOS entradas para que ffmpeg las junte (antes se grababa solo
+    el video y los trozos quedaban mudos).
+    """
     import yt_dlp
 
     height = 1080 if quality == "1080p" else 720
-    opts = {"quiet": True, "noplaylist": True, "format": f"best[height<={height}]/best"}
+    opts = {"quiet": True, "noplaylist": True,
+            "format": f"bv*[height<={height}]+ba/b[height<={height}]/bv*+ba/b/b",
+            "remote_components": ["ejs:github"]}
     if config.COOKIES_FILE:
         opts["cookiefile"] = config.COOKIES_FILE
     with yt_dlp.YoutubeDL(opts) as y:
         info = y.extract_info(url, download=False)
     if not info.get("is_live"):
         raise RuntimeError("Ese link no es un directo en vivo (para videos normales usa 'Crear clips')")
-    stream = info.get("url") or ((info.get("formats") or [{}])[-1].get("url"))
-    if not stream:
+
+    fmts = [f for f in (info.get("requested_formats") or [info]) if f.get("url")]
+    if not fmts:
         raise RuntimeError("No pude obtener el stream del directo")
-    return stream, info.get("title") or url, info.get("http_headers") or {}
+    inputs = [(f["url"], f.get("http_headers") or info.get("http_headers") or {}) for f in fmts]
+
+    if len(fmts) >= 2:
+        vi = next((i for i, f in enumerate(fmts) if _has(f, "v")), 0)
+        ai = next((i for i, f in enumerate(fmts) if i != vi and _has(f, "a")), 1 - vi if vi < 2 else 1)
+        inputs = [inputs[vi], inputs[ai]]
+        maps = ["-map", "0:v:0", "-map", "1:a:0?"]
+        print("  stream: video y audio por separado (los junto al grabar)", flush=True)
+    else:
+        maps = ["-map", "0:v:0", "-map", "0:a:0?"]
+        if not _has(fmts[0], "a"):
+            print("  aviso: YouTube no confirma que este formato traiga audio; reviso al grabar.", flush=True)
+    return inputs, maps, info.get("title") or url
 
 
-def _start_ffmpeg(stream, headers, seg_dir, logf):
+def _start_ffmpeg(inputs, maps, seg_dir, logf):
     cmd = ["ffmpeg", "-y", "-loglevel", "warning"]
-    if stream.startswith("http"):
-        cmd += ["-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "10"]
-    if headers and stream.startswith("http"):
-        cmd += ["-headers", "".join(f"{k}: {v}\r\n" for k, v in headers.items())]
-    cmd += ["-i", stream, "-c", "copy", "-f", "segment", "-segment_time", str(config.SEGMENT_SECONDS),
-            "-segment_format", "mpegts", "-reset_timestamps", "1", str(seg_dir / "seg_%05d.ts")]
+    for stream, headers in inputs:
+        if stream.startswith("http"):
+            cmd += ["-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "10"]
+            if headers:
+                cmd += ["-headers", "".join(f"{k}: {v}\r\n" for k, v in headers.items())]
+        cmd += ["-i", stream]
+    cmd += maps + ["-c", "copy", "-f", "segment", "-segment_time", str(config.SEGMENT_SECONDS),
+                   "-segment_format", "mpegts", "-reset_timestamps", "1", str(seg_dir / "seg_%05d.ts")]
     return subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=logf)
+
+
+def _has_audio(path) -> bool:
+    r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "a", "-show_entries", "stream=codec_type",
+                        "-of", "csv=p=0", str(path)], capture_output=True, text=True)
+    return "audio" in r.stdout
 
 
 def _stop_ffmpeg(proc):
@@ -99,6 +132,11 @@ def process_live(job):
             return
         start = st["offset"]
         try:
+            if not _has_audio(f):
+                if not st.get("warned_mute"):
+                    print("  ✗ Este trozo NO trae audio: no hay nada que transcribir. Mira ffmpeg.log / avísame.", flush=True)
+                    st["warned_mute"] = True
+                raise RuntimeError("trozo sin audio")
             segments, words = transcribe(f, work)
         except Exception as e:  # noqa: BLE001  (un trozo malo no debe cortar el directo)
             print(f"  aviso: no pude transcribir {f.name}: {e}", flush=True)
@@ -171,8 +209,8 @@ def process_live(job):
 
     try:
         db.set_source(sid, error=None, progress={})
-        stream, title, headers = _resolve(src["url"], quality)
-        proc = _start_ffmpeg(stream, headers, seg_dir, logf)
+        inputs, maps, title = _resolve(src["url"], quality)
+        proc = _start_ffmpeg(inputs, maps, seg_dir, logf)
         db.set_source(sid, title=title, status="recording")
         print(f"  grabando: {title}", flush=True)
 

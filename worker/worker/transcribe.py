@@ -10,7 +10,6 @@ from pathlib import Path
 
 import config
 
-
 _groq_off_until = 0.0  # tras una falla de Groq, se usa Whisper local un rato sin volver a insistir
 
 
@@ -25,11 +24,17 @@ def _run(cmd):
         raise RuntimeError(f"ffmpeg falló: {' | '.join(tail)[:300]}")
 
 
+def _get_groq_keys():
+    """Devuelve la lista de llaves limpias (sin espacios ni comas extra)."""
+    return [k.strip() for k in config.GROQ_API_KEY.split(",") if k.strip()]
+
+
 def transcribe(video: Path, workdir: Path):
     global _groq_off_until
-    if config.GROQ_API_KEY and time.time() >= _groq_off_until:
+    keys = _get_groq_keys()
+    if keys and time.time() >= _groq_off_until:
         try:
-            return _groq(video, workdir)
+            return _groq(video, workdir, keys)
         except _UseLocal as e:
             _groq_off_until = time.time() + 600
             print(f"  Transcripción: Groq no disponible ({e}). Sigo con Whisper local (más lento) por 10 min.", flush=True)
@@ -56,10 +61,8 @@ def _local(video: Path, workdir: Path):
     return segments, words
 
 
-def _groq(video: Path, workdir: Path, chunk_sec: int = 600):
-    """Whisper en la nube de Groq. Parte el audio en trozos de 10 min (límite de tamaño por archivo)."""
-    import requests
-
+def _groq(video: Path, workdir: Path, keys: list, chunk_sec: int = 600):
+    """Whisper en la nube de Groq. Prueba cada llave hasta que una funcione."""
     probe = subprocess.run(
         ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(video)],
         capture_output=True, text=True, check=True,
@@ -72,7 +75,23 @@ def _groq(video: Path, workdir: Path, chunk_sec: int = 600):
         mp3 = workdir / f"chunk{i}.mp3"
         _run(["ffmpeg", "-y", "-ss", str(t), "-t", str(chunk_sec), "-i", str(video),
               "-vn", "-ac", "1", "-ar", "16000", "-b:a", "32k", str(mp3)])
-        r = _post_chunk(mp3)
+        
+        # Prueba cada llave de Groq hasta que una responda
+        r = None
+        last_error = "sin llaves válidas"
+        for key in keys:
+            try:
+                r = _post_chunk(mp3, key)
+                break  # Si funciona, salimos del bucle de llaves
+            except _UseLocal as e:
+                last_error = str(e)
+                if "401" in last_error or "403" in last_error:
+                    continue  # Esta llave está mala, probamos la siguiente
+                raise  # Si es error de cupo o red, no vale la pena probar otra llave
+                
+        if not r:
+            raise _UseLocal(last_error)
+
         j = r.json()
         for s in j.get("segments", []):
             segments.append({"start": s["start"] + t, "end": s["end"] + t, "text": s["text"].strip()})
@@ -84,8 +103,8 @@ def _groq(video: Path, workdir: Path, chunk_sec: int = 600):
     return segments, words
 
 
-def _post_chunk(mp3: Path, tries: int = 3):
-    """Sube un trozo a Groq. Espera si es un límite corto; si es de largo plazo, cae a Whisper local."""
+def _post_chunk(mp3: Path, key: str, tries: int = 3):
+    """Sube un trozo a Groq con una llave específica."""
     import requests
 
     for attempt in range(tries):
@@ -93,7 +112,7 @@ def _post_chunk(mp3: Path, tries: int = 3):
             with open(mp3, "rb") as f:
                 r = requests.post(
                     "https://api.groq.com/openai/v1/audio/transcriptions",
-                    headers={"Authorization": f"Bearer {config.GROQ_API_KEY}"},
+                    headers={"Authorization": f"Bearer {key}"},
                     files={"file": (mp3.name, f, "audio/mpeg")},
                     data=[
                         ("model", "whisper-large-v3-turbo"),
@@ -106,10 +125,14 @@ def _post_chunk(mp3: Path, tries: int = 3):
                 )
         except requests.RequestException as e:
             raise _UseLocal(f"sin conexión: {type(e).__name__}")
+            
         if r.ok:
             return r
+            
+        # Si la llave está mala (401/403), lanzamos el error para que pruebe la siguiente llave
         if r.status_code in (401, 403):
             raise _UseLocal(f"llave rechazada ({r.status_code})")
+            
         if r.status_code in (402, 429):
             try:
                 wait = float(r.headers.get("retry-after", ""))
@@ -120,7 +143,10 @@ def _post_chunk(mp3: Path, tries: int = 3):
                 time.sleep(wait + 1)
                 continue
             raise _UseLocal("sin cupo de transcripción")
+            
         if r.status_code >= 500:
             raise _UseLocal(f"Groq caído ({r.status_code})")
+            
         raise RuntimeError(f"Groq transcripción {r.status_code}: {r.text[:200]}")
+        
     raise _UseLocal("sin cupo de transcripción")

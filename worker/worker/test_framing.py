@@ -63,8 +63,8 @@ assert render._probe(src) == (3840, 2160)
 keys = [(0.0, 0.0), (2.0, 0.0), (2.5, 1.0)]
 expr = framing.x_expression(keys)
 config.CLIP_FRAMING = "center"
-orig = framing.frame_plan
-framing.frame_plan = lambda *a, **k: (1.0, keys, 0.0)
+orig = framing.camera_keys
+framing.camera_keys = lambda *a, **k: keys
 config.CLIP_FRAMING = "auto"
 out = tmp / "o.mp4"
 render.render_clip(src, [{"w": "hola", "start": 0.2, "end": 0.8}], 0.0, 5.0, out, tmp)
@@ -82,7 +82,7 @@ def frame(t):
 a, b = frame(0.5), frame(4.5)
 assert np.abs(a - b).mean() > 10, "la cámara no se movió"
 print("OK: render 4K -> 1080x1920 con paneo (", round(out.stat().st_size / 1e6, 1), "MB )")
-framing.frame_plan = orig
+framing.camera_keys = orig
 
 # tope de tamaño: clip de 81 s no pasa de ~44 MB
 assert render._bitrate(81) * 81 / 8 < 46e6 and render._bitrate(20) == 12_000_000
@@ -95,12 +95,12 @@ from skimage import data  # noqa: E402
 astro = Image.fromarray(data.astronaut())
 
 
-def make_video(path, placer, secs=4, fps=6, size=(1920, 1080)):
-    p = subprocess.Popen(["ffmpeg", "-loglevel", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{size[0]}x{size[1]}",
+def make_video(path, placer, secs=4, fps=6):
+    p = subprocess.Popen(["ffmpeg", "-loglevel", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", "1920x1080",
                           "-r", str(fps), "-i", "-", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "12", str(path)],
                          stdin=subprocess.PIPE)
     for i in range(secs * fps):
-        canvas = Image.new("RGB", size, (90, 90, 90))
+        canvas = Image.new("RGB", (1920, 1080), (90, 90, 90))
         placer(canvas, i / fps)
         p.stdin.write(canvas.tobytes())
     p.stdin.close()
@@ -114,8 +114,8 @@ def paste(canvas, x, size=900):
 # una persona a la izquierda (cara en ~x=0.26) y otra video con la persona a la derecha (~x=0.74)
 make_video(tmp / "izq.mp4", lambda c, t: paste(c, 100))
 make_video(tmp / "der.mp4", lambda c, t: paste(c, 920))
-ki = (framing.frame_plan(tmp / "izq.mp4", 0, 4, 1920, 1080) or (0, None))[1]
-kd = (framing.frame_plan(tmp / "der.mp4", 0, 4, 1920, 1080) or (0, None))[1]
+ki = framing.camera_keys(tmp / "izq.mp4", 0, 4, 1920, 1080, CROP)
+kd = framing.camera_keys(tmp / "der.mp4", 0, 4, 1920, 1080, CROP)
 print("claves izq:", ki, " der:", kd)
 assert ki and kd, "no detectó la cara"
 assert ki[0][1] < 0.3 and kd[-1][1] > 0.7, (ki, kd)
@@ -132,7 +132,7 @@ def dos(c, t):
 
 
 make_video(tmp / "dos.mp4", dos, secs=6)
-kk = (framing.frame_plan(tmp / "dos.mp4", 0, 6, 1920, 1080) or (0, None))[1]
+kk = framing.camera_keys(tmp / "dos.mp4", 0, 6, 1920, 1080, CROP)
 print("claves dos personas:", kk)
 assert kk and kk[-1][1] > 0.7, kk
 print("OK: con dos personas sigue a la que se mueve")
@@ -152,54 +152,3 @@ for nombre, lado in (("izq.mp4", "izq"), ("der.mp4", "der")):
     cx = (det[0]["c"] + det[0]["width"] / 2) / small.shape[1]
     assert 0.2 < cx < 0.8, (lado, cx)
 print("OK: la cara sale completa y centrada en el clip final")
-
-
-# ---------------- ZOOM a la cara (plano abierto en 4K -> primer plano) ----------------
-make_video(tmp / "abierto4k.mp4", lambda c, t: c.paste(astro.resize((900, 900)), (1300, 700)), secs=3, fps=4, size=(3840, 2160))
-zp = framing.frame_plan(tmp / "abierto4k.mp4", 0, 3, 3840, 2160)
-assert zp, "no detectó la cara en el plano abierto"
-zoom, keys4k, yfrac = zp
-print("zoom:", round(zoom, 2), "claves:", keys4k, "y:", round(yfrac, 2))
-assert zoom > 1.4, zoom                      # acercó
-assert zoom <= 2160 / (1920 / config.CLIP_MAX_UPSCALE) + 1e-6   # sin pasarse del límite de nitidez
-out3 = tmp / "zoom.mp4"
-render.render_clip(tmp / "abierto4k.mp4", [], 0.0, 2.0, out3, tmp)
-raw = subprocess.run(["ffmpeg", "-v", "error", "-ss", "1", "-i", str(out3), "-frames:v", "1", "-f", "rawvideo",
-                      "-pix_fmt", "gray", "-"], capture_output=True).stdout
-g = np.frombuffer(raw, np.uint8).reshape(1920, 1080)
-det = framing._load().detect_multi_scale(g[::2, ::2], scale_factor=1.2, step_ratio=1, min_size=(40, 40), max_size=(540, 540))
-assert det, "no se ve la cara en el clip con zoom"
-d = max(det, key=lambda r: r["width"])
-face_frac = d["width"] * 2 / 1080
-cy = (d["r"] + d["height"] / 2) * 2 / 1920
-print("cara ocupa", round(face_frac, 2), "del ancho; centro vertical", round(cy, 2))
-assert 0.2 < face_frac < 0.45 and cy < 0.5, (face_frac, cy)
-Image.fromarray(g).save("/tmp/zoom_frame.png")
-print("OK: plano abierto 4K -> primer plano con la cara arriba")
-
-
-# ---------------- ZOOM: plano abierto 4K -> primer plano ----------------
-def abierto(c, t):
-    c.paste(astro.resize((900, 900)), (1500, 400))   # persona chica (~4% del ancho) en un video 4K
-
-
-make_video(tmp / "abierto.mp4", abierto, secs=3, size=(3840, 2160))
-zp = framing.frame_plan(tmp / "abierto.mp4", 0, 3, 3840, 2160)
-print("plan 4K plano abierto:", zp)
-assert zp and zp[0] > 1.4, zp                      # acerca
-assert zp[0] <= 2160 / (1920 / config.CLIP_MAX_UPSCALE) + 1e-6, zp   # sin pasarse del límite de nitidez
-assert 0.0 < zp[2] < 1.0, zp                       # sube/baja el encuadre para dejar la cara arriba
-out3 = tmp / "zoom.mp4"
-render.render_clip(tmp / "abierto.mp4", [], 0.0, 2.0, out3, tmp)
-raw = subprocess.run(["ffmpeg", "-v", "error", "-ss", "1", "-i", str(out3), "-frames:v", "1", "-f", "rawvideo",
-                      "-pix_fmt", "gray", "-"], capture_output=True).stdout
-g = np.frombuffer(raw, np.uint8).reshape(1920, 1080)
-det = framing._load().detect_multi_scale(g[::2, ::2], scale_factor=1.2, step_ratio=1, min_size=(60, 60), max_size=(540, 900))
-assert det, "no se ve la cara en el clip con zoom"
-big = max(det, key=lambda d: d["width"])
-frac = big["width"] * 2 / 1080
-cy = (big["r"] + big["height"] / 2) * 2 / 1920
-print(f"cara ocupa {frac:.0%} del ancho, centro a {cy:.0%} de la altura")
-assert frac > 0.15 and cy < 0.55, (frac, cy)
-subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-ss", "1", "-i", str(out3), "-frames:v", "1", "/tmp/zoom.png"])
-print("OK: el plano abierto 4K sale como primer plano")

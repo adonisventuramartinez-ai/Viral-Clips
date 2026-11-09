@@ -6,8 +6,6 @@ mostrar en el cuadro 9:16:
   - 2+ cerca entre sí  -> las deja juntas.
   - 2+ lejos           -> va con quien habla (la cara con más movimiento de boca) y cambia con un paneo suave.
   - no encuentra caras -> centro (o CLIP_FOCUS_X).
-Además hace ZOOM: si la gente sale chica (plano abierto), acerca para que la cara ocupe ~30% del ancho del cuadro y la
-sube al tercio de arriba, como un primer plano de Shorts. El zoom se limita para no agrandar de más (nitidez).
 
 Devuelve claves de cámara [(segundo, izquierda)] donde izquierda va de 0 a 1 (0 = recorte pegado al borde izquierdo,
 1 = pegado al derecho). render.py las convierte en una expresión de ffmpeg.
@@ -16,7 +14,7 @@ import statistics
 import subprocess
 
 SAMPLE_FPS = 3.0
-DET_W = 800        # ancho al que se reduce el cuadro para buscar caras (más ancho = encuentra caras más chicas)
+DET_W = 640        # ancho al que se reduce el cuadro para buscar caras
 WIN = 3            # +-1 s de ventana para decidir quién habla
 MIN_DWELL = 4      # muestras seguidas (~1.3 s) antes de mover la cámara
 MIN_GAP = 2.0      # segundos mínimos entre dos paneos
@@ -62,12 +60,12 @@ def _read_frames(source, start, dur, src_w, src_h):
 def _detect(gray):
     h, w = gray.shape
     raw = _load().detect_multi_scale(gray, scale_factor=1.2, step_ratio=1,
-                                     min_size=(int(w * 0.035),) * 2, max_size=(int(w * 0.4),) * 2)
+                                     min_size=(int(w * 0.045),) * 2, max_size=(int(w * 0.4),) * 2)
     faces = []
     for r in raw:
         if r["r"] + r["height"] / 2 > h * 0.8:   # caras muy abajo suelen ser falsos positivos
             continue
-        faces.append({"x": (r["c"] + r["width"] / 2) / w, "y": (r["r"] + r["height"] / 2) / h, "w": r["width"] / w,
+        faces.append({"x": (r["c"] + r["width"] / 2) / w, "w": r["width"] / w,
                       "box": (r["r"], r["c"], r["width"], r["height"])})
     # quita cajas repetidas (misma cara detectada dos veces)
     out = []
@@ -174,39 +172,11 @@ def plan(samples, crop_frac):
 
 # ---------------------------------------------------------------- API
 
-def _zoom_and_y(samples, src_w, src_h, face_frac, max_upscale):
-    """Zoom para que la cara ocupe `face_frac` del ancho del cuadro, y altura de la cara (fracción 0-1)."""
-    ws = [f["w"] for s in samples for f in s["faces"]]
-    ys = [f["y"] for s in samples for f in s["faces"]]
-    if not ws:
-        return 1.0, 0.5
-    face_w_px = statistics.median(ws) * src_w
-    crop_w_px = face_w_px / face_frac
-    crop_h_px = crop_w_px * 16 / 9
-    z = src_h / crop_h_px
-    z_max = max(1.0, src_h / (1920 / max_upscale))   # no agrandar más de max_upscale veces el original
-    return min(max(z, 1.0), z_max), statistics.median(ys)
-
-
-def frame_plan(source, start, dur, src_w, src_h, face_frac=0.30, max_upscale=1.6):
-    """(zoom, claves_x, y) para el clip, o None (usar centro sin zoom). Nunca lanza error.
-
-    claves_x = [(segundo, 0-1)] posición horizontal; y = 0-1 posición vertical (fracción del espacio sobrante).
-    """
+def camera_keys(source, start, dur, src_w, src_h, crop_frac):
+    """Claves de cámara para el clip, o None (usar centro). Nunca lanza error: si algo falla, centro."""
     try:
         samples = sample_faces(source, start, dur, src_w, src_h)
-        zoom, fy = _zoom_and_y(samples, src_w, src_h, face_frac, max_upscale)
-        crop_frac = min(1.0, (src_h / zoom) * 9 / 16 / src_w)
-        keys = plan(samples, crop_frac)
-        if keys is None:
-            return None
-        ch_frac = 1.0 / zoom
-        if ch_frac >= 0.999:
-            y = 0.0
-        else:
-            top = min(max(fy - 0.36 * ch_frac, 0.0), 1.0 - ch_frac)   # la cara queda en el tercio de arriba
-            y = top / (1.0 - ch_frac)
-        return zoom, keys, y
+        return plan(samples, crop_frac)
     except ImportError:
         print("  Encuadre: falta scikit-image, uso el centro (pip install scikit-image).", flush=True)
     except Exception as e:  # noqa: BLE001

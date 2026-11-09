@@ -1,25 +1,17 @@
-"""IA con rotación automática.
-
-Prueba los proveedores en orden. Si uno se queda sin cupo (429/402), tiene la llave mala,
-se cae o contesta basura, lo aparta un rato y sigue con el siguiente, sin que el trabajo falle.
-
-Solo se usan los proveedores que tengan llave en worker/.env. Orden por defecto:
-  groq -> cerebras -> gemini -> mistral -> openrouter -> github -> groq8b -> anthropic
-Se cambia con LLM_ORDER (separado por comas). Si pones LLM_PROVIDER=xxx, ese va primero.
-"""
+"""IA con rotación automática (soporta múltiples llaves de Groq separadas por comas)."""
 import os
 import re
 import time
 
 import config  # noqa: F401  (carga worker/.env)
 
-MAX_WAIT = int(os.environ.get("LLM_MAX_WAIT", "180") or 180)  # máx. segundos esperando si TODOS están sin cupo
+MAX_WAIT = int(os.environ.get("LLM_MAX_WAIT", "180") or 180)
 DEFAULT_ORDER = "groq,cerebras,gemini,mistral,openrouter,github,groq8b,anthropic"
 
 _DAILY = re.compile(r"per day|daily|per_day|perday|\btpd\b|\brpd\b|per-day", re.I)
 
-_cool = {}   # nombre -> momento (time.time) en que vuelve a estar disponible
-_dead = {}   # nombre -> motivo (llave inválida: no se vuelve a intentar en esta sesión)
+_cool = {}
+_dead = {}
 _last = None
 
 
@@ -38,10 +30,10 @@ def _env(name, default=""):
 
 
 def _providers():
-    """Lista de proveedores con llave, ya en orden."""
+    """Lista de proveedores. Las llaves de Groq se leen separadas por comas."""
+    groq_keys = [k.strip() for k in _env("GROQ_API_KEY").split(",") if k.strip()]
+    
     table = {
-        "groq": dict(kind="openai", url="https://api.groq.com/openai/v1", key=_env("GROQ_API_KEY"),
-                     model=_env("GROQ_MODEL", "llama-3.3-70b-versatile"), json=True, max_tokens=3000),
         "cerebras": dict(kind="openai", url="https://api.cerebras.ai/v1", key=_env("CEREBRAS_API_KEY"),
                          model=_env("CEREBRAS_MODEL", "gpt-oss-120b"), json=True, max_tokens=6000),
         "gemini": dict(kind="openai", url="https://generativelanguage.googleapis.com/v1beta/openai",
@@ -54,17 +46,37 @@ def _providers():
                            json=False, max_tokens=4000),
         "github": dict(kind="openai", url="https://models.github.ai/inference", key=_env("GITHUB_MODELS_TOKEN"),
                        model=_env("GITHUB_MODEL", "openai/gpt-4.1-mini"), json=False, max_tokens=3000),
-        # Mismo Groq, otro modelo: Groq cuenta el cupo por modelo.
-        "groq8b": dict(kind="openai", url="https://api.groq.com/openai/v1", key=_env("GROQ_API_KEY"),
-                       model=_env("GROQ_FALLBACK_MODEL", "llama-3.1-8b-instant"), json=True, max_tokens=3000),
         "anthropic": dict(kind="anthropic", url="", key=_env("ANTHROPIC_API_KEY"),
                           model=_env("CLAUDE_MODEL", "claude-sonnet-5-5"), json=False, max_tokens=4000),
     }
-    order = [n.strip().lower() for n in _env("LLM_ORDER", DEFAULT_ORDER).split(",") if n.strip()]
+
+    # Agregamos dinámicamente cada cuenta de Groq
+    for i, key in enumerate(groq_keys):
+        name = "groq" if i == 0 else f"groq_cuenta{i+1}"
+        table[name] = dict(
+            kind="openai", url="https://api.groq.com/openai/v1", key=key,
+            model=_env("GROQ_MODEL", "llama-3.3-70b-versatile"), json=True, max_tokens=3000
+        )
+        # Añadimos el modelo de 8B para cada cuenta
+        table[f"{name}_8b"] = dict(
+            kind="openai", url="https://api.groq.com/openai/v1", key=key,
+            model=_env("GROQ_FALLBACK_MODEL", "llama-3.1-8b-instant"), json=True, max_tokens=3000
+        )
+
+    # Orden por defecto: todas las Groq primero, luego el resto
+    default_order = []
+    for i in range(len(groq_keys)):
+        name = "groq" if i == 0 else f"groq_cuenta{i+1}"
+        default_order.extend([name, f"{name}_8b"])
+    default_order.extend(["cerebras", "gemini", "mistral", "openrouter", "github", "anthropic"])
+
+    order = [n.strip().lower() for n in _env("LLM_ORDER", ",".join(default_order)).split(",") if n.strip()]
     first = _env("LLM_PROVIDER").lower()
+    
     if first in order:
         order.remove(first)
         order.insert(0, first)
+
     out = []
     for n in order:
         if n in table and table[n]["key"]:
@@ -124,7 +136,7 @@ def _call_openai(p, prompt, max_tokens=None, ping=False):
     use_json = p["json"] and not ping
     r = post(use_json)
     if r.status_code == 400 and use_json and "response_format" in r.text.lower():
-        r = post(False)  # ese modelo no soporta modo JSON: se reintenta normal
+        r = post(False)
     if not r.ok:
         raise _from_http(r.status_code, r.text, r.headers)
     try:
@@ -143,7 +155,7 @@ def _call_anthropic(p, prompt, max_tokens=None, ping=False):
     try:
         msg = client.messages.create(model=p["model"], max_tokens=max_tokens or p["max_tokens"],
                                      messages=[{"role": "user", "content": prompt}])
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         status = getattr(e, "status_code", None)
         if status is None:
             raise _Fail("transient", f"sin conexión ({type(e).__name__})", 120)
@@ -187,14 +199,9 @@ def _note_used(p):
 
 
 def ask(prompt, check=None):
-    """Pregunta a la IA con rotación.
-
-    check(texto) -> valor usable, o None si la respuesta no sirve (entonces se prueba el siguiente).
-    Devuelve el valor de check, o el texto si no hay check.
-    """
     provs = _providers()
     if not provs:
-        raise AllBusy("No hay ninguna llave de IA en worker/.env (GROQ_API_KEY, CEREBRAS_API_KEY, GEMINI_API_KEY...).")
+        raise AllBusy("No hay ninguna llave de IA en worker/.env.")
     deadline = time.time() + MAX_WAIT
     while True:
         avail = [p for p in provs if _ready(p["name"])]
@@ -204,8 +211,7 @@ def ask(prompt, check=None):
                 raise AllBusy("Todas las llaves de IA fueron rechazadas: " + "; ".join(f"{k}: {v}" for k, v in _dead.items()))
             if time.time() + wait > deadline:
                 mins = max(1, round(wait / 60))
-                raise AllBusy(f"Todos los proveedores de IA están sin cupo. El primero vuelve en ~{mins} min: "
-                              "reenvía el video luego o agrega otra llave en worker/.env.")
+                raise AllBusy(f"Todos los proveedores de IA están sin cupo. El primero vuelve en ~{mins} min.")
             print(f"  IA: todos sin cupo, espero {int(wait) + 1} s…", flush=True)
             time.sleep(wait + 1)
             continue
@@ -222,7 +228,6 @@ def ask(prompt, check=None):
 
 
 def check_all():
-    """Prueba cada llave con una petición mínima. Devuelve [(nombre, estado, detalle)] con estado ok|cupo|mala."""
     out = []
     for p in _providers():
         try:

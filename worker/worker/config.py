@@ -33,17 +33,6 @@ try:
     CLIP_SHARPEN = min(1.5, max(0.0, float(os.environ.get("CLIP_SHARPEN") or 0.5)))
 except ValueError:
     CLIP_SHARPEN = 0.5
-# Zoom a la cara: qué parte del ancho del cuadro debe ocupar la cara (0.30 = primer plano tipo Shorts) y
-# cuánto se permite agrandar el original (1.6 = hasta 60% más; más = más zoom pero más suave)
-def _f(name, d):
-    try:
-        return float(os.environ.get(name) or d)
-    except ValueError:
-        return d
-
-
-CLIP_FACE_SIZE = min(0.6, max(0.1, _f("CLIP_FACE_SIZE", 0.30)))
-CLIP_MAX_UPSCALE = min(3.0, max(1.0, _f("CLIP_MAX_UPSCALE", 1.6)))
 # Encuadre horizontal del recorte: 0 = izquierda, 0.5 = centro, 1 = derecha (útil si la persona no está en el centro)
 try:
     CLIP_FOCUS_X = min(1.0, max(0.0, float(os.environ.get("CLIP_FOCUS_X") or 0.5)))
