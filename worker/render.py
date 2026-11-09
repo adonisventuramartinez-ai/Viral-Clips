@@ -51,15 +51,17 @@ def build_ass(words, start, end, group=3, is_split=False):
 
 
 def _probe(path: Path):
-    """(ancho, alto) del video."""
+    """(ancho, alto) del video. Si falla, asume 1920x1080 para que el clip no se cancele."""
     r = subprocess.run(
         ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height",
          "-of", "csv=p=0:s=x", str(path)], capture_output=True, text=True)
     try:
         w, h = r.stdout.strip().split("x")[:2]
         return int(w), int(h)
-    except ValueError:
-        raise RuntimeError("No pude leer el tamaño del video: " + (r.stderr or "")[-200:])
+    except (ValueError, IndexError):
+        # Si no puede leer el tamaño (típico en modo en vivo), usa Full HD por defecto
+        print(f"  Aviso: no pude leer el tamaño de {path.name}, usando 1920x1080 por defecto.", flush=True)
+        return 1920, 1080
 
 
 def _bitrate(dur: float) -> int:
