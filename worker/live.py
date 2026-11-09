@@ -27,17 +27,26 @@ def _resolve(url, quality):
     """Pide a yt-dlp la URL directa del stream. Devuelve (url, título, headers)."""
     import yt_dlp
 
-    height = 1080 if quality == "1080p" else 720
-    opts = {"quiet": True, "noplaylist": True, "format": f"best[height<={height}]/best"}
+    # --- ARREGLO YOUTUBE: Forzamos web_safari y un selector de formato flexible ---
+    opts = {
+        "quiet": True,
+        "noplaylist": True,
+        "format": "bv*+ba/b",
+        "extractor_args": {"youtube": {"player_client": ["web_safari", "default"]}}
+    }
     if config.COOKIES_FILE:
         opts["cookiefile"] = config.COOKIES_FILE
+        
     with yt_dlp.YoutubeDL(opts) as y:
         info = y.extract_info(url, download=False)
+        
     if not info.get("is_live"):
         raise RuntimeError("Ese link no es un directo en vivo (para videos normales usa 'Crear clips')")
+        
     stream = info.get("url") or ((info.get("formats") or [{}])[-1].get("url"))
     if not stream:
         raise RuntimeError("No pude obtener el stream del directo")
+        
     return stream, info.get("title") or url, info.get("http_headers") or {}
 
 
