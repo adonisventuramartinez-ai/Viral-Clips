@@ -76,6 +76,7 @@ export default function EnVivo() {
         clip_seconds: Number(f.get("secs")),
         quality: f.get("quality"),
         review_minutes: Number(f.get("review")),
+        layout: f.get("layout"), // <-- NUEVO: Enviamos el formato
       }),
     });
     const j = await res.json();
@@ -111,6 +112,7 @@ export default function EnVivo() {
         <form className="card" style={{ marginBottom: 16 }} onSubmit={start}>
           <label>Link del directo (YouTube, Twitch o Kick)</label>
           <input name="url" placeholder="https://www.youtube.com/watch?v=..." required />
+          
           <div className="row">
             <div><label>Duración de cada clip</label>
               <select name="secs" defaultValue="45"><option value="30">30 s</option><option value="45">45 s</option><option value="60">60 s</option></select></div>
@@ -119,6 +121,17 @@ export default function EnVivo() {
             <div><label>Calidad</label>
               <select name="quality" defaultValue="720p"><option>720p</option><option>1080p</option></select></div>
           </div>
+
+          {/* --- NUEVO: Selector de Formato --- */}
+          <div style={{ marginTop: 14 }}>
+            <label>Formato del video</label>
+            <select name="layout" defaultValue="crop">
+              <option value="crop">Zoom a la cara</option>
+              <option value="split">Pantalla dividida</option>
+              <option value="blur">Fondo borroso</option>
+            </select>
+          </div>
+
           <div style={{ marginTop: 16 }}><button className="btn" disabled={busy}>{busy ? "Conectando…" : "Empezar a grabar"}</button></div>
         </form>
       )}
