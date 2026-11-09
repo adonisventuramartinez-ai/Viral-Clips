@@ -30,11 +30,7 @@ def _has(f, kind):
 
 
 def _resolve(url, quality):
-    """Pide a yt-dlp el stream del directo. Devuelve (entradas, mapas_ffmpeg, título).
-
-    Si YouTube separa video y audio, devuelve las DOS entradas para que ffmpeg las junte (antes se grababa solo
-    el video y los trozos quedaban mudos).
-    """
+    """Pide a yt-dlp el stream del directo. Devuelve (entradas, mapas_ffmpeg, título)."""
     import yt_dlp
 
     height = 1080 if quality == "1080p" else 720
@@ -159,15 +155,27 @@ def process_live(job):
         base = cov[0]["start"]
         lst = work / f"{cid}.txt"
         lst.write_text("".join(f"file '{s['path'].resolve()}'\n" for s in cov))
-        win = work / f"{cid}.ts"
-        r = subprocess.run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(lst), "-c", "copy", str(win)],
+        
+        # --- ARREGLO: Unimos los .ts y lo convertimos a .mp4 estándar ---
+        win_ts = work / f"{cid}.ts"
+        r = subprocess.run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(lst), "-c", "copy", str(win_ts)],
                            capture_output=True, text=True)
         if r.returncode != 0:
             raise RuntimeError("ffmpeg concat falló: " + r.stderr[-400:])
+            
+        # Convertimos a mp4 (esto arregla los metadatos corruptos)
+        win = work / f"{cid}_clean.mp4"
+        r2 = subprocess.run(["ffmpeg", "-y", "-i", str(win_ts), "-c", "copy", str(win)], 
+                            capture_output=True, text=True)
+        if r2.returncode != 0:
+            raise RuntimeError("ffmpeg conversion a mp4 falló: " + r2.stderr[-400:])
+        # -----------------------------------------------------------------
+
         wend = cov[-1]["end"]
         end = min(m["end"], wend)
         rel_words = [{**w, "start": w["start"] - base, "end": w["end"] - base}
                      for w in all_words if w["end"] >= base and w["start"] <= wend]
+        
         out = work / f"{cid}.mp4"
         render_clip(win, rel_words, m["start"] - base, end - base, out, work)
         path = f"{sid}/{cid}.mp4"
@@ -176,8 +184,11 @@ def process_live(job):
         in_clip = [{"w": w["w"], "start": w["start"] - m["start"], "end": w["end"] - m["start"]}
                    for w in all_words if m["start"] <= w["start"] <= end]
         db.save_clip(sid, src.get("user_id"), m, path, out.stat().st_size, in_clip)
-        for p in (lst, win, out):
+        
+        # Borramos todos los temporales
+        for p in (lst, win_ts, win, out):
             p.unlink(missing_ok=True)
+            
         st["clips"] += 1
         chosen_all.append(m)
         print(f"  clip listo: {m['title']} ({m['score']}%)", flush=True)
