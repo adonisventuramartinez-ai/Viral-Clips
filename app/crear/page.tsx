@@ -1,9 +1,15 @@
 "use client";
 import { useState } from "react";
+import CropPreview from "@/components/CropPreview"; // <-- Importamos el componente
 
 export default function Crear() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  
+  // --- NUEVOS ESTADOS PARA LA VISTA PREVIA ---
+  const [videoUrl, setVideoUrl] = useState("");
+  const [crop, setCrop] = useState({ x: 10, y: 10, w: 80, h: 60 });
+  // -------------------------------------------
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -21,12 +27,13 @@ export default function Crear() {
         clip_seconds: Number(f.get("secs")),
         clips: Number(f.get("count")),
         quality: f.get("quality"),
-        layout: f.get("layout"), // <-- NUEVO: Enviamos el formato
+        layout: f.get("layout"),
+        custom_crop: crop, // <-- NUEVO: Enviamos el encuadre personalizado
       }),
     });
     const data = await res.json();
     if (res.ok && !data.demo) {
-      window.location.href = "/biblioteca"; // ahí se ve el progreso y los clips
+      window.location.href = "/biblioteca";
       return;
     }
     setMsg(res.ok ? { ok: true, text: data.message } : { ok: false, text: data.error });
@@ -37,9 +44,30 @@ export default function Crear() {
     <>
       <h1>Crear clips</h1>
       <p className="sub">Pega un link de YouTube, Kick o Twitch (o sube un video) y la IA saca los mejores momentos.</p>
+      
       <form className="card neon" onSubmit={submit}>
         <label>Link del video</label>
-        <input name="url" placeholder="https://www.youtube.com/watch?v=..." />
+        <input 
+          name="url" 
+          placeholder="https://www.youtube.com/watch?v=..." 
+          onChange={(e) => setVideoUrl(e.target.value)} // <-- Actualiza el video para la vista previa
+        />
+        
+        {/* --- NUEVA VISTA PREVIA --- */}
+        {videoUrl && videoUrl.startsWith("http") && (
+          <div style={{ marginTop: 16, marginBottom: 16 }}>
+            <label>Vista previa del encuadre</label>
+            <CropPreview 
+              videoUrl={videoUrl} 
+              onCropChange={(newCrop) => setCrop(newCrop)} 
+            />
+            <p className="sub" style={{ fontSize: 12, marginTop: 4 }}>
+              * Arrastra el recuadro para elegir qué parte del video quieres en tu clip.
+            </p>
+          </div>
+        )}
+        {/* --------------------------- */}
+
         <label>…o sube un archivo (mp4, mov, mkv)</label>
         <input type="file" accept="video/*" disabled />
         
@@ -56,7 +84,6 @@ export default function Crear() {
           <div><label>Calidad</label>
             <select name="quality" defaultValue="2160p"><option value="720p">720p</option><option value="1080p">1080p</option><option value="1440p">1440p</option><option value="2160p">Máxima (4K, más nítido)</option></select></div>
           
-          {/* --- NUEVO: Selector de Formato --- */}
           <div>
             <label>Formato del video</label>
             <select name="layout" defaultValue="crop">
