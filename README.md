@@ -8,7 +8,7 @@ Convierte podcasts y videos en clips verticales virales con subtítulos.
 
 ## Puesta en marcha
 
-1. **Supabase → SQL Editor:** ejecuta `supabase/migrations/0001_init.sql` y luego `0002_worker.sql`.
+1. **Supabase → SQL Editor:** ejecuta en orden `0001_init.sql`, `0002_worker.sql`, `0003_live.sql` y **`0004_comunidad.sql`** (crea `layout`/`custom_crop` que faltaban, el ranking y las tablas de comunidad).
 2. **Vercel → Settings → Environment Variables:** además de las de Supabase, agrega `APP_PASSWORD` (la contraseña que quieras). Luego *Redeploy*.
    Sin `APP_PASSWORD` la página responde 503 a propósito: las rutas /api usan la service role key y no deben quedar abiertas.
 3. **Worker:** sigue `worker/README.md` (necesita `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` y `GROQ_API_KEY`).
