@@ -1,11 +1,25 @@
 "use client";
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 
 export default function CropPreview({ videoUrl, onCropChange }: { videoUrl: string, onCropChange: (crop: any) => void }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [crop, setCrop] = useState({ x: 10, y: 10, w: 80, h: 60 }); // Porcentajes
+  const [crop, setCrop] = useState({ x: 10, y: 10, w: 80, h: 60 });
   const [isDragging, setIsDragging] = useState(false);
   const [startPos, setStartPos] = useState({ x: 0, y: 0 });
+  
+  // --- NUEVO: Estado para guardar el ID de YouTube ---
+  const [ytId, setYtId] = useState<string | null>(null);
+
+  // --- NUEVO: Detectar si el link es de YouTube ---
+  useEffect(() => {
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+    const match = videoUrl.match(regExp);
+    if (match && match[2].length === 11) {
+      setYtId(match[2]);
+    } else {
+      setYtId(null);
+    }
+  }, [videoUrl]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -20,7 +34,6 @@ export default function CropPreview({ videoUrl, onCropChange }: { videoUrl: stri
     const dy = e.clientY - startPos.y;
     const rect = containerRef.current.getBoundingClientRect();
     
-    // Convertir el movimiento en píxeles a porcentajes
     const dxPct = (dx / rect.width) * 100;
     const dyPct = (dy / rect.height) * 100;
 
@@ -41,15 +54,28 @@ export default function CropPreview({ videoUrl, onCropChange }: { videoUrl: stri
   return (
     <div 
       ref={containerRef}
-      style={{ position: "relative", width: "100%", maxWidth: 600, margin: "0 auto", userSelect: "none" }}
+      style={{ position: "relative", width: "100%", aspectRatio: "16/9", background: "#000", overflow: "hidden", userSelect: "none" }}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
     >
-      <video src={videoUrl} controls style={{ width: "100%", display: "block" }} />
+      {/* Si es YouTube, usamos el iframe. Si no, un video normal */}
+      {ytId ? (
+        <iframe
+          width="100%"
+          height="100%"
+          src={`https://www.youtube.com/embed/${ytId}?controls=1&rel=0`}
+          frameBorder="0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+          style={{ pointerEvents: "none" }} // Evitamos que el iframe bloquee el arrastre del recuadro
+        />
+      ) : (
+        <video src={videoUrl} controls style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} />
+      )}
       
       {/* Overlay Oscuro */}
-      <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.5)", pointerEvents: "none" }} />
       
       {/* Recuadro de Recorte */}
       <div
@@ -58,7 +84,7 @@ export default function CropPreview({ videoUrl, onCropChange }: { videoUrl: stri
           left: `${crop.x}%`, top: `${crop.y}%`,
           width: `${crop.w}%`, height: `${crop.h}%`,
           border: "2px solid #2ee6d6",
-          boxShadow: "0 0 0 9999px rgba(0,0,0,0.3)",
+          boxShadow: "0 0 0 9999px rgba(0,0,0,0.2)",
           cursor: "move",
           background: "transparent",
           pointerEvents: "auto"
