@@ -139,4 +139,13 @@ input:focus, select:focus { outline: none; border-color: var(--cyan); }
 .clip .tag { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,.6); border-radius: 999px; padding: 3px 9px; font-size: 11px; font-family: ui-monospace, monospace; }
 .clip .play { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 46px; height: 46px; border-radius: 50%; background: rgba(0,0,0,.55); display: grid; place-content: center; border: 1px solid rgba(255,255,255,.3); }
 .clip .meta { padding: 12px; }
-.clip .meta p { font-size: 13px; font-weight:
+.clip .meta p { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+.clip .meta small { color: var(--muted); font-size: 12px; font-family: ui-monospace, monospace; }
+.viral { color: var(--cyan); font-weight: 700; }
+.clip .acts { display: grid; gap: 6px; margin-top: 10px; }
+
+.bar { height: 8px; background: #0b0f16; border-radius: 99px; overflow: hidden; border: 1px solid var(--line); }
+.bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--red), var(--cyan)); }
+.banner { background: rgba(255,45,79,.1); border: 1px solid rgba(255,45,79,.4); border-radius: 12px; padding: 12px 14px; font-size: 14px; margin-bottom: 18px; }
+.banner.ok { background: rgba(46,230,214,.08); border-color: rgba(46,230,214,.4); }
+code { font-family: ui-monospace, monospace; background: #0b0f16; padding: 2px 6px; border-radius: 6px; font-size: 13px; }
