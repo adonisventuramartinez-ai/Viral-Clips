@@ -1,9 +1,10 @@
 import "./globals.css";
 import type { Metadata } from "next";
-import Nav from "@/components/Nav";
+import Sidebar from "@/components/Sidebar";
+import Topbar from "@/components/Topbar";
 import { supabaseConfigured } from "@/lib/supabase";
 
-export const metadata: Metadata = { title: "ClipForge · clips virales con IA", description: "Convierte podcasts y directos en clips verticales virales." };
+export const metadata: Metadata = { title: "ClipForge · convertí tus streams en clips virales", description: "Vertical, con subtítulos y listo para TikTok, Reels y Shorts." };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -13,14 +14,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
       </head>
       <body>
-        <div className="shell">
-          <Nav />
-          {!supabaseConfigured && (
-            <div className="banner" style={{ marginTop: 18 }}>
-              Modo demo: Supabase no está conectado. Copia <code>.env.example</code> a <code>.env.local</code> y agrega tus llaves.
+        <div className="app">
+          <Sidebar />
+          <div className="main">
+            <Topbar />
+            <div className="page">
+              {!supabaseConfigured && (
+                <div className="banner">Modo demo: Supabase no está conectado. Copia <code>.env.example</code> a <code>.env.local</code> y agrega tus llaves.</div>
+              )}
+              {children}
             </div>
-          )}
-          {children}
+          </div>
         </div>
       </body>
     </html>
