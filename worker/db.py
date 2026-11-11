@@ -64,9 +64,23 @@ def upload_clip(path, local_file):
         sb.storage.from_("clips").upload(path, f.read(), {"content-type": "video/mp4", "upsert": "true"})
 
 
+_clipper_cache = {}
+
+
+def _clipper_of(source):
+    """Nombre público de quien creó la fuente (columna sources.clipper, migración 0004). Si no existe, None."""
+    if source not in _clipper_cache:
+        try:
+            r = sb.table("sources").select("clipper").eq("id", source).maybe_single().execute()
+            _clipper_cache[source] = (r.data or {}).get("clipper") if r else None
+        except Exception:  # noqa: BLE001  (columna aún no creada)
+            _clipper_cache[source] = None
+    return _clipper_cache[source]
+
+
 def save_clip(source, user_id, m, storage_path, size_bytes, words_in_clip):
     sb.table("clips").insert({
-        "source_id": source, "user_id": user_id, "title": m["title"],
+        "source_id": source, "user_id": user_id, "title": m["title"], "clipper": _clipper_of(source),
         "start_sec": m["abs_start"], "end_sec": m["abs_end"], "viral_score": m["score"],
         "reason": m["reason"], "captions": words_in_clip,
         "storage_path": storage_path, "size_bytes": size_bytes,
