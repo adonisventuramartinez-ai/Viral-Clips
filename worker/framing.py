@@ -66,6 +66,7 @@ def _detect(gray):
         if r["r"] + r["height"] / 2 > h * 0.8:   # caras muy abajo suelen ser falsos positivos
             continue
         faces.append({"x": (r["c"] + r["width"] / 2) / w, "w": r["width"] / w,
+                      "y": (r["r"] + r["height"] / 2) / h,
                       "box": (r["r"], r["c"], r["width"], r["height"])})
     # quita cajas repetidas (misma cara detectada dos veces)
     out = []
@@ -194,3 +195,30 @@ def x_expression(keys):
         seg = f(a) if abs(a - b) < 1e-6 else f"{f(a)}+({f(b - a)})*(t-{t0:.3f})/{max(t1 - t0, 0.05):.3f}"
         expr = f"if(lt(t,{t1:.3f}),{seg},{expr})"
     return f"(iw-ow)*({expr})"
+
+
+def cam_box(source, start, dur, src_w, src_h, aspect):
+    """Recuadro (en % del video) alrededor de la cara más grande y constante, con la proporción `aspect` (ancho/alto).
+    Sirve para el panel de la cámara en el modo dividido. Devuelve None si no hay cara fiable."""
+    try:
+        samples = sample_faces(source, start, min(dur, 12.0), src_w, src_h)
+        faces = [f for s in samples for f in s["faces"]]
+        if len(faces) < max(3, 0.15 * len(samples)):
+            return None
+        big = sorted(faces, key=lambda f: -f["w"])[: max(3, len(faces) // 2)]
+        fx = statistics.median(f["x"] for f in big)
+        fy = statistics.median(f["y"] for f in big)
+        fw = statistics.median(f["w"] for f in big)
+        w_pct = min(100.0, fw * 100 * 3.2)                      # la cara ocupa ~1/3 del panel
+        h_pct = w_pct * src_w / (src_h * aspect)
+        if h_pct > 100:
+            h_pct = 100.0
+            w_pct = h_pct * src_h * aspect / src_w
+        x = min(max(fx * 100 - w_pct / 2, 0.0), 100 - w_pct)
+        y = min(max(fy * 100 - h_pct * 0.45, 0.0), 100 - h_pct)   # cara un poco por encima del centro
+        return {"x": round(x, 2), "y": round(y, 2), "w": round(w_pct, 2), "h": round(h_pct, 2)}
+    except ImportError:
+        print("  Encuadre: falta scikit-image (pip install scikit-image).", flush=True)
+    except Exception as e:  # noqa: BLE001
+        print(f"  Encuadre: no pude ubicar la cámara ({type(e).__name__}: {str(e)[:100]}).", flush=True)
+    return None
