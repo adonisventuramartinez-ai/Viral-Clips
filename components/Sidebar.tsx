@@ -14,7 +14,6 @@ const items: [string, string, React.ReactNode][] = [
   ["/donadores", "Donadores", I("M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.6-7 10-7 10z")],
   ["/estadisticas", "Estadísticas", I("M4 20V4M4 20h16M8 16v-5M12 16V8M16 16v-3")],
   ["/redes", "Mis redes", I("M18 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 22a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM8.6 13.5l6.8 4M15.4 6.5l-6.8 4")],
-  ["/promo", "Promo", I("M3 11v3l11 5V6zM14 8l6-3v14l-6-3M6 15l1 5h3")],
   ["/sugerencias", "Sugerencias", I("M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z")],
   ["/programas", "Programas", I("M4 7h16v11H4zM8 3l4 4 4-4")],
   ["/biblioteca", "Biblioteca", I("M5 4h4v16H5zM11 4h4v16h-4zM17 6l3 .8-3.5 13.2-3-.8")],
