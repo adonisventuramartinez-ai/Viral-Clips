@@ -35,6 +35,10 @@ def build_ass(words, start, end, group=3, is_split=False):
     """words: lista global [{w,start,end}]. Genera eventos relativos al inicio del clip."""
     ws = [w for w in words if w["start"] >= start - 0.05 and w["end"] <= end + 0.3]
     lines = [ASS_HEADER_SPLIT if is_split else ASS_HEADER]
+    
+    # Efecto Pop: escala al 120% y vuelve al 100% en 100 ms
+    POP_EFFECT = "{\\fscx120\\fscy120\\t(0,100,\\fscx100\\fscy100)}"
+
     for i in range(0, len(ws), group):
         g = ws[i : i + group]
         for j, w in enumerate(g):
@@ -42,16 +46,21 @@ def build_ass(words, start, end, group=3, is_split=False):
             t1 = (g[j + 1]["start"] if j + 1 < len(g) else w["end"]) - start
             if t1 <= t0:
                 t1 = t0 + 0.1
-            text = " ".join(
-                (YELLOW if k == j else WHITE) + x["w"].upper().replace("{", "(").replace("}", ")")
-                for k, x in enumerate(g)
-            )
+            
+            partes = []
+            for k, x in enumerate(g):
+                if k == j:
+                    partes.append(f"{YELLOW}{POP_EFFECT}{x['w'].upper().replace('{', '(').replace('}', ')')}")
+                else:
+                    partes.append(f"{WHITE}{x['w'].upper().replace('{', '(').replace('}', ')')}")
+            
+            text = " ".join(partes)
             lines.append(f"Dialogue: 0,{_t(t0)},{_t(t1)},Cap,,0,0,0,,{text}\n")
     return "".join(lines)
 
 
 def _probe(path: Path):
-    """(ancho, alto) del video. Si falla, asume 1920x1080 para que el clip no se cancele."""
+    """(ancho, alto) del video. Si falla, asume 1920x1080."""
     r = subprocess.run(
         ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height",
          "-of", "csv=p=0:s=x", str(path)], capture_output=True, text=True)
@@ -64,15 +73,23 @@ def _probe(path: Path):
 
 
 def _bitrate(dur: float) -> int:
-    """Bitrate de video más alto posible sin pasar ~44 MB por clip (límite de 50 MB del plan gratis de Supabase)."""
     total = 44_000_000 * 8 / max(dur, 1.0)
     return int(min(12_000_000, max(3_000_000, total - 192_000)))
 
 
-def _crop_filter(source: Path, start: float, dur: float):
-    """Recorte 9:16 hecho en la resolución ORIGINAL (sin agrandar nada) y después un solo escalado nítido."""
+def _crop_filter(source: Path, start: float, dur: float, custom_crop: dict = None):
     sw, sh = _probe(source)
-    if sw / sh > 9 / 16:                     # video horizontal (lo normal): se recorta el ancho
+    
+    # SI EL USUARIO ELIGIÓ EL RECUADRO, USAMOS SUS COORDENADAS
+    if custom_crop:
+        cw = int(sw * (custom_crop["w"] / 100)) // 2 * 2
+        ch = int(sh * (custom_crop["h"] / 100)) // 2 * 2
+        x = int(sw * (custom_crop["x"] / 100)) // 2 * 2
+        y = int(sh * (custom_crop["y"] / 100)) // 2 * 2
+        return f"crop=w={cw}:h={ch}:x={x}:y={y}"
+
+    # Detección automática (si no hay custom_crop)
+    if sw / sh > 9 / 16:
         cw, ch = int(sh * 9 / 16) // 2 * 2, sh
         crop_frac = cw / sw
         keys = None
@@ -88,11 +105,11 @@ def _crop_filter(source: Path, start: float, dur: float):
         else:
             xexpr = f"(iw-ow)*{config.CLIP_FOCUS_X:.3f}"
         return f"crop=w={cw}:h={ch}:x='{xexpr}':y=0"
-    ch, cw = int(sw * 16 / 9) // 2 * 2, sw   # video ya vertical o cuadrado: se recorta el alto, centrado
+    ch, cw = int(sw * 16 / 9) // 2 * 2, sw
     return f"crop=w={cw}:h={min(ch, sh)}:x=0:y='(ih-oh)/2'"
 
 
-def render_clip(source: Path, words, start: float, end: float, out: Path, workdir: Path):
+def render_clip(source: Path, words, start: float, end: float, out: Path, workdir: Path, custom_crop: dict = None):
     dur = end - start
 
     if config.CLIP_LAYOUT == "blur":
@@ -107,7 +124,6 @@ def render_clip(source: Path, words, start: float, end: float, out: Path, workdi
     elif config.CLIP_LAYOUT == "split":
         ass = workdir / f"{out.stem}.ass"
         ass.write_text(build_ass(words, start, end, is_split=True), encoding="utf-8")
-        # MODO SPLIT SCREEN CORREGIDO (Une las mitades y luego pone subtítulos)
         vf = (
             "split=2[top][bottom];"
             "[top]crop=iw:ih/2:0:0,scale=1080:960:force_original_aspect_ratio=increase,crop=1080:960[t];"
@@ -121,7 +137,7 @@ def render_clip(source: Path, words, start: float, end: float, out: Path, workdi
         ass.write_text(build_ass(words, start, end), encoding="utf-8")
         sharpen = f"unsharp=5:5:{config.CLIP_SHARPEN:.2f}:5:5:0.0," if config.CLIP_SHARPEN > 0 else ""
         vf = (
-            _crop_filter(source, start, dur)
+            _crop_filter(source, start, dur, custom_crop)
             + ",scale=1080:1920:flags=lanczos+accurate_rnd+full_chroma_int,"
             + sharpen
             + "setsar=1,subtitles={sub}"
