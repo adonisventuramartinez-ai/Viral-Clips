@@ -1,97 +1,68 @@
 "use client";
-import { useRef, useState, useEffect } from "react";
+import { useRef } from "react";
+import type { CSSProperties } from "react";
+import { boxH, type Box, type Embed } from "@/lib/embed";
 
-export default function CropPreview({ videoUrl, onCropChange }: { videoUrl: string, onCropChange: (crop: any) => void }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [crop, setCrop] = useState({ x: 10, y: 10, w: 80, h: 60 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [startPos, setStartPos] = useState({ x: 0, y: 0 });
-  
-  // --- NUEVO: Estado para guardar el ID de YouTube ---
-  const [ytId, setYtId] = useState<string | null>(null);
+const fill: CSSProperties = { position: "absolute", inset: 0, width: "100%", height: "100%", border: 0, pointerEvents: "none", objectFit: "cover" };
 
-  // --- NUEVO: Detectar si el link es de YouTube ---
-  useEffect(() => {
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-    const match = videoUrl.match(regExp);
-    if (match && match[2].length === 11) {
-      setYtId(match[2]);
+/** El video (o su miniatura) llenando el contenedor. */
+export function Media({ e, still = false }: { e: Embed; still?: boolean }) {
+  if (still && e.thumb) return <img src={e.thumb} alt="" style={fill} />;
+  if (e.kind === "file") return <video src={e.src} muted loop autoPlay playsInline style={fill} />;
+  if (e.kind === "none") return null;
+  return <iframe src={e.src} allow="autoplay; encrypted-media; picture-in-picture" tabIndex={-1} style={fill} />;
+}
+
+/** Muestra SOLO la zona `box` del video, estirada para llenar el contenedor (que debe tener la misma proporción que el recuadro). */
+export function Region({ e, box, still = false }: { e: Embed; box: Box; still?: boolean }) {
+  return (
+    <div style={{ position: "absolute", left: `${(-box.x / box.w) * 100}%`, top: `${(-box.y / box.h) * 100}%`, width: `${10000 / box.w}%`, aspectRatio: "16 / 9" }}>
+      <Media e={e} still={still} />
+    </div>
+  );
+}
+
+const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
+
+/** Video completo con un recuadro que se arrastra y se agranda desde la esquina (mantiene la proporción `aspect`). */
+export default function CropPreview({ embed, box, aspect, onChange }: { embed: Embed; box: Box; aspect: number; onChange: (b: Box) => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ mode: "move" | "resize"; sx: number; sy: number; start: Box } | null>(null);
+
+  const down = (mode: "move" | "resize") => (ev: React.PointerEvent) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    (ev.currentTarget as HTMLElement).setPointerCapture(ev.pointerId);
+    drag.current = { mode, sx: ev.clientX, sy: ev.clientY, start: box };
+  };
+  const move = (ev: React.PointerEvent) => {
+    const d = drag.current;
+    const el = ref.current;
+    if (!d || !el) return;
+    const r = el.getBoundingClientRect();
+    const dx = ((ev.clientX - d.sx) / r.width) * 100;
+    const dy = ((ev.clientY - d.sy) / r.height) * 100;
+    if (d.mode === "move") {
+      onChange({ ...d.start, x: clamp(d.start.x + dx, 0, 100 - d.start.w), y: clamp(d.start.y + dy, 0, 100 - d.start.h) });
     } else {
-      setYtId(null);
+      const maxW = Math.min(100 - d.start.x, ((100 - d.start.y) * 9 * aspect) / 16);
+      const w = clamp(d.start.w + dx, 8, Math.max(8, maxW));
+      onChange({ ...d.start, w, h: boxH(w, aspect) });
     }
-  }, [videoUrl]);
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-    setStartPos({ x: e.clientX, y: e.clientY });
   };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging || !containerRef.current) return;
-    
-    const dx = e.clientX - startPos.x;
-    const dy = e.clientY - startPos.y;
-    const rect = containerRef.current.getBoundingClientRect();
-    
-    const dxPct = (dx / rect.width) * 100;
-    const dyPct = (dy / rect.height) * 100;
-
-    const newCrop = {
-      x: Math.max(0, Math.min(100 - crop.w, crop.x + dxPct)),
-      y: Math.max(0, Math.min(100 - crop.h, crop.y + dyPct)),
-      w: crop.w,
-      h: crop.h
-    };
-    
-    setCrop(newCrop);
-    onCropChange(newCrop);
-    setStartPos({ x: e.clientX, y: e.clientY });
-  };
-
-  const handleMouseUp = () => setIsDragging(false);
+  const up = () => { drag.current = null; };
 
   return (
-    <div 
-      ref={containerRef}
-      style={{ position: "relative", width: "100%", aspectRatio: "16/9", background: "#000", overflow: "hidden", userSelect: "none" }}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
-    >
-      {/* Si es YouTube, usamos el iframe. Si no, un video normal */}
-      {ytId ? (
-        <iframe
-          width="100%"
-          height="100%"
-          src={`https://www.youtube.com/embed/${ytId}?controls=1&rel=0`}
-          frameBorder="0"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-          style={{ pointerEvents: "none" }} // Evitamos que el iframe bloquee el arrastre del recuadro
-        />
-      ) : (
-        <video src={videoUrl} controls style={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} />
-      )}
-      
-      {/* Overlay Oscuro */}
-      <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.5)", pointerEvents: "none" }} />
-      
-      {/* Recuadro de Recorte */}
+    <div ref={ref} style={{ position: "relative", width: "100%", aspectRatio: "16 / 9", background: "#000", overflow: "hidden", userSelect: "none", touchAction: "none", borderRadius: 10 }}>
+      <Media e={embed} />
       <div
-        style={{
-          position: "absolute",
-          left: `${crop.x}%`, top: `${crop.y}%`,
-          width: `${crop.w}%`, height: `${crop.h}%`,
-          border: "2px solid #2ee6d6",
-          boxShadow: "0 0 0 9999px rgba(0,0,0,0.2)",
-          cursor: "move",
-          background: "transparent",
-          pointerEvents: "auto"
-        }}
-        onMouseDown={handleMouseDown}
+        onPointerDown={down("move")}
+        onPointerMove={move}
+        onPointerUp={up}
+        onPointerCancel={up}
+        style={{ position: "absolute", left: `${box.x}%`, top: `${box.y}%`, width: `${box.w}%`, height: `${box.h}%`, border: "2px solid #2ee6d6", boxShadow: "0 0 0 9999px rgba(0,0,0,.6)", cursor: "move", touchAction: "none" }}
       >
-        <div style={{ position: "absolute", bottom: 0, right: 0, width: 20, height: 20, background: "#2ee6d6", cursor: "se-resize" }} />
+        <div onPointerDown={down("resize")} style={{ position: "absolute", right: -2, bottom: -2, width: 22, height: 22, background: "#2ee6d6", cursor: "nwse-resize", touchAction: "none", borderTopLeftRadius: 6 }} />
       </div>
     </div>
   );
