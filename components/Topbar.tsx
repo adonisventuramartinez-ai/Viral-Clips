@@ -15,7 +15,6 @@ export default function Topbar() {
   return (
     <header className="topbar">
       <Link href="/crear" className="logo" style={{ fontWeight: 700, fontSize: 20 }}>⚡ Clip<b>Forge</b></Link>
-      <Link href="/promo" className="pill">📣 Publicita tu canal</Link>
       {DONATE && <a href={DONATE} target="_blank" rel="noreferrer" className="pill green">♥ Donar</a>}
       <Link href="/redes" className="pill ghost">👤 {name || "Mi perfil"}</Link>
     </header>
