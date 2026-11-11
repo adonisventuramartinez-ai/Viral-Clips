@@ -26,8 +26,9 @@ def process(job):
     secs = int(payload.get("clip_seconds", 45))
     quality = payload.get("quality", "1080p")
     
-    # --- NUEVO: Leer el layout que el usuario eligió en la web ---
+    # --- LEER LAYOUT Y RECUADRO PERSONALIZADO ---
     clip_layout = src.get("layout") or config.CLIP_LAYOUT
+    custom_crop = src.get("custom_crop")  # <-- NUEVO: Lee el recuadro
 
     def alive():
         if not db.source_exists(sid):
@@ -44,7 +45,7 @@ def process(job):
         segments, words = transcribe(video, work)
         if not segments:
             raise RuntimeError("No se detectó voz en el video")
-        # tiempos del archivo -> tiempos del video original, para guardar en la base
+        
         db.save_transcript(sid, [{**s, "start": s["start"] + offset, "end": s["end"] + offset} for s in segments])
 
         alive()
@@ -60,10 +61,11 @@ def process(job):
             cid = str(uuid.uuid4())
             out = work / f"{cid}.mp4"
             
-            # --- NUEVO: Forzar el layout elegido para este video ---
             config.CLIP_LAYOUT = clip_layout
             
-            render_clip(video, words, m["start"], m["end"], out, work)
+            # --- PASAR EL RECUADRO AL RENDER ---
+            render_clip(video, words, m["start"], m["end"], out, work, custom_crop=custom_crop)
+            
             path = f"{sid}/{cid}.mp4"
             db.upload_clip(path, out)
             m["abs_start"], m["abs_end"] = m["start"] + offset, m["end"] + offset
