@@ -17,8 +17,12 @@ Style: Cap,DejaVu Sans,86,&H00FFFFFF,&H00FFFFFF,&H00000000,&H80000000,-1,0,0,0,1
 Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
 """
 
-# En modo pantalla dividida los subtítulos se suben (MargenV 820) para que no tapen la cara de abajo
-ASS_HEADER_SPLIT = ASS_HEADER.replace("60,60,520,1", "60,60,820,1")
+# En modo dividido los subtítulos quedan sobre la unión de los dos paneles (MargenV 1000)
+ASS_HEADER_SPLIT = ASS_HEADER.replace("60,60,520,1", "60,60,1000,1")
+
+# Medidas del modo dividido (suman 1920): arriba la cámara, abajo el juego
+SPLIT_TOP_H = 760
+SPLIT_BOT_H = 1920 - SPLIT_TOP_H
 
 YELLOW = "{\\c&H00E0FF&}"  # ASS usa BGR
 WHITE = "{\\c&HFFFFFF&}"
@@ -76,15 +80,34 @@ def _bitrate(dur: float) -> int:
     return int(min(12_000_000, max(3_000_000, total - 192_000)))
 
 
+def _even(v: float) -> int:
+    return max(2, int(v) // 2 * 2)
+
+
+def _box_filter(sw: int, sh: int, box: dict) -> str:
+    """Recuadro en % del video -> filtro crop de ffmpeg (siempre dentro del cuadro y con medidas pares)."""
+    cw = min(sw, _even(sw * float(box["w"]) / 100))
+    ch = min(sh, _even(sh * float(box["h"]) / 100))
+    x = min(sw - cw, max(0, int(sw * float(box["x"]) / 100) // 2 * 2))
+    y = min(sh - ch, max(0, int(sh * float(box["y"]) / 100) // 2 * 2))
+    return f"crop=w={cw}:h={ch}:x={x}:y={y}"
+
+
+def _fit_filter(sw: int, sh: int, aspect: float, fx: float = 0.5) -> str:
+    """Recorte de la proporción `aspect` (ancho/alto) lo más grande posible; fx = 0 izquierda, 1 derecha."""
+    if sw / sh > aspect:
+        cw, ch = min(sw, _even(sh * aspect)), sh
+    else:
+        cw, ch = sw, min(sh, _even(sw / aspect))
+    return f"crop=w={cw}:h={ch}:x='(iw-ow)*{fx:.3f}':y='(ih-oh)/2'"
+
+
 def _crop_filter(source: Path, start: float, dur: float, custom_crop: dict = None):
+    """Modo vertical: recorte 9:16 manual, siguiendo caras, o centrado."""
     sw, sh = _probe(source)
-    
+
     if custom_crop:
-        cw = int(sw * (custom_crop["w"] / 100)) // 2 * 2
-        ch = int(sh * (custom_crop["h"] / 100)) // 2 * 2
-        x = int(sw * (custom_crop["x"] / 100)) // 2 * 2
-        y = int(sh * (custom_crop["y"] / 100)) // 2 * 2
-        return f"crop=w={cw}:h={ch}:x={x}:y={y}"
+        return _box_filter(sw, sh, custom_crop)
 
     if sw / sh > 9 / 16:
         cw, ch = int(sh * 9 / 16) // 2 * 2, sh
@@ -106,73 +129,80 @@ def _crop_filter(source: Path, start: float, dur: float, custom_crop: dict = Non
     return f"crop=w={cw}:h={min(ch, sh)}:x=0:y='(ih-oh)/2'"
 
 
-def render_clip(source: Path, words, start: float, end: float, out: Path, workdir: Path, custom_crop: dict = None):
-    dur = end - start
+def _cam_box(source: Path, start: float, dur: float, sw: int, sh: int, custom_crop: dict = None) -> dict:
+    """Recuadro (en %) de la cámara para el panel de arriba del modo dividido.
+    Prioridad: el que marcó el usuario > detección de cara > esquina inferior derecha (donde suele estar la cámara)."""
+    if custom_crop:
+        return custom_crop
+    aspect = 1080 / SPLIT_TOP_H
+    if config.CLIP_FRAMING == "auto":
+        import framing
+        box = framing.cam_box(source, start, dur, sw, sh, aspect)
+        if box:
+            print("  Dividido: encontré la cámara por la cara", flush=True)
+            return box
+    print("  Dividido: no encontré la cámara, uso la esquina inferior derecha (márcala a mano en la web)", flush=True)
+    w = 30.0
+    h = min(100.0, w * sw / (sh * aspect))
+    return {"x": 100 - w - 1, "y": 100 - h - 1, "w": w, "h": h}
 
-    if config.CLIP_LAYOUT == "blur":
-        ass = workdir / f"{out.stem}.ass"
-        ass.write_text(build_ass(words, start, end), encoding="utf-8")
-        vf = (
-            "split=2[bg][fg];"
-            "[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=30:5[b];"
+
+def _ass_for(words, start, end, workdir: Path, stem: str, split: bool) -> Path:
+    ass = workdir / f"{stem}.ass"
+    ass.write_text(build_ass(words, start, end, is_split=split), encoding="utf-8")
+    return ass
+
+
+def build_filter(layout: str, source: Path, start: float, dur: float, ass_name: str, custom_crop: dict = None) -> str:
+    """Devuelve el grafo de filtros (sin etiqueta final) para el encuadre pedido."""
+    if layout == "blur":
+        return (
+            "[0:v]split=2[bg][fg];"
+            "[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=30:5,eq=brightness=-0.12[b];"
             "[fg]scale=1080:-2:flags=lanczos[f];"
-            "[b][f]overlay=(W-w)/2:(H-h)/2,subtitles={sub}"
+            f"[b][f]overlay=(W-w)/2:(H-h)/2,setsar=1,subtitles={ass_name}"
         )
-    elif config.CLIP_LAYOUT == "split":
-        ass = workdir / f"{out.stem}.ass"
-        ass.write_text(build_ass(words, start, end, is_split=True), encoding="utf-8")
-        vf = (
-            "split=2[top][bottom];"
-            "[top]crop=iw:ih/2:0:0,scale=1080:960:force_original_aspect_ratio=increase,crop=1080:960[t];"
-            "[bottom]crop=iw:ih/2:0:ih/2,scale=1080:960:force_original_aspect_ratio=increase,crop=1080:960[b];"
-            "[t][b]vstack[v];"
-            "[v]subtitles={sub}[out]"
+    if layout == "split":
+        sw, sh = _probe(source)
+        cam = _box_filter(sw, sh, _cam_box(source, start, dur, sw, sh, custom_crop))
+        game = _fit_filter(sw, sh, 1080 / SPLIT_BOT_H, config.CLIP_FOCUS_X)
+        return (
+            "[0:v]split=2[a][b];"
+            f"[a]{cam},scale=1080:{SPLIT_TOP_H}:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:{SPLIT_TOP_H},setsar=1[t];"
+            f"[b]{game},scale=1080:{SPLIT_BOT_H}:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:{SPLIT_BOT_H},setsar=1[g];"
+            f"[t][g]vstack=inputs=2,subtitles={ass_name}"
         )
-    elif config.CLIP_LAYOUT == "3x7":
-        ass = workdir / f"{out.stem}.ass"
-        ass.write_text(build_ass(words, start, end, is_split=True), encoding="utf-8")
-        vf = (
-            "split=2[top][bottom];"
-            "[top]crop=iw:ih/2:0:0,scale=1080:576:force_original_aspect_ratio=increase,crop=1080:576[t];"
-            "[bottom]crop=iw:ih/2:0:ih/2,scale=1080:1344:force_original_aspect_ratio=increase,crop=1080:1344[b];"
-            "[t][b]vstack[v];"
-            "[v]subtitles={sub}[out]"
-        )
-    else:
-        # MODO CROP
-        ass = workdir / f"{out.stem}.ass"
-        ass.write_text(build_ass(words, start, end), encoding="utf-8")
-        sharpen = f"unsharp=5:5:{config.CLIP_SHARPEN:.2f}:5:5:0.0," if config.CLIP_SHARPEN > 0 else ""
-        vf = (
-            _crop_filter(source, start, dur, custom_crop)
-            + ",scale=1080:1920:flags=lanczos+accurate_rnd+full_chroma_int,"
-            + sharpen
-            + "setsar=1,subtitles={sub}"
-        )
-    vf = vf.format(sub=ass.name)
+    sharpen = f"unsharp=5:5:{config.CLIP_SHARPEN:.2f}:5:5:0.0," if config.CLIP_SHARPEN > 0 else ""
+    return (
+        "[0:v]" + _crop_filter(source, start, dur, custom_crop)
+        + ",scale=1080:1920:flags=lanczos+accurate_rnd+full_chroma_int,"
+        + sharpen + f"setsar=1,subtitles={ass_name}"
+    )
 
-    # --- LÓGICA DEL LOGO ---
-    logo_path = workdir / config.LOGO_PATH if hasattr(config, 'LOGO_PATH') and config.LOGO_PATH else None
-    
-    if logo_path and logo_path.exists():
-        # Superponemos el logo en la esquina superior derecha
-        vf = f"{vf}[v];[1:v]scale=150:-1[logo];[v][logo]overlay=W-w-20:20[out]"
-        cmd_inputs = ["-i", str(source.resolve()), "-i", str(logo_path)]
-        map_args = ["-filter_complex", vf, "-map", "[out]", "-map", "0:a?"]
+
+def render_clip(source: Path, words, start: float, end: float, out: Path, workdir: Path,
+                custom_crop: dict = None, layout: str = None):
+    dur = end - start
+    layout = (layout or config.CLIP_LAYOUT or "crop").strip().lower()
+    if layout not in ("crop", "split", "blur"):
+        layout = "crop"
+
+    ass = _ass_for(words, start, end, workdir, out.stem, split=(layout == "split"))
+    graph = build_filter(layout, source, start, dur, ass.name, custom_crop)
+
+    logo = (workdir / config.LOGO_PATH) if getattr(config, "LOGO_PATH", "") else None
+    if logo and logo.exists():
+        graph = f"{graph}[v];[1:v]scale=150:-1[logo];[v][logo]overlay=W-w-20:20[out]"
+        inputs = ["-i", str(source.resolve()), "-i", str(logo)]
     else:
-        # Si no hay logo, renderizado normal
-        if config.CLIP_LAYOUT in ["split", "3x7"]:
-            cmd_inputs = ["-i", str(source.resolve())]
-            map_args = ["-filter_complex", vf, "-map", "[out]", "-map", "0:a?"]
-        else:
-            cmd_inputs = ["-i", str(source.resolve())]
-            map_args = ["-vf", vf, "-map", "0:v", "-map", "0:a?"]
-    # -----------------------
+        graph = f"{graph}[out]"
+        inputs = ["-i", str(source.resolve())]
 
     vb = _bitrate(dur)
     cmd = [
         "ffmpeg", "-y", "-ss", f"{start:.2f}", "-t", f"{dur:.2f}",
-    ] + cmd_inputs + map_args + [
+    ] + inputs + [
+        "-filter_complex", graph, "-map", "[out]", "-map", "0:a?",
         "-c:v", "libx264", "-preset", config.CLIP_PRESET, "-crf", str(config.CLIP_CRF),
         "-profile:v", "high", "-level", "4.2",
         "-maxrate", str(vb), "-bufsize", str(vb * 2),

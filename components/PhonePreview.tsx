@@ -43,3 +43,4 @@ export default function PhonePreview({ layout, embed, cropBox, camBox }: { layou
     </div>
   );
 }
+
