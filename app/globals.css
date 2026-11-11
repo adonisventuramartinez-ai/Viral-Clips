@@ -1,11 +1,17 @@
 :root {
-  --bg: #090b10;
-  --panel: #10141c;
-  --line: #222a38;
-  --text: #eef1f6;
-  --muted: #8a94a7;
-  --red: #ff2d4f;
+  --bg: #07071a;
+  --panel: #0e1026;
+  --panel2: #12152f;
+  --line: #232748;
+  --text: #eef1f8;
+  --muted: #8d93b3;
+  --red: #ff2d6f;
   --cyan: #2ee6d6;
+  --violet: #8b3dff;
+  --magenta: #d62bff;
+  --orange: #ff9a1f;
+  --grad: linear-gradient(100deg, #8b3dff, #d62bff 55%, #ff9a1f);
+  --side: 86px;
 }
 * { box-sizing: border-box; margin: 0; }
 html, body { background: var(--bg); color: var(--text); font-family: "Space Grotesk", system-ui, sans-serif; }
