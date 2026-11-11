@@ -36,7 +36,6 @@ def build_ass(words, start, end, group=3, is_split=False):
     ws = [w for w in words if w["start"] >= start - 0.05 and w["end"] <= end + 0.3]
     lines = [ASS_HEADER_SPLIT if is_split else ASS_HEADER]
     
-    # Efecto Pop: escala al 120% y vuelve al 100% en 100 ms
     POP_EFFECT = "{\\fscx120\\fscy120\\t(0,100,\\fscx100\\fscy100)}"
 
     for i in range(0, len(ws), group):
@@ -80,7 +79,6 @@ def _bitrate(dur: float) -> int:
 def _crop_filter(source: Path, start: float, dur: float, custom_crop: dict = None):
     sw, sh = _probe(source)
     
-    # SI EL USUARIO ELIGIÓ EL RECUADRO, USAMOS SUS COORDENADAS
     if custom_crop:
         cw = int(sw * (custom_crop["w"] / 100)) // 2 * 2
         ch = int(sh * (custom_crop["h"] / 100)) // 2 * 2
@@ -88,7 +86,6 @@ def _crop_filter(source: Path, start: float, dur: float, custom_crop: dict = Non
         y = int(sh * (custom_crop["y"] / 100)) // 2 * 2
         return f"crop=w={cw}:h={ch}:x={x}:y={y}"
 
-    # Detección automática (si no hay custom_crop)
     if sw / sh > 9 / 16:
         cw, ch = int(sh * 9 / 16) // 2 * 2, sh
         crop_frac = cw / sw
@@ -131,6 +128,16 @@ def render_clip(source: Path, words, start: float, end: float, out: Path, workdi
             "[t][b]vstack[v];"
             "[v]subtitles={sub}[out]"
         )
+    elif config.CLIP_LAYOUT == "3x7":
+        ass = workdir / f"{out.stem}.ass"
+        ass.write_text(build_ass(words, start, end, is_split=True), encoding="utf-8")
+        vf = (
+            "split=2[top][bottom];"
+            "[top]crop=iw:ih/2:0:0,scale=1080:576:force_original_aspect_ratio=increase,crop=1080:576[t];"
+            "[bottom]crop=iw:ih/2:0:ih/2,scale=1080:1344:force_original_aspect_ratio=increase,crop=1080:1344[b];"
+            "[t][b]vstack[v];"
+            "[v]subtitles={sub}[out]"
+        )
     else:
         # MODO CROP
         ass = workdir / f"{out.stem}.ass"
@@ -144,16 +151,28 @@ def render_clip(source: Path, words, start: float, end: float, out: Path, workdi
         )
     vf = vf.format(sub=ass.name)
 
-    vb = _bitrate(dur)
+    # --- LÓGICA DEL LOGO ---
+    logo_path = workdir / config.LOGO_PATH if hasattr(config, 'LOGO_PATH') and config.LOGO_PATH else None
     
-    if config.CLIP_LAYOUT == "split":
-        vf_cmd = ["-filter_complex", vf, "-map", "[out]", "-map", "0:a?"]
+    if logo_path and logo_path.exists():
+        # Superponemos el logo en la esquina superior derecha
+        vf = f"{vf}[v];[1:v]scale=150:-1[logo];[v][logo]overlay=W-w-20:20[out]"
+        cmd_inputs = ["-i", str(source.resolve()), "-i", str(logo_path)]
+        map_args = ["-filter_complex", vf, "-map", "[out]", "-map", "0:a?"]
     else:
-        vf_cmd = ["-vf", vf, "-map", "0:v", "-map", "0:a?"]
+        # Si no hay logo, renderizado normal
+        if config.CLIP_LAYOUT in ["split", "3x7"]:
+            cmd_inputs = ["-i", str(source.resolve())]
+            map_args = ["-filter_complex", vf, "-map", "[out]", "-map", "0:a?"]
+        else:
+            cmd_inputs = ["-i", str(source.resolve())]
+            map_args = ["-vf", vf, "-map", "0:v", "-map", "0:a?"]
+    # -----------------------
 
+    vb = _bitrate(dur)
     cmd = [
-        "ffmpeg", "-y", "-ss", f"{start:.2f}", "-t", f"{dur:.2f}", "-i", str(source.resolve()),
-    ] + vf_cmd + [
+        "ffmpeg", "-y", "-ss", f"{start:.2f}", "-t", f"{dur:.2f}",
+    ] + cmd_inputs + map_args + [
         "-c:v", "libx264", "-preset", config.CLIP_PRESET, "-crf", str(config.CLIP_CRF),
         "-profile:v", "high", "-level", "4.2",
         "-maxrate", str(vb), "-bufsize", str(vb * 2),
