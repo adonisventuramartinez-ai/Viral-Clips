@@ -1,15 +1,13 @@
 "use client";
 import { useState } from "react";
-import CropPreview from "@/components/CropPreview"; // <-- Importamos el componente
+import CropPreview from "@/components/CropPreview";
 
 export default function Crear() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   
-  // --- NUEVOS ESTADOS PARA LA VISTA PREVIA ---
   const [videoUrl, setVideoUrl] = useState("");
   const [crop, setCrop] = useState({ x: 10, y: 10, w: 80, h: 60 });
-  // -------------------------------------------
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -28,7 +26,7 @@ export default function Crear() {
         clips: Number(f.get("count")),
         quality: f.get("quality"),
         layout: f.get("layout"),
-        custom_crop: crop, // <-- NUEVO: Enviamos el encuadre personalizado
+        custom_crop: crop,
       }),
     });
     const data = await res.json();
@@ -50,10 +48,9 @@ export default function Crear() {
         <input 
           name="url" 
           placeholder="https://www.youtube.com/watch?v=..." 
-          onChange={(e) => setVideoUrl(e.target.value)} // <-- Actualiza el video para la vista previa
+          onChange={(e) => setVideoUrl(e.target.value)} 
         />
         
-        {/* --- NUEVA VISTA PREVIA --- */}
         {videoUrl && videoUrl.startsWith("http") && (
           <div style={{ marginTop: 16, marginBottom: 16 }}>
             <label>Vista previa del encuadre</label>
@@ -66,7 +63,6 @@ export default function Crear() {
             </p>
           </div>
         )}
-        {/* --------------------------- */}
 
         <label>…o sube un archivo (mp4, mov, mkv)</label>
         <input type="file" accept="video/*" disabled />
@@ -89,6 +85,7 @@ export default function Crear() {
             <select name="layout" defaultValue="crop">
               <option value="crop">Zoom a la cara</option>
               <option value="split">Pantalla dividida</option>
+              <option value="3x7">División 3x7 (franja arriba)</option> {/* <-- NUEVO */}
               <option value="blur">Fondo borroso</option>
             </select>
           </div>
