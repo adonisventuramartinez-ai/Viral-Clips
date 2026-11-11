@@ -40,6 +40,9 @@ except ValueError:
     CLIP_FOCUS_X = 0.5
 COOKIES_FILE = os.environ.get("COOKIES_FILE", "")  # cookies.txt de YouTube si te pide "confirmar que no eres un bot"
 
+# --- NUEVO: Ruta del logo para el Brand Kit ---
+LOGO_PATH = os.environ.get("LOGO_PATH", "")
+
 POLL_SECONDS = int(os.environ.get("POLL_SECONDS", "5"))
 WORK_DIR = Path(os.environ.get("WORK_DIR", "./work"))
 
