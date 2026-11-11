@@ -20,7 +20,8 @@ export async function POST(req: Request) {
     quality = "1080p", 
     review_minutes = 2,
     layout = "crop",
-    custom_crop = null // <-- NUEVO: Recibe el encuadre
+    custom_crop = null, // Recibe el encuadre
+    clipper = null // Nombre público de quien crea el clip (ranking Clipeadores)
   } = body;
 
   if (!url) return NextResponse.json({ error: kind === "live" ? "Falta el link del directo" : "Falta el link del video" }, { status: 400 });
@@ -44,7 +45,8 @@ export async function POST(req: Request) {
       range_to: range_to || null, 
       status: "queued",
       layout: layout,
-      custom_crop: custom_crop // <-- NUEVO: Guarda el encuadre
+      custom_crop: custom_crop, // Guarda el encuadre
+      clipper: typeof clipper === "string" && clipper.trim() ? clipper.trim().slice(0, 40) : null
     })
     .select("id")
     .single();
