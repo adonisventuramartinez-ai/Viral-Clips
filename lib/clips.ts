@@ -11,18 +11,22 @@ type Row = {
   reason: string | null;
   storage_path: string | null;
   size_bytes: number | null;
+  is_public?: boolean | null;
 };
 
 const COLS = "id,title,start_sec,end_sec,viral_score,reason,storage_path,size_bytes";
 
 /** Clips (más nuevos primero) con URLs firmadas para ver y descargar. sourceId opcional. */
 export async function loadClips(db: SupabaseClient, sourceId?: string): Promise<Clip[]> {
-  const base = db.from("clips").select(COLS);
-  const filtered = sourceId ? base.eq("source_id", sourceId) : base;
-  const { data, error } = await filtered.order("created_at", { ascending: false }).limit(200);
+  const q = (cols: string) => {
+    const base = db.from("clips").select(cols);
+    return (sourceId ? base.eq("source_id", sourceId) : base).order("created_at", { ascending: false }).limit(200);
+  };
+  let { data, error } = await q(COLS + ",is_public");
+  if (error) ({ data, error } = await q(COLS)); // aún no corriste la migración 0004: funciona sin is_public
   if (error) throw new Error(error.message);
 
-  const rows = (data ?? []) as Row[];
+  const rows = (data ?? []) as unknown as Row[];
   const paths = rows.map((r) => r.storage_path).filter((p): p is string => !!p);
   const play = new Map<string, string>();
   const dl = new Map<string, string>();
@@ -46,6 +50,7 @@ export async function loadClips(db: SupabaseClient, sourceId?: string): Promise<
     captions: "",
     thumb: "",
     reason: r.reason ?? undefined,
+    isPublic: r.is_public ?? true,
     videoUrl: r.storage_path ? play.get(r.storage_path) : undefined,
     downloadUrl: r.storage_path ? dl.get(r.storage_path) : undefined,
   }));

@@ -11,7 +11,9 @@ export default function Biblioteca() {
   const [loaded, setLoaded] = useState(false);
   const [err, setErr] = useState("");
   const [worker, setWorker] = useState<boolean | null>(null);
-  const [sort, setSort] = useState<"viral" | "new">("viral");
+  const [sort, setSort] = useState<"viral" | "new" | "old">("viral");
+  const [q, setQ] = useState("");
+  const [minScore, setMinScore] = useState(0);
   const [cleaning, setCleaning] = useState(false);
   const [note, setNote] = useState("");
   const reload = useRef<() => void>(() => {});
@@ -92,7 +94,10 @@ export default function Biblioteca() {
   const failed = sources.filter((s) => s.status === "error");
   const stuck = sources.filter((s) => s.status === "queued");
   const cleanable = sources.filter((s) => s.status === "error" || s.status === "stopped" || ACTIVE.includes(s.status));
-  const shown = sort === "viral" ? [...clips].sort((a, b) => b.score - a.score) : clips;
+  const term = q.trim().toLowerCase();
+  const filtered = clips.filter((c) => c.score >= minScore && (!term || c.title.toLowerCase().includes(term)));
+  const shown = sort === "viral" ? [...filtered].sort((a, b) => b.score - a.score) : sort === "old" ? [...filtered].reverse() : filtered;
+  const STEPS = ["queued", "downloading", "transcribing", "analyzing", "clipping"];
 
   return (
     <>
@@ -119,7 +124,7 @@ export default function Biblioteca() {
           <div style={{ display: "flex", gap: 12, alignItems: "center", minWidth: 0 }}>
             <i className="dot" />
             <div style={{ minWidth: 0 }}>
-              <b>{STATUS_LABEL[s.status] ?? s.status}…</b>
+              <b>{STATUS_LABEL[s.status] ?? s.status}…{STEPS.includes(s.status) ? ` (paso ${STEPS.indexOf(s.status) + 1} de ${STEPS.length})` : ""}</b>
               <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis" }}>{s.title ?? s.url}</span>
             </div>
           </div>
@@ -141,15 +146,24 @@ export default function Biblioteca() {
       ))}
 
       {clips.length > 0 && (
-        <div style={{ margin: "14px 0 0", maxWidth: 220 }}>
-          <select value={sort} onChange={(e) => setSort(e.target.value as "viral" | "new")}>
+        <div style={{ margin: "14px 0 0", display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔍 Buscar por título…" style={{ maxWidth: 260 }} />
+          <select value={sort} onChange={(e) => setSort(e.target.value as "viral" | "new" | "old")} style={{ maxWidth: 220 }}>
             <option value="viral">Más virales primero</option>
             <option value="new">Más recientes primero</option>
+            <option value="old">Más antiguos primero</option>
           </select>
+          <select value={minScore} onChange={(e) => setMinScore(Number(e.target.value))} style={{ maxWidth: 180 }}>
+            <option value={0}>Cualquier score</option>
+            <option value={60}>Score 60%+</option>
+            <option value={75}>Score 75%+</option>
+            <option value={90}>Score 90%+</option>
+          </select>
+          <small style={{ color: "var(--muted)" }}>{filtered.length} de {clips.length} clips</small>
         </div>
       )}
 
-      <div className="clips">{shown.map((c) => <ClipCard key={c.id} clip={c} />)}</div>
+      <div className="clips">{shown.map((c) => <ClipCard key={c.id} clip={c} onDeleted={(id) => setClips((p) => p.filter((x) => x.id !== id))} />)}</div>
 
       {loaded && !demo && clips.length === 0 && working.length === 0 && failed.length === 0 && (
         <div className="card" style={{ marginTop: 16 }}>

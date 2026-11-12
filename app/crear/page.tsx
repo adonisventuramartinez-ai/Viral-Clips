@@ -6,7 +6,7 @@ import PhonePreview, { type Layout } from "@/components/PhonePreview";
 import { ASPECT_CAM, ASPECT_VERT, DEFAULT_CAM, DEFAULT_CROP, parseEmbed, round2, toSeconds, type Box } from "@/lib/embed";
 
 type Src = "twitch" | "kick" | "archivo";
-const LAYOUTS: [Layout, string][] = [["crop", "Vertical"], ["split", "Dividido"], ["blur", "Fondo difuminado"]];
+const LAYOUTS: [Layout, string][] = [["crop", "Vertical"], ["split", "Dividido"], ["duo", "Dos personas"], ["blur", "Fondo difuminado"]];
 const PH: Record<Src, string> = { twitch: "https://www.twitch.tv/videos/…", kick: "https://kick.com/…/videos/…", archivo: "https://… (YouTube o enlace directo .mp4)" };
 
 export default function Crear() {
@@ -103,11 +103,11 @@ export default function Crear() {
           <div className="row" style={{ gridTemplateColumns: "repeat(4,1fr)" }}>
             <div><label>Desde</label><input value={from} onChange={(e) => setFrom(e.target.value)} placeholder="0:00" /></div>
             <div><label>Hasta</label><input value={to} onChange={(e) => setTo(e.target.value)} placeholder="1:00" /></div>
-            <div><label>Duración</label><select name="secs" defaultValue="45"><option value="30">30 s</option><option value="45">45 s</option><option value="60">60 s</option></select></div>
-            <div><label>Cantidad</label><select name="count" defaultValue="5"><option>1</option><option>3</option><option>5</option><option>10</option></select></div>
+            <div><label>Duración</label><select name="secs" defaultValue="45"><option value="30">30 s</option><option value="45">45 s</option><option value="60">60 s</option><option value="75">75 s</option><option value="90">90 s</option></select></div>
+            <div><label>Cantidad</label><select name="count" defaultValue="5"><option>1</option><option>3</option><option>5</option><option>10</option><option>15</option><option>20</option><option>30</option><option>50</option></select></div>
           </div>
           <div className="row" style={{ gridTemplateColumns: "1fr 1fr" }}>
-            <div><label>Calidad</label><select name="quality" defaultValue="1080p"><option value="720p">720p</option><option value="1080p">1080p</option></select></div>
+            <div><label>Calidad</label><select name="quality" defaultValue="1080p"><option value="720p">720p</option><option value="1080p">1080p</option><option value="1440p">1440p (2K)</option><option value="2160p">2160p (4K)</option></select></div>
             <div><label>Tu nombre (ranking)</label><input value={name} onChange={(e) => setName(e.target.value)} placeholder="ej. Juan" maxLength={40} /></div>
           </div>
 
@@ -137,6 +137,12 @@ export default function Crear() {
                     ? "Kick no permite mostrar el video aquí. Los clips se generan igual y el encuadre lo decide la IA."
                     : "No puedo mostrar este link en la vista previa. Los clips se generan igual."
                   : "Pega un link de YouTube, Twitch o un .mp4 y verás aquí tu video con el encuadre elegido."}
+              </small>
+            )}
+
+            {layout === "duo" && (
+              <small style={{ display: "block", textAlign: "center", color: "var(--muted)", margin: "14px 0 0" }}>
+                La IA busca a las dos personas sola: la de la izquierda va arriba y la de la derecha abajo (si una está sobre la otra, la de más arriba va arriba). La vista previa es aproximada. Si no las ve claras, usa la mitad izquierda y la mitad derecha del video.
               </small>
             )}
 

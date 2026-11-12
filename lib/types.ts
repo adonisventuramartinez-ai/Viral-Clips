@@ -10,7 +10,7 @@ export type Clip = {
   videoUrl?: string; // clips reales: URL firmada de Supabase Storage
   downloadUrl?: string;
   reason?: string;
-  narrated?: boolean;
+  isPublic?: boolean;
 };
 
 export type SourceRow = {

@@ -94,7 +94,7 @@ def main():
     config.WORK_DIR.mkdir(parents=True, exist_ok=True)
     import llm
     print(f"IA en orden de uso: {' → '.join(llm.configured())}", flush=True)
-    print("Worker listo (encuadres: vertical, dividido, difuminado), esperando trabajos…", flush=True)
+    print("Worker listo (encuadres: vertical, dividido, dos personas, difuminado), esperando trabajos…", flush=True)
     last_clean = 0.0
     while True:
         db.heartbeat()

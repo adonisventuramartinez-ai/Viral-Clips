@@ -2,7 +2,7 @@
 import { Media, Region } from "@/components/CropPreview";
 import { DEFAULT_CAM, DEFAULT_CROP, GAME_BOX, SPLIT_TOP, type Box, type Embed } from "@/lib/embed";
 
-export type Layout = "crop" | "split" | "blur";
+export type Layout = "crop" | "split" | "blur" | "duo";
 
 const grad = { game: "linear-gradient(180deg,#7bb7ff,#4a7a3a)", cam: "linear-gradient(160deg,#ff6ad5,#8b3dff)" };
 
@@ -32,6 +32,11 @@ export default function PhonePreview({ layout, embed, cropBox, camBox }: { layou
         {zone({ top: `${topPct}%`, bottom: 0 }, grad.game, "Juego", <Region e={embed} box={game} />)}
       </>)}
 
+      {layout === "duo" && (<>
+        {zone({ top: 0, height: "50%" }, grad.cam, "Persona 1 (izquierda)", <Region e={embed} box={{ x: 0, y: 10.5, w: 50, h: 79 }} />)}
+        {zone({ top: "50%", bottom: 0 }, grad.game, "Persona 2 (derecha)", <Region e={embed} box={{ x: 50, y: 10.5, w: 50, h: 79 }} />)}
+      </>)}
+
       {layout === "blur" && (<>
         {zone({ inset: 0, filter: "blur(16px) brightness(.65)" }, grad.game, "", <Region e={embed} box={{ ...DEFAULT_CROP }} still />)}
         <div className="zone" style={{ top: "50%", left: 0, right: 0, transform: "translateY(-50%)", aspectRatio: "16 / 9", background: live ? "#000" : "linear-gradient(160deg,#4a7a3a,#2a4a6a)" }}>
@@ -39,7 +44,7 @@ export default function PhonePreview({ layout, embed, cropBox, camBox }: { layou
         </div>
       </>)}
 
-      <div className="cap2" style={{ bottom: layout === "split" ? "50%" : "26%" }}>ASÍ <span style={{ color: "#ffe000" }}>SE VERÁN</span></div>
+      <div className="cap2" style={{ bottom: layout === "split" ? "50%" : layout === "duo" ? "46%" : "26%" }}>ASÍ <span style={{ color: "#ffe000" }}>SE VERÁN</span></div>
     </div>
   );
 }

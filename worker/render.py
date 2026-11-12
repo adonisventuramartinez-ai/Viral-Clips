@@ -19,10 +19,13 @@ Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
 
 # En modo dividido los subtítulos quedan sobre la unión de los dos paneles (MargenV 1000)
 ASS_HEADER_SPLIT = ASS_HEADER.replace("60,60,520,1", "60,60,1000,1")
+# En dos personas la unión de los paneles está en y=960: el texto queda a caballo entre las dos
+ASS_HEADER_DUO = ASS_HEADER.replace("60,60,520,1", "60,60,890,1")
 
 # Medidas del modo dividido (suman 1920): arriba la cámara, abajo el juego
 SPLIT_TOP_H = 760
 SPLIT_BOT_H = 1920 - SPLIT_TOP_H
+DUO_H = 960   # dos personas: dos paneles iguales de 1080x960
 
 YELLOW = "{\\c&H00E0FF&}"  # ASS usa BGR
 WHITE = "{\\c&HFFFFFF&}"
@@ -35,10 +38,10 @@ def _t(sec: float) -> str:
     return f"{int(h)}:{int(m):02d}:{s:05.2f}"
 
 
-def build_ass(words, start, end, group=3, is_split=False):
+def build_ass(words, start, end, group=3, is_split=False, is_duo=False):
     """words: lista global [{w,start,end}]. Genera eventos relativos al inicio del clip."""
     ws = [w for w in words if w["start"] >= start - 0.05 and w["end"] <= end + 0.3]
-    lines = [ASS_HEADER_SPLIT if is_split else ASS_HEADER]
+    lines = [ASS_HEADER_DUO if is_duo else ASS_HEADER_SPLIT if is_split else ASS_HEADER]
     
     POP_EFFECT = "{\\fscx120\\fscy120\\t(0,100,\\fscx100\\fscy100)}"
 
@@ -147,9 +150,23 @@ def _cam_box(source: Path, start: float, dur: float, sw: int, sh: int, custom_cr
     return {"x": 100 - w - 1, "y": 100 - h - 1, "w": w, "h": h}
 
 
-def _ass_for(words, start, end, workdir: Path, stem: str, split: bool) -> Path:
+def _duo_boxes(source: Path, start: float, dur: float, sw: int, sh: int):
+    """(arriba, abajo): cada persona en su panel. Si no ve a dos personas, usa la mitad izquierda arriba y la derecha abajo."""
+    aspect = 1080 / DUO_H
+    if config.CLIP_FRAMING == "auto":
+        import framing
+        two = framing.duo_boxes(source, start, dur, sw, sh, aspect)
+        if two:
+            print("  Dos personas: encontré a las dos (izquierda/arriba va arriba)", flush=True)
+            return two
+    print("  Dos personas: no vi a dos personas claras, uso mitad izquierda arriba y mitad derecha abajo", flush=True)
+    h = min(100.0, 50.0 * sw / (sh * aspect))
+    return ({"x": 0.0, "y": (100 - h) / 2, "w": 50.0, "h": h}, {"x": 50.0, "y": (100 - h) / 2, "w": 50.0, "h": h})
+
+
+def _ass_for(words, start, end, workdir: Path, stem: str, split: bool, duo: bool = False) -> Path:
     ass = workdir / f"{stem}.ass"
-    ass.write_text(build_ass(words, start, end, is_split=split), encoding="utf-8")
+    ass.write_text(build_ass(words, start, end, is_split=split, is_duo=duo), encoding="utf-8")
     return ass
 
 
@@ -161,6 +178,16 @@ def build_filter(layout: str, source: Path, start: float, dur: float, ass_name: 
             "[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=30:5,eq=brightness=-0.12[b];"
             "[fg]scale=1080:-2:flags=lanczos[f];"
             f"[b][f]overlay=(W-w)/2:(H-h)/2,setsar=1,subtitles={ass_name}"
+        )
+    if layout == "duo":
+        sw, sh = _probe(source)
+        top, bot = _duo_boxes(source, start, dur, sw, sh)
+        a, b = _box_filter(sw, sh, top), _box_filter(sw, sh, bot)
+        return (
+            "[0:v]split=2[a][b];"
+            f"[a]{a},scale=1080:{DUO_H}:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:{DUO_H},setsar=1[t];"
+            f"[b]{b},scale=1080:{DUO_H}:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:{DUO_H},setsar=1[g];"
+            f"[t][g]vstack=inputs=2,subtitles={ass_name}"
         )
     if layout == "split":
         sw, sh = _probe(source)
@@ -184,10 +211,10 @@ def render_clip(source: Path, words, start: float, end: float, out: Path, workdi
                 custom_crop: dict = None, layout: str = None):
     dur = end - start
     layout = (layout or config.CLIP_LAYOUT or "crop").strip().lower()
-    if layout not in ("crop", "split", "blur"):
+    if layout not in ("crop", "split", "blur", "duo"):
         layout = "crop"
 
-    ass = _ass_for(words, start, end, workdir, out.stem, split=(layout == "split"))
+    ass = _ass_for(words, start, end, workdir, out.stem, split=(layout == "split"), duo=(layout == "duo"))
     graph = build_filter(layout, source, start, dur, ass.name, custom_crop)
 
     logo = (workdir / config.LOGO_PATH) if getattr(config, "LOGO_PATH", "") else None

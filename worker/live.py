@@ -33,7 +33,8 @@ def _resolve(url, quality):
     """Pide a yt-dlp el stream del directo. Devuelve (entradas, mapas_ffmpeg, título)."""
     import yt_dlp
 
-    height = 1080 if quality == "1080p" else 720
+    digits = "".join(ch for ch in str(quality) if ch.isdigit())   # "2160p" -> 2160 (4K)
+    height = int(digits) if digits else 720
     opts = {"quiet": True, "noplaylist": True,
             "format": f"bv*[height<={height}]+ba/b[height<={height}]/bv*+ba/b/b",
             "remote_components": ["ejs:github"]}
@@ -177,7 +178,8 @@ def process_live(job):
                      for w in all_words if w["end"] >= base and w["start"] <= wend]
         
         out = work / f"{cid}.mp4"
-        render_clip(win, rel_words, m["start"] - base, end - base, out, work)
+        render_clip(win, rel_words, m["start"] - base, end - base, out, work,
+                    custom_crop=src.get("custom_crop"), layout=src.get("layout"))
         path = f"{sid}/{cid}.mp4"
         db.upload_clip(path, out)
         m["abs_start"], m["abs_end"] = m["start"], end

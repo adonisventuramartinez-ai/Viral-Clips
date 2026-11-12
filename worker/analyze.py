@@ -10,7 +10,7 @@ WINDOW = 900  # segundos de transcripción por llamada
 PROMPT = """Eres editor experto de clips virales para TikTok, Reels y Shorts.
 Te paso un trozo de la transcripción de un podcast/directo. Cada línea empieza con [segundo].
 
-Elige hasta {want} momentos con alto potencial viral: polémica, humor, confesiones, historias con gancho,
+Elige hasta {want} momentos (si hay muchos, ordénalos de mejor a peor y no repitas el mismo tema) con alto potencial viral: polémica, humor, confesiones, historias con gancho,
 frases citables, reacciones fuertes, giros inesperados. Cada clip debe:
 - durar cerca de {secs} segundos (entre {lo} y {hi});
 - empezar con un gancho que enganche en los primeros 3 segundos;
@@ -55,7 +55,7 @@ def _parse_moments(txt):
 
 def _build_prompt(chunk, want, secs):
     text = "\n".join(f"[{int(s['start'])}] {s['text']}" for s in chunk)
-    return PROMPT.format(want=want, secs=secs, lo=int(secs * 0.6), hi=int(secs * 1.5), text=text)
+    return PROMPT.format(want=want, secs=secs, lo=int(secs * 0.75), hi=int(secs * 1.3), text=text)
 
 
 def _ask_llm(chunk, want, secs):
@@ -92,7 +92,7 @@ def _clean(m, secs, duration):
         return None
     if end <= start:
         end = start + secs
-    length = min(max(end - start, secs * 0.5), secs * 1.8)
+    length = min(max(end - start, secs * 0.6), secs * 1.4)
     end = min(start + length, duration)
     if end - start < 5:
         return None
@@ -103,7 +103,7 @@ def _clean(m, secs, duration):
 def find_moments(segments, n_clips, secs):
     duration = segments[-1]["end"] if segments else 0
     chunks = _chunks(segments)
-    want = max(3, math.ceil(n_clips * 1.6 / max(1, len(chunks))))
+    want = min(40, max(3, math.ceil(n_clips * 2.0 / max(1, len(chunks)))))   # pide de más: luego se quitan solapes y se queda con los mejores
     cands = []
     for ch in chunks:
         for m in _ask_llm(ch, want, secs):

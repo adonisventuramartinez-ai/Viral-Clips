@@ -76,7 +76,8 @@ export default function EnVivo() {
         clip_seconds: Number(f.get("secs")),
         quality: f.get("quality"),
         review_minutes: Number(f.get("review")),
-        layout: f.get("layout"), // <-- NUEVO: Enviamos el formato
+        layout: f.get("layout"),
+        clipper: (() => { try { return localStorage.getItem("cf_clipper") || null; } catch { return null; } })(),
       }),
     });
     const j = await res.json();
@@ -115,11 +116,11 @@ export default function EnVivo() {
           
           <div className="row">
             <div><label>Duración de cada clip</label>
-              <select name="secs" defaultValue="45"><option value="30">30 s</option><option value="45">45 s</option><option value="60">60 s</option></select></div>
+              <select name="secs" defaultValue="45"><option value="30">30 s</option><option value="45">45 s</option><option value="60">60 s</option><option value="75">75 s</option><option value="90">90 s</option></select></div>
             <div><label>Revisar cada</label>
               <select name="review" defaultValue="2"><option value="1">1 min</option><option value="2">2 min</option><option value="5">5 min</option></select></div>
             <div><label>Calidad</label>
-              <select name="quality" defaultValue="720p"><option>720p</option><option>1080p</option></select></div>
+              <select name="quality" defaultValue="720p"><option value="720p">720p</option><option value="1080p">1080p</option><option value="1440p">1440p (2K)</option><option value="2160p">2160p (4K)</option></select></div>
           </div>
 
           {/* --- NUEVO: Selector de Formato --- */}
@@ -128,6 +129,7 @@ export default function EnVivo() {
             <select name="layout" defaultValue="crop">
               <option value="crop">Zoom a la cara</option>
               <option value="split">Pantalla dividida</option>
+              <option value="duo">Dos personas (una arriba, otra abajo)</option>
               <option value="blur">Fondo borroso</option>
             </select>
           </div>

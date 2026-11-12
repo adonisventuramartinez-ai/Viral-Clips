@@ -71,7 +71,7 @@ def _detect(gray):
     # quita cajas repetidas (misma cara detectada dos veces)
     out = []
     for f in sorted(faces, key=lambda f: -f["w"]):
-        if all(abs(f["x"] - o["x"]) > max(f["w"], o["w"]) * 0.6 for o in out):
+        if all(abs(f["x"] - o["x"]) > max(f["w"], o["w"]) * 0.6 or abs(f["y"] - o["y"]) > max(f["w"], o["w"]) * 1.2 for o in out):
             out.append(f)
     return out
 
@@ -221,4 +221,64 @@ def cam_box(source, start, dur, src_w, src_h, aspect):
         print("  Encuadre: falta scikit-image (pip install scikit-image).", flush=True)
     except Exception as e:  # noqa: BLE001
         print(f"  Encuadre: no pude ubicar la cámara ({type(e).__name__}: {str(e)[:100]}).", flush=True)
+    return None
+
+
+def _panel_box(fx, fy, fw, src_w, src_h, aspect):
+    """Recuadro (en % del video) centrado en una cara (fracciones 0-1) con la proporción `aspect`."""
+    w_pct = min(100.0, fw * 100 * 3.2)
+    h_pct = w_pct * src_w / (src_h * aspect)
+    if h_pct > 100:
+        h_pct = 100.0
+        w_pct = h_pct * src_h * aspect / src_w
+    x = min(max(fx * 100 - w_pct / 2, 0.0), 100 - w_pct)
+    y = min(max(fy * 100 - h_pct * 0.45, 0.0), 100 - h_pct)
+    return {"x": round(x, 2), "y": round(y, 2), "w": round(w_pct, 2), "h": round(h_pct, 2)}
+
+
+def split_two(faces, n_samples, src_w, src_h):
+    """Lógica pura: de todas las caras vistas saca (persona_de_arriba, persona_de_abajo) o None si no hay dos personas claras.
+    Agrupa las caras en 2 grupos (k-means) y exige que estén bien separadas y presentes en suficientes cuadros.
+    Orden: si están lado a lado, la de la izquierda va arriba; si una está sobre la otra, la de más arriba va arriba."""
+    if len(faces) < 6 or n_samples < 3:
+        return None
+    k = src_h / src_w                                   # para medir distancias con la misma escala en x e y
+    pts = [(f["x"], f["y"] * k, f["w"]) for f in faces]
+    c = [min(pts, key=lambda p: p[0] + p[1]), max(pts, key=lambda p: p[0] + p[1])]
+    c = [(p[0], p[1]) for p in c]
+    groups = [[], []]
+    for _ in range(12):
+        groups = [[], []]
+        for p in pts:
+            d = [(p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2 for q in c]
+            groups[0 if d[0] <= d[1] else 1].append(p)
+        if not all(groups):
+            return None
+        c = [(statistics.median(p[0] for p in g), statistics.median(p[1] for p in g)) for g in groups]
+    need = max(3, 0.15 * n_samples)
+    if min(len(g) for g in groups) < need:
+        return None
+    sep = ((c[0][0] - c[1][0]) ** 2 + (c[0][1] - c[1][1]) ** 2) ** 0.5
+    fw = statistics.median(p[2] for g in groups for p in g)
+    if sep < max(0.18, fw * 1.8):                       # demasiado cerca: es una sola persona o dos pegadas
+        return None
+    people = [{"x": c[i][0], "y": c[i][1] / k, "w": statistics.median(p[2] for p in groups[i])} for i in range(2)]
+    stacked = abs(c[0][1] - c[1][1]) > abs(c[0][0] - c[1][0])
+    people.sort(key=lambda p: p["y"] if stacked else p["x"])
+    return people[0], people[1]
+
+
+def duo_boxes(source, start, dur, src_w, src_h, aspect):
+    """Modo 'dos personas': devuelve (recuadro_arriba, recuadro_abajo) en % del video, o None si no ve a dos personas."""
+    try:
+        samples = sample_faces(source, start, min(dur, 15.0), src_w, src_h)
+        faces = [f for s in samples for f in s["faces"]]
+        two = split_two(faces, len(samples), src_w, src_h)
+        if not two:
+            return None
+        return tuple(_panel_box(p["x"], p["y"], p["w"], src_w, src_h, aspect) for p in two)
+    except ImportError:
+        print("  Encuadre: falta scikit-image (pip install scikit-image).", flush=True)
+    except Exception as e:  # noqa: BLE001
+        print(f"  Encuadre: no pude ubicar a las dos personas ({type(e).__name__}: {str(e)[:100]}).", flush=True)
     return None
