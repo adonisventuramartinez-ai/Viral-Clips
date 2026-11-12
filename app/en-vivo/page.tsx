@@ -128,7 +128,9 @@ export default function EnVivo() {
             <label>Formato del video</label>
             <select name="layout" defaultValue="crop">
               <option value="crop">Zoom a la cara</option>
-              <option value="split">Pantalla dividida</option>
+              <option value="split">Dividido: cara grande</option>
+              <option value="split_eq">Dividido: equilibrado</option>
+              <option value="split_game">Dividido: juego grande</option>
               <option value="duo">Dos personas (una arriba, otra abajo)</option>
               <option value="blur">Fondo borroso</option>
             </select>

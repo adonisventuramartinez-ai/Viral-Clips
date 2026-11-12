@@ -96,7 +96,9 @@ export default function ClipCard({ clip, onDeleted, onAdjusted }: { clip: Clip; 
             <select value={a.layout} onChange={(e) => setA({ ...a, layout: e.target.value })}>
               <option value="">Mismo encuadre</option>
               <option value="crop">Vertical</option>
-              <option value="split">Dividido (cara + gameplay)</option>
+              <option value="split">Dividido: cara grande</option>
+              <option value="split_eq">Dividido: equilibrado</option>
+              <option value="split_game">Dividido: juego grande</option>
               <option value="duo">Dos personas</option>
               <option value="blur">Fondo difuminado</option>
             </select>

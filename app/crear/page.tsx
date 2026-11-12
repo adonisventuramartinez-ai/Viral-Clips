@@ -4,10 +4,11 @@ import CropPreview from "@/components/CropPreview";
 import CommunityFeed from "@/components/CommunityFeed";
 import PhonePreview, { type Layout } from "@/components/PhonePreview";
 import { useBrand } from "@/lib/useBrand";
-import { ASPECT_CAM, ASPECT_VERT, DEFAULT_CAM, DEFAULT_CROP, parseEmbed, round2, toSeconds, type Box } from "@/lib/embed";
+import { ASPECT_VERT, DEFAULT_CAM, DEFAULT_CROP, aspectCam, boxH, isSplit, parseEmbed, round2, toSeconds, type Box } from "@/lib/embed";
 
 type Src = "twitch" | "kick" | "archivo";
-const LAYOUTS: [Layout, string][] = [["crop", "Vertical"], ["split", "Dividido"], ["duo", "Dos personas"], ["blur", "Fondo difuminado"]];
+const LAYOUTS: [Layout, string][] = [["crop", "Vertical"], ["split_eq", "Dividido"], ["duo", "Dos personas"], ["blur", "Fondo difuminado"]];
+const PROPS: [Layout, string][] = [["split", "Cara grande"], ["split_eq", "Equilibrado"], ["split_game", "Juego grande"]];
 const PH: Record<Src, string> = { twitch: "https://www.twitch.tv/videos/…", kick: "https://kick.com/…/videos/…", archivo: "https://… (YouTube o enlace directo .mp4)" };
 
 export default function Crear() {
@@ -45,10 +46,13 @@ export default function Crear() {
   const live = embed.kind !== "none";
   const isKick = /kick\.com/i.test(first);
 
+  // El recuadro de la cámara tiene que respetar la proporción del panel de arriba (cambia con "Cara grande / Equilibrado / Juego grande")
+  const camFixed: Box = (() => { const h = Math.min(100, boxH(camBox.w, aspectCam(layout))); return { ...camBox, h, y: Math.min(camBox.y, 100 - h) }; })();
+
   // Recuadro que realmente se enviará al worker (null = que lo decida la IA)
-  const sentBox: Box | null = !live ? null : layout === "crop" ? (manualCrop ? cropBox : null) : layout === "split" ? (manualCam ? camBox : null) : null;
+  const sentBox: Box | null = !live ? null : layout === "crop" ? (manualCrop ? cropBox : null) : isSplit(layout) ? (manualCam ? camFixed : null) : null;
   const previewCrop = layout === "crop" && manualCrop ? cropBox : null;
-  const previewCam = layout === "split" && manualCam ? camBox : null;
+  const previewCam = isSplit(layout) && manualCam ? camFixed : null;
 
   const step = !url ? 1 : msg?.ok ? 4 : layout !== "crop" || manualCrop ? 2 : 3;
 
@@ -114,7 +118,7 @@ export default function Crear() {
     <button type="button" className={`tab ${k === "kick" ? "kick" : ""} ${src === k ? "on" : ""}`} onClick={() => setSrc(k)}>{label}</button>
   );
 
-  const editable = live && ((layout === "crop") || (layout === "split"));
+  const editable = live && (layout === "crop" || isSplit(layout));
   const manual = layout === "crop" ? manualCrop : manualCam;
   const toggleManual = () => (layout === "crop" ? setManualCrop(!manualCrop) : setManualCam(!manualCam));
 
@@ -158,7 +162,7 @@ export default function Crear() {
 
           <label>Encuadre en el teléfono</label>
           <div className="tabs3">{LAYOUTS.map(([k, l]) => (
-            <button type="button" key={k} className={`tab ${layout === k ? "on" : ""}`} style={{ fontSize: 12 }} onClick={() => setLayout(k)}>{l}</button>
+            <button type="button" key={k} className={`tab ${(k === "split_eq" ? isSplit(layout) : layout === k) ? "on" : ""}`} style={{ fontSize: 12 }} onClick={() => setLayout(k)}>{l}</button>
           ))}</div>
 
           <div style={{ border: "1px dashed var(--line)", borderRadius: 12, padding: 12, margin: "6px 0 12px" }}>
@@ -179,6 +183,18 @@ export default function Crear() {
             </div>
             <small style={{ color: "var(--muted)" }}>Guarda encuadre, duración, cantidad y calidad actuales.</small>
           </div>
+
+          {isSplit(layout) && (
+            <>
+              <label>Tamaño de cada parte</label>
+              <div className="tabs3">{PROPS.map(([k, l]) => (
+                <button type="button" key={k} className={`tab ${layout === k ? "on" : ""}`} style={{ fontSize: 12 }} onClick={() => setLayout(k)}>{l}</button>
+              ))}</div>
+              <small style={{ display: "block", color: "var(--muted)", margin: "-6px 0 12px" }}>
+                {layout === "split" ? "Tu cara grande arriba y el gameplay completo abajo, sin recortar." : layout === "split_eq" ? "Mitad y mitad: el gameplay se ve más grande y se recorta un poco de los lados." : "El gameplay ocupa más de la mitad (se recortan más los lados): ideal si lo importante pasa en el centro."}
+              </small>
+            </>
+          )}
 
           <button className="btn" style={{ width: "100%", marginTop: 6 }} disabled={busy}>{busy ? "Importando…" : links.length > 1 ? `Importar ${links.length} links y generar clips` : "Importar link y generar clips"}</button>
           {msg && <div className={`banner ${msg.ok ? "ok" : ""}`} style={{ marginTop: 14, marginBottom: 0 }}>{msg.text}</div>}
@@ -220,7 +236,7 @@ export default function Crear() {
                 {manual && (
                   layout === "crop"
                     ? <CropPreview embed={embed} box={cropBox} aspect={ASPECT_VERT} onChange={setCropBox} />
-                    : <CropPreview embed={embed} box={camBox} aspect={ASPECT_CAM} onChange={setCamBox} />
+                    : <CropPreview embed={embed} box={camFixed} aspect={aspectCam(layout)} onChange={setCamBox} />
                 )}
                 <button type="button" className="btn ghost sm" style={{ width: "100%", marginTop: 10 }} onClick={toggleManual}>
                   {manual ? (layout === "crop" ? "Usar encuadre automático" : "Que la IA busque mi cámara") : (layout === "crop" ? "Ajustar encuadre a mano" : "Marcar mi cámara a mano")}

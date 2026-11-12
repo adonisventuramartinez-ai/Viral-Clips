@@ -41,10 +41,13 @@ export function parseEmbed(url: string, startSec = 0): Embed {
 }
 
 /** Lo que el worker calcula igual (render.py): mantén estas medidas en sincronía. */
-export const SPLIT_TOP = 1312; // arriba tu cara/cámara; abajo (608 px) el gameplay completo en 16:9
-export const SPLIT_BOT = 1920 - SPLIT_TOP;
-export const ASPECT_CAM = 1080 / SPLIT_TOP; // panel de arriba (cámara)
-export const ASPECT_GAME = 1080 / SPLIT_BOT; // panel de abajo (juego)
+// Dividido: alto (px) del panel de arriba (tu cara). Mismos valores que SPLIT_TOPS en worker/render.py
+export const SPLIT_TOPS: Record<string, number> = { split: 1312, split_eq: 1000, split_game: 780 };
+export const isSplit = (layout: string) => layout in SPLIT_TOPS;
+export const splitTop = (layout: string) => SPLIT_TOPS[layout] ?? SPLIT_TOPS.split;
+export const aspectCam = (layout: string) => 1080 / splitTop(layout); // panel de arriba (cámara)
+export const aspectGame = (layout: string) => 1080 / (1920 - splitTop(layout)); // panel de abajo (juego)
+export const ASPECT_CAM = aspectCam("split_eq");
 export const ASPECT_VERT = 9 / 16;
 
 /** Alto (%) que le toca a un recuadro de ancho `w` (%) para tener la proporción `aspect` sobre un video 16:9. */
@@ -59,6 +62,5 @@ export function centerBox(aspect: number): Box {
 
 export const DEFAULT_CROP: Box = centerBox(ASPECT_VERT);
 export const DEFAULT_CAM: Box = { x: 72, y: 43, w: 26, h: boxH(26, ASPECT_CAM) }; // esquina inferior derecha
-export const GAME_BOX: Box = centerBox(ASPECT_GAME);
 
 export const round2 = (b: Box): Box => ({ x: +b.x.toFixed(2), y: +b.y.toFixed(2), w: +b.w.toFixed(2), h: +b.h.toFixed(2) });

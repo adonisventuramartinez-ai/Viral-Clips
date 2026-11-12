@@ -11,12 +11,15 @@ DEFAULT_SUBS = {"text": "FFFFFF", "active": "FFE000", "outline": "000000", "size
                 "upper": True, "pop": True, "offset": 0}
 
 # Medidas de los encuadres (suman 1920)
-SPLIT_TOP_H = 1312   # arriba: tu cara/cámara grande. Abajo: el gameplay completo en 16:9 (1080x608)
-SPLIT_BOT_H = 1920 - SPLIT_TOP_H
+# Dividido: alto (px) del panel de ARRIBA (tu cara). Abajo va el gameplay con el resto.
+#   split      cara grande: gameplay completo en 16:9 (1080x608), sin recortar
+#   split_eq   equilibrado: ~50/50, el gameplay se recorta un poco de los lados
+#   split_game juego grande: el gameplay ocupa ~60% (recorta más de los lados)
+SPLIT_TOPS = {"split": 1312, "split_eq": 1000, "split_game": 780}
 DUO_H = 960   # dos personas: dos paneles iguales de 1080x960
 
 # Altura (MargenV) de los subtítulos según el encuadre: en dividido y dos personas quedan a caballo sobre la unión
-SUB_MARGIN = {"crop": 520, "blur": 520, "split": 578, "duo": 890}
+SUB_MARGIN = {"crop": 520, "blur": 520, "duo": 890}
 
 
 def _hex(c: str, default: str = "FFFFFF") -> str:
@@ -36,7 +39,8 @@ def _subs(style):
 
 
 def _header(layout: str, st: dict) -> str:
-    margin = max(40, SUB_MARGIN.get(layout, 520) + st["offset"])
+    base = SUB_MARGIN.get(layout) or (1920 - SPLIT_TOPS[layout] - 30 if layout in SPLIT_TOPS else 520)
+    margin = max(40, base + st["offset"])
     return f"""[Script Info]
 ScriptType: v4.00+
 PlayResX: 1080
@@ -161,12 +165,12 @@ def _crop_filter(source: Path, start: float, dur: float, custom_crop: dict = Non
     return f"crop=w={cw}:h={min(ch, sh)}:x=0:y='(ih-oh)/2'"
 
 
-def _cam_box(source: Path, start: float, dur: float, sw: int, sh: int, custom_crop: dict = None) -> dict:
+def _cam_box(source: Path, start: float, dur: float, sw: int, sh: int, custom_crop: dict = None, top_h: int = 1312) -> dict:
     """Recuadro (en %) de la cámara para el panel de arriba del modo dividido.
     Prioridad: el que marcó el usuario > detección de cara > esquina inferior derecha (donde suele estar la cámara)."""
     if custom_crop:
         return custom_crop
-    aspect = 1080 / SPLIT_TOP_H
+    aspect = 1080 / top_h
     if config.CLIP_FRAMING == "auto":
         import framing
         box = framing.cam_box(source, start, dur, sw, sh, aspect)
@@ -221,13 +225,20 @@ def build_filter(layout: str, source: Path, start: float, dur: float, ass_name: 
             f"[b]{b},scale=1080:{DUO_H}:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:{DUO_H},setsar=1[g];"
             f"[t][g]vstack=inputs=2,subtitles={ass_name}"
         )
-    if layout == "split":
+    if layout in SPLIT_TOPS:
+        top_h = SPLIT_TOPS[layout]
+        bot_h = 1920 - top_h
         sw, sh = _probe(source)
-        cam = _box_filter(sw, sh, _cam_box(source, start, dur, sw, sh, custom_crop))
+        cam = _box_filter(sw, sh, _cam_box(source, start, dur, sw, sh, custom_crop, top_h))
+        if bot_h <= 640:   # cabe el gameplay completo en 16:9: sin recortar
+            game = f"scale=1080:{bot_h}:force_original_aspect_ratio=decrease:flags=lanczos,pad=1080:{bot_h}:(ow-iw)/2:(oh-ih)/2:black"
+        else:              # panel más alto: el gameplay llena el panel (recorta un poco de los lados)
+            game = (f"{_fit_filter(sw, sh, 1080 / bot_h, config.CLIP_FOCUS_X)},"
+                    f"scale=1080:{bot_h}:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:{bot_h}")
         return (
             "[0:v]split=2[a][b];"
-            f"[a]{cam},scale=1080:{SPLIT_TOP_H}:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:{SPLIT_TOP_H},setsar=1[t];"
-            f"[b]scale=1080:{SPLIT_BOT_H}:force_original_aspect_ratio=decrease:flags=lanczos,pad=1080:{SPLIT_BOT_H}:(ow-iw)/2:(oh-ih)/2:black,setsar=1[g];"
+            f"[a]{cam},scale=1080:{top_h}:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:{top_h},setsar=1[t];"
+            f"[b]{game},setsar=1[g];"
             f"[t][g]vstack=inputs=2,subtitles={ass_name}"
         )
     sharpen = f"unsharp=5:5:{config.CLIP_SHARPEN:.2f}:5:5:0.0," if config.CLIP_SHARPEN > 0 else ""
@@ -257,7 +268,7 @@ def render_clip(source: Path, words, start: float, end: float, out: Path, workdi
                 custom_crop: dict = None, layout: str = None, brand: dict = None, hook: str = None):
     dur = end - start
     layout = (layout or config.CLIP_LAYOUT or "crop").strip().lower()
-    if layout not in ("crop", "split", "blur", "duo"):
+    if layout not in ("crop", "blur", "duo", *SPLIT_TOPS):
         layout = "crop"
 
     ass = _ass_for(words, start, end, workdir, out.stem, layout, brand, hook)

@@ -35,7 +35,7 @@ export async function POST(req: Request) {
     quality: ["720p", "1080p", "1440p", "2160p"].includes(quality) ? quality : "1080p",
     review_minutes: num(review_minutes, 2, 1, 10),
   };
-  const safeLayout = ["crop", "split", "blur", "duo"].includes(layout) ? layout : "crop";
+  const safeLayout = ["crop", "split", "split_eq", "split_game", "blur", "duo"].includes(layout) ? layout : "crop";
 
   const db = serverClient();
   if (!db) return NextResponse.json({ ok: true, demo: true, message: "Modo demo: conecta Supabase para encolar de verdad." });

@@ -30,3 +30,7 @@
 - El chat de Twitch (💬) depende de que yt-dlp pueda bajarlo; si no puede, se ignora y todo sigue igual.
 - "Ajustar" y los Ajustes de logo/subtítulos necesitan tu Supabase y tu worker; el render sí se probó con ffmpeg.
 - Fuente de los subtítulos: DejaVu Sans Bold (la que trae el Docker).
+
+# Quinta tanda
+- Dividido con 3 tamaños (Proyecto, En vivo y Ajustar): "Cara grande" (cara arriba 68% + gameplay completo abajo), "Equilibrado" (mitad y mitad, el gameplay se recorta un poco de los lados) y "Juego grande" (gameplay ~60%). Por defecto el botón Dividido usa Equilibrado.
+- Este zip ya NO trae la carpeta .git (el anterior la traía y por eso Git te daba conflictos).
