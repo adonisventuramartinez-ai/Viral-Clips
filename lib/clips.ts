@@ -12,6 +12,8 @@ type Row = {
   storage_path: string | null;
   size_bytes: number | null;
   is_public?: boolean | null;
+  description?: string | null;
+  hashtags?: string[] | null;
 };
 
 const COLS = "id,title,start_sec,end_sec,viral_score,reason,storage_path,size_bytes";
@@ -22,8 +24,15 @@ export async function loadClips(db: SupabaseClient, sourceId?: string): Promise<
     const base = db.from("clips").select(cols);
     return (sourceId ? base.eq("source_id", sourceId) : base).order("created_at", { ascending: false }).limit(200);
   };
-  let { data, error } = await q(COLS + ",is_public");
-  if (error) ({ data, error } = await q(COLS)); // aún no corriste la migración 0004: funciona sin is_public
+  // Prueba con todas las columnas nuevas y va quitando las que aún no existan (migraciones 0004 / 0005 sin correr)
+  let data: unknown[] | null = null;
+  let error: { message: string } | null = null;
+  for (const extra of [",is_public,description,hashtags", ",is_public", ""]) {
+    const r = await q(COLS + extra);
+    data = r.data as unknown[] | null;
+    error = r.error;
+    if (!error) break;
+  }
   if (error) throw new Error(error.message);
 
   const rows = (data ?? []) as unknown as Row[];
@@ -55,6 +64,8 @@ export async function loadClips(db: SupabaseClient, sourceId?: string): Promise<
     thumb: "",
     reason: r.reason ?? undefined,
     isPublic: r.is_public ?? true,
+    description: r.description ?? undefined,
+    hashtags: r.hashtags ?? undefined,
     videoUrl: r.storage_path ? play.get(r.storage_path) : undefined,
     downloadUrl: r.storage_path ? dl.get(r.storage_path) : undefined,
   }));

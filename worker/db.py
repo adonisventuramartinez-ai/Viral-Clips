@@ -78,13 +78,30 @@ def _clipper_of(source):
     return _clipper_cache[source]
 
 
+_extra_cols_ok = True   # pasa a False si la tabla clips aún no tiene description/hashtags (migración 0005)
+
+
 def save_clip(source, user_id, m, storage_path, size_bytes, words_in_clip):
-    sb.table("clips").insert({
+    global _extra_cols_ok
+    row = {
         "source_id": source, "user_id": user_id, "title": m["title"], "clipper": _clipper_of(source),
         "start_sec": m["abs_start"], "end_sec": m["abs_end"], "viral_score": m["score"],
         "reason": m["reason"], "captions": words_in_clip,
         "storage_path": storage_path, "size_bytes": size_bytes,
-    }).execute()
+    }
+    extra = {}
+    if m.get("description"):
+        extra["description"] = m["description"]
+    if m.get("hashtags"):
+        extra["hashtags"] = m["hashtags"]
+    if extra and _extra_cols_ok:
+        try:
+            sb.table("clips").insert({**row, **extra}).execute()
+            return
+        except Exception as e:  # noqa: BLE001
+            _extra_cols_ok = False
+            print(f"  Aviso: no pude guardar descripción/hashtags ({str(e)[:80]}). Ejecuta 0005_calidad.sql en Supabase.", flush=True)
+    sb.table("clips").insert(row).execute()
 
 
 def get_clip(clip_id):

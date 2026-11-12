@@ -15,6 +15,8 @@ export type Clip = {
   downloadUrl?: string;
   reason?: string;
   isPublic?: boolean;
+  description?: string;
+  hashtags?: string[];
 };
 
 export type SourceRow = {

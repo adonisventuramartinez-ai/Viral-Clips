@@ -255,13 +255,21 @@ _LOGO_POS = {
 }
 
 
-def _logo_graph(graph: str, brand: dict) -> str:
-    """Pega el logo sobre el video. brand = {path, pos, size (% del ancho), opacity (0-100), margin}."""
+def _logo_graph(graph: str, brand: dict, src: str = "v") -> str:
+    """Pega el logo sobre el video. brand = {path, pos, size (% del ancho), opacity (0-100), margin}.
+    `graph` debe terminar en la etiqueta [src]."""
     pos = _LOGO_POS.get(brand.get("pos", "bc"), _LOGO_POS["bc"]).format(m=int(brand.get("margin", 110)))
     width = max(40, int(1080 * min(60, max(5, float(brand.get("size", 24)))) / 100)) // 2 * 2
     alpha = min(1.0, max(0.1, float(brand.get("opacity", 100)) / 100))
-    return (f"{graph}[v];[1:v]scale={width}:-1,format=rgba,colorchannelmixer=aa={alpha:.2f}[logo];"
-            f"[v][logo]overlay={pos}:format=auto[out]")
+    return (f"{graph};[1:v]scale={width}:-1,format=rgba,colorchannelmixer=aa={alpha:.2f}[logo];"
+            f"[{src}][logo]overlay={pos}:format=auto[out]")
+
+
+def _bar_graph(graph: str, dur: float, src_in: str = "vA", src_out: str = "vB") -> str:
+    """Barra de progreso blanca abajo que se llena durante el clip (retiene a quien mira). `graph` termina en [src_in]."""
+    d = max(0.5, dur)
+    return (f"{graph};color=c=white:s=1080x14:r=30:d={d:.2f}[bar];"
+            f"[{src_in}][bar]overlay=x='-w+w*t/{d:.2f}':y=H-h-10:shortest=1[{src_out}]")
 
 
 def render_clip(source: Path, words, start: float, end: float, out: Path, workdir: Path,
@@ -275,11 +283,17 @@ def render_clip(source: Path, words, start: float, end: float, out: Path, workdi
     graph = build_filter(layout, source, start, dur, ass.name, custom_crop)
 
     logo = Path(brand["path"]) if brand and brand.get("path") else None
-    if logo and logo.exists():
-        graph = _logo_graph(graph, brand)
+    use_logo = bool(logo and logo.exists())
+    graph = f"{graph}[vA]"
+    cur = "vA"
+    if brand and brand.get("progress_bar"):
+        graph = _bar_graph(graph, dur, "vA", "vB")
+        cur = "vB"
+    if use_logo:
+        graph = _logo_graph(graph, brand, cur)
         inputs = ["-i", str(source.resolve()), "-i", str(logo.resolve())]
     else:
-        graph = f"{graph}[out]"
+        graph = f"{graph};[{cur}]null[out]"
         inputs = ["-i", str(source.resolve())]
 
     vb = _bitrate(dur)

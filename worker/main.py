@@ -13,6 +13,7 @@ import rerender
 import selfcheck
 import brand
 import energy
+import profiles
 from render import render_clip
 from transcribe import transcribe
 
@@ -28,7 +29,12 @@ def process(job):
     n_clips = int(payload.get("clips", 15))
     secs = int(payload.get("clip_seconds", 45))
     quality = payload.get("quality", "1080p")
-    
+    # Opciones de contenido: lo que mandó la web en el trabajo manda sobre lo guardado en la fuente
+    opts = {**(src.get("options") or {}), **{k: v for k, v in payload.items() if v is not None}}
+    prof = profiles.get(opts.get("content_type"))
+    game = opts.get("game")
+    print(f"  Tipo de contenido: {prof['label']}" + (f" · juego: {game}" if game else ""), flush=True)
+
     # Encuadre elegido en la web: crop | split | blur y, si lo marcó a mano, el recuadro en % del video
     clip_layout = src.get("layout") or config.CLIP_LAYOUT
     custom_crop = src.get("custom_crop")
@@ -56,21 +62,26 @@ def process(job):
 
         alive()
         db.set_source(sid, status="analyzing")
+        ai_segments = segments
         try:
             dur_v = segments[-1]["end"]
             loud = energy.loud_seconds(video)
+            motion = energy.motion_seconds(video) if prof["bonus"].get("motion") else set()
             chat = energy.chat_seconds(src["url"], work, offset, dur_v)
-            n_hot = energy.annotate(segments, loud, chat)
-            print(f"  Pistas: {len(loud)} s con volumen alto, {n_hot} frase(s) marcada(s)", flush=True)
+            n_hot = energy.annotate(segments, loud, chat, motion)
+            print(f"  Pistas: {len(loud)} s con volumen alto, {len(motion)} s de acción en pantalla, {n_hot} frase(s) marcada(s)", flush=True)
+            if prof.get("action"):
+                ai_segments = energy.add_action_markers(segments, loud, motion, chat)
         except Exception as e:  # noqa: BLE001  (las pistas son un extra: nunca deben tumbar el trabajo)
             print(f"  Pistas: no pude calcularlas ({type(e).__name__}: {e})", flush=True)
-        chosen, rejected = find_moments(segments, n_clips, secs)
+        chosen, rejected = find_moments(ai_segments, n_clips, secs, words=words, profile=prof, game=game)
         db.save_rejected(sid, rejected)
         if not chosen:
             raise RuntimeError("La IA no encontró momentos para clips")
 
         db.set_source(sid, status="clipping")
         logo = brand.load(work)
+        logo["progress_bar"] = bool(opts.get("progress_bar"))
         for m in sorted(chosen, key=lambda x: x["start"]):
             alive()
             cid = str(uuid.uuid4())

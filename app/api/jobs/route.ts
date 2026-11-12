@@ -21,7 +21,10 @@ export async function POST(req: Request) {
     review_minutes = 2,
     layout = "crop",
     custom_crop = null, // Recibe el encuadre
-    clipper = null // Nombre público de quien crea el clip (ranking Clipeadores)
+    clipper = null, // Nombre público de quien crea el clip (ranking Clipeadores)
+    content_type = "auto", // auto | podcast | entrevista | juego | directo
+    game = null, // nombre del juego (ayuda a la IA a entender las jugadas)
+    progress_bar = false // barra de progreso abajo del clip
   } = body;
 
   if (!url) return NextResponse.json({ error: kind === "live" ? "Falta el link del directo" : "Falta el link del video" }, { status: 400 });
@@ -35,6 +38,10 @@ export async function POST(req: Request) {
     quality: ["720p", "1080p", "1440p", "2160p"].includes(quality) ? quality : "1080p",
     review_minutes: num(review_minutes, 2, 1, 10),
   };
+  const safeType = ["auto", "podcast", "entrevista", "juego", "directo"].includes(content_type) ? content_type : "auto";
+  const safeGame = typeof game === "string" && game.trim() ? game.trim().slice(0, 60) : null;
+  const options = { content_type: safeType, game: safeGame, progress_bar: progress_bar === true };
+  Object.assign(safe, options);
   const safeLayout = ["crop", "split", "split_eq", "split_game", "blur", "duo"].includes(layout) ? layout : "crop";
 
   const db = serverClient();
@@ -47,21 +54,20 @@ export async function POST(req: Request) {
     }
   }
 
-  const { data: source, error } = await db
-    .from("sources")
-    .insert({ 
-      kind, 
-      url: url.trim(), 
-      range_from: range_from || null, 
-      range_to: range_to || null, 
-      status: "queued",
-      layout: safeLayout,
-      custom_crop: custom_crop, // Guarda el encuadre
-      clipper: typeof clipper === "string" && clipper.trim() ? clipper.trim().slice(0, 40) : null
-    })
-    .select("id")
-    .single();
-    
+  const row = {
+    kind,
+    url: url.trim(),
+    range_from: range_from || null,
+    range_to: range_to || null,
+    status: "queued",
+    layout: safeLayout,
+    custom_crop: custom_crop, // Guarda el encuadre
+    clipper: typeof clipper === "string" && clipper.trim() ? clipper.trim().slice(0, 40) : null,
+  };
+  // Si aún no corriste 0005_calidad.sql no existe la columna "options": se reintenta sin ella (las opciones igual viajan en el trabajo).
+  let ins = await db.from("sources").insert({ ...row, options }).select("id").single();
+  if (ins.error && /options/i.test(ins.error.message)) ins = await db.from("sources").insert(row).select("id").single();
+  const { data: source, error } = ins;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const { error: jobErr } = await db.from("jobs").insert({

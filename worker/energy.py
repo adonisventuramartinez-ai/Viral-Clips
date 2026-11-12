@@ -2,11 +2,13 @@
 explosiones del chat. Se marcan en la transcripción con 🔊 y 💬 y suben un poco el puntaje de esos momentos."""
 import json
 import math
+import re
 import statistics
 import subprocess
 from pathlib import Path
 
 RATE = 8000
+ACTION_TEXT = "[acción sin voz]"
 
 
 def loud_seconds(video: Path, min_db_over=6.0, z=2.2, max_minutes=240) -> set:
@@ -38,6 +40,70 @@ def loud_seconds(video: Path, min_db_over=6.0, z=2.2, max_minutes=240) -> set:
     med = statistics.median(sm)
     mad = statistics.median(abs(x - med) for x in sm) * 1.4826 or 1.0
     return {i for i, x in enumerate(sm) if x - med >= min_db_over and (x - med) / mad >= z}
+
+
+def scene_levels(video: Path, max_minutes=240) -> list:
+    """Cuánto cambia la imagen en cada segundo (0 = igual, 1 = otra escena). Usa 4 fotogramas por segundo, es barato.
+    Devuelve una lista con un valor por segundo (promedio de los cambios de ese segundo). Vacía si falla."""
+    cmd = ["ffmpeg", "-v", "error", "-i", str(video), "-an", "-t", str(max_minutes * 60),
+           "-vf", "fps=4,scale=160:-2,select=gte(scene\\,0),metadata=print:file=-", "-f", "null", "-"]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=max_minutes * 60)
+    except Exception:  # noqa: BLE001
+        return []
+    per = {}
+    t = None
+    for line in r.stdout.splitlines():
+        m = re.search(r"pts_time:([0-9.]+)", line)
+        if m:
+            t = float(m.group(1))
+            continue
+        m = re.search(r"lavfi\.scene_score=([0-9.]+)", line)
+        if m and t is not None:
+            per.setdefault(int(t), []).append(float(m.group(1)))
+    if not per:
+        return []
+    return [statistics.fmean(per.get(i, [0.0])) for i in range(max(per) + 1)]
+
+
+def motion_seconds(video: Path, min_score=0.05, z=2.5, min_over=0.03) -> set:
+    """Segundos con un cambio de imagen claramente mayor al normal (explosiones, jugadas, cortes bruscos)."""
+    lv = scene_levels(video)
+    if len(lv) < 20:
+        return set()
+    sm = [statistics.fmean(lv[max(0, i - 1): i + 2]) for i in range(len(lv))]
+    med = statistics.median(sm)
+    mad = statistics.median(abs(x - med) for x in sm) * 1.4826 or 0.01
+    return {i for i, x in enumerate(sm) if x >= min_score and x - med >= min_over and (x - med) / mad >= z}
+
+
+def add_action_markers(segments, loud: set, motion: set, chat: set = None, gap=3, min_gap_to_speech=1.5):
+    """Para juegos: agrega líneas '[acción sin voz]' donde hubo picos (🔊/🎮/💬) pero nadie hablaba,
+    para que la IA pueda elegir jugadas sin voz. Devuelve una lista NUEVA ordenada; no toca la transcripción guardada."""
+    chat = chat or set()
+    secs = sorted(loud | motion | chat)
+    if not secs:
+        return list(segments)
+    groups, cur = [], [secs[0]]
+    for t in secs[1:]:
+        if t - cur[-1] <= gap:
+            cur.append(t)
+        else:
+            groups.append(cur)
+            cur = [t]
+    groups.append(cur)
+    out = list(segments)
+    for g in groups:
+        a, b = g[0], g[-1] + 1
+        speech = any(s["end"] > a - min_gap_to_speech and s["start"] < b + min_gap_to_speech and s.get("text") != ACTION_TEXT
+                     for s in segments)
+        if speech:
+            continue
+        marks = ("🔊" if any(t in loud for t in g) else "") + ("🎮" if any(t in motion for t in g) else "") \
+            + ("💬" if any(t in chat for t in g) else "")
+        out.append({"start": float(a), "end": float(b), "text": ACTION_TEXT, "hot": marks})
+    out.sort(key=lambda s: s["start"])
+    return out
 
 
 def _find_times(node, out):
@@ -88,14 +154,17 @@ def chat_seconds(url: str, workdir: Path, offset: float, duration: float, bin_s=
         return set()
 
 
-def annotate(segments, loud: set, chat: set):
-    """Marca cada frase: s['hot'] = '🔊', '💬' o ambos (vacío si nada). Devuelve cuántas marcó."""
+def annotate(segments, loud: set, chat: set, motion: set = None):
+    """Marca cada frase: s['hot'] = '🔊' (volumen), '🎮' (acción en pantalla), '💬' (chat) o varios (vacío si nada).
+    Devuelve cuántas marcó."""
     n = 0
     for s in segments:
         a, b = int(s["start"]), int(math.ceil(s["end"]))
         marks = ""
         if loud and any(t in loud for t in range(a, b + 1)):
             marks += "🔊"
+        if motion and any(t in motion for t in range(a, b + 1)):
+            marks += "🎮"
         if chat and any(t in chat for t in range(a, b + 1)):
             marks += "💬"
         s["hot"] = marks

@@ -47,6 +47,18 @@ POLL_SECONDS = int(os.environ.get("POLL_SECONDS", "5"))
 WORK_DIR = Path(os.environ.get("WORK_DIR", "./work"))
 
 # --- Modo En vivo ---
-SEGMENT_SECONDS = int(os.environ.get("SEGMENT_SECONDS", "120"))   # tamaño de cada trozo grabado
+SEGMENT_SECONDS = int(os.environ.get("SEGMENT_SECONDS", "45"))    # tamaño de cada trozo grabado (más corto = clips más rápido)
 REVIEW_MINUTES = int(os.environ.get("REVIEW_MINUTES", "2"))       # cada cuánto revisa la IA (si la web no lo manda)
 LIVE_MIN_SCORE = int(os.environ.get("LIVE_MIN_SCORE", "55"))      # puntaje mínimo para crear un clip en vivo
+
+LIVE_MAX_NEW = int(os.environ.get("LIVE_MAX_NEW", "3"))           # máximo de clips nuevos por cada revisión en vivo
+LIVE_CHAT = (os.environ.get("LIVE_CHAT") or "1").strip().lower() not in ("0", "false", "no", "off")   # leer el chat del directo
+LIVE_RECONNECTS = int(os.environ.get("LIVE_RECONNECTS", "6"))     # reconexiones seguidas antes de rendirse
+WATCH_SECONDS = int(os.environ.get("WATCH_SECONDS", "120"))       # cada cuánto mira si tus canales entraron en vivo
+
+# --- Calidad de la IA ---
+RERANK = (os.environ.get("RERANK") or "1").strip().lower() not in ("0", "false", "no", "off")   # segunda pasada que re-puntúa candidatos
+SNAP_CUTS = (os.environ.get("SNAP_CUTS") or "1").strip().lower() not in ("0", "false", "no", "off")  # cortar en pausas/finales de frase
+
+# --- Quién habla (opcional): necesita `pip install pyannote.audio` y una llave gratis de huggingface.co ---
+HF_TOKEN = os.environ.get("HF_TOKEN", "").strip()

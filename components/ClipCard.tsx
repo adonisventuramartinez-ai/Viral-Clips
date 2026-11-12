@@ -2,13 +2,15 @@
 import { useState } from "react";
 import type { Clip } from "@/lib/types";
 
-const TAGS = "#fyp #viral #clips #streamer";
+const TAGS = ["#fyp", "#viral", "#clips", "#streamer"];
+type Net = "tiktok" | "shorts" | "reels";
+const uniq = (a: string[]) => a.filter((t, i) => a.findIndex((x) => x.toLowerCase() === t.toLowerCase()) === i);
 
 export default function ClipCard({ clip, onDeleted, onAdjusted }: { clip: Clip; onDeleted?: (id: string) => void; onAdjusted?: () => void }) {
   const real = Boolean(clip.videoUrl);
   const [busy, setBusy] = useState(false);
   const [pub, setPub] = useState(clip.isPublic ?? true);
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<Net | "">("");
   const [adj, setAdj] = useState(false);
   const [a, setA] = useState({ start: clip.start, end: clip.end, layout: "" });
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
@@ -47,11 +49,20 @@ export default function ClipCard({ clip, onDeleted, onAdjusted }: { clip: Clip; 
     if (!res || !res.ok) setPub(!next);
   }
 
-  async function copyText() {
+  // Texto listo para pegar en cada red: usa la descripción y los hashtags que escribió la IA (si el clip los tiene)
+  function textFor(net: Net) {
+    const tags = clip.hashtags && clip.hashtags.length ? clip.hashtags : TAGS;
+    const desc = clip.description ?? "";
+    if (net === "tiktok") return `${clip.title}\n${uniq([...tags.slice(0, 5), "#fyp"]).join(" ")}`;
+    if (net === "shorts") return `${clip.title}\n${desc ? desc + "\n" : ""}${uniq([...tags.slice(0, 4), "#Shorts"]).join(" ")}`;
+    return `${desc || clip.title}\n${tags.slice(0, 8).join(" ")}`;
+  }
+
+  async function copyText(net: Net) {
     try {
-      await navigator.clipboard.writeText(`${clip.title} ${TAGS}`);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
+      await navigator.clipboard.writeText(textFor(net));
+      setCopied(net);
+      setTimeout(() => setCopied(""), 1800);
     } catch { /* sin permiso de portapapeles */ }
   }
 
@@ -77,7 +88,11 @@ export default function ClipCard({ clip, onDeleted, onAdjusted }: { clip: Clip; 
           {clip.downloadUrl
             ? <a className="btn sm" href={clip.downloadUrl} style={{ textAlign: "center" }}>Descargar</a>
             : <button className="btn sm" disabled>Descargar</button>}
-          <button className="btn sm ghost" onClick={copyText}>{copied ? "¡Copiado!" : "Copiar título + hashtags"}</button>
+          {(["tiktok", "shorts", "reels"] as Net[]).map((n) => (
+            <button key={n} className="btn sm ghost" onClick={() => copyText(n)} title="Copia título, descripción y hashtags para esa red">
+              {copied === n ? "¡Copiado!" : `📋 ${n === "tiktok" ? "TikTok" : n === "shorts" ? "Shorts" : "Reels"}`}
+            </button>
+          ))}
           <button className="btn sm ghost" onClick={togglePublic} title="Si está público aparece en el Top y el feed de la comunidad">
             {pub ? "🌐 Público" : "🔒 Privado"}
           </button>

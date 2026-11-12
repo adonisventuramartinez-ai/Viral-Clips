@@ -9,6 +9,14 @@ import { ASPECT_VERT, DEFAULT_CAM, DEFAULT_CROP, aspectCam, boxH, isSplit, parse
 type Src = "twitch" | "kick" | "archivo";
 const LAYOUTS: [Layout, string][] = [["crop", "Vertical"], ["split_eq", "Dividido"], ["duo", "Dos personas"], ["blur", "Fondo difuminado"]];
 const PROPS: [Layout, string][] = [["split", "Cara grande"], ["split_eq", "Equilibrado"], ["split_game", "Juego grande"]];
+const TYPES: [string, string][] = [["auto", "General"], ["podcast", "Podcast"], ["entrevista", "Entrevista"], ["juego", "Juegos"], ["directo", "Directo (charla)"]];
+const TYPE_HELP: Record<string, string> = {
+  auto: "La IA busca lo más viral sin suponer nada del contenido.",
+  podcast: "Busca polémica, confesiones y anécdotas; el clip arranca en la pregunta si la hubo.",
+  entrevista: "El clip empieza en la pregunta y sigue con la respuesta completa.",
+  juego: "Da más peso a la acción en pantalla y al volumen, y empieza unos segundos antes de la jugada.",
+  directo: "Prioriza reacciones, historias y los momentos donde explota el chat.",
+};
 const PH: Record<Src, string> = { twitch: "https://www.twitch.tv/videos/…", kick: "https://kick.com/…/videos/…", archivo: "https://… (YouTube o enlace directo .mp4)" };
 
 export default function Crear() {
@@ -25,6 +33,9 @@ export default function Crear() {
   const [secs, setSecs] = useState("45");
   const [count, setCount] = useState("5");
   const [quality, setQuality] = useState("1080p");
+  const [ctype, setCtype] = useState("auto");
+  const [game, setGame] = useState("");
+  const [bar, setBar] = useState(false);
   const [multi, setMulti] = useState(false); // varios links a la vez (uno por línea)
   const [presets, setPresets] = useState<Record<string, any>>({});
   const [presetName, setPresetName] = useState("");
@@ -63,7 +74,7 @@ export default function Crear() {
   function savePreset() {
     const n = presetName.trim().slice(0, 30);
     if (!n) return setMsg({ ok: false, text: "Ponle un nombre a tu configuración." });
-    savePresets({ ...presets, [n]: { layout, secs, count, quality, manualCrop, cropBox, manualCam, camBox } });
+    savePresets({ ...presets, [n]: { layout, secs, count, quality, manualCrop, cropBox, manualCam, camBox, ctype, game, bar } });
     setPresetName("");
     setMsg({ ok: true, text: `Guardé “${n}”. La puedes cargar cuando quieras.` });
   }
@@ -71,6 +82,7 @@ export default function Crear() {
     const p = presets[n];
     if (!p) return;
     setLayout(p.layout); setSecs(p.secs); setCount(p.count); setQuality(p.quality);
+    setCtype(p.ctype ?? "auto"); setGame(p.game ?? ""); setBar(!!p.bar);
     setManualCrop(!!p.manualCrop); setCropBox(p.cropBox ?? DEFAULT_CROP); setManualCam(p.manualCam !== false); setCamBox(p.camBox ?? DEFAULT_CAM);
     setMsg({ ok: true, text: `Cargué “${n}”.` });
   }
@@ -99,6 +111,7 @@ export default function Crear() {
             kind: "vod_url", url: link, range_from: links.length === 1 ? from || null : null, range_to: links.length === 1 ? to || null : null,
             clip_seconds: Number(secs), clips: Number(count), quality,
             layout, custom_crop: sentBox ? round2(sentBox) : null, clipper,
+            content_type: ctype, game: ctype === "juego" ? game.trim() : "", progress_bar: bar,
           }),
         });
         const data = await res.json().catch(() => ({}));
@@ -159,6 +172,18 @@ export default function Crear() {
             <div><label>Calidad</label><select name="quality" value={quality} onChange={(e) => setQuality(e.target.value)}><option value="720p">720p</option><option value="1080p">1080p</option><option value="1440p">1440p (2K)</option><option value="2160p">2160p (4K)</option></select></div>
             <div><label>Tu nombre (ranking)</label><input value={name} onChange={(e) => setName(e.target.value)} placeholder="ej. Juan" maxLength={40} /></div>
           </div>
+
+          <label>Tipo de contenido</label>
+          <div className="tabs3" style={{ flexWrap: "wrap" }}>{TYPES.map(([k, l]) => (
+            <button type="button" key={k} className={`tab ${ctype === k ? "on" : ""}`} style={{ fontSize: 12 }} onClick={() => setCtype(k)}>{l}</button>
+          ))}</div>
+          <small style={{ display: "block", color: "var(--muted)", margin: "-2px 0 10px" }}>{TYPE_HELP[ctype]}</small>
+          {ctype === "juego" && (
+            <input value={game} onChange={(e) => setGame(e.target.value)} placeholder="¿Qué juego es? (ej. Valorant, Fortnite, GTA)" maxLength={60} style={{ marginBottom: 10 }} />
+          )}
+          <label style={{ display: "flex", gap: 8, alignItems: "center", textTransform: "none", fontSize: 13, color: "var(--text)", margin: "0 0 12px" }}>
+            <input type="checkbox" checked={bar} onChange={(e) => setBar(e.target.checked)} style={{ width: "auto" }} /> Barra de progreso abajo del clip (retiene más gente)
+          </label>
 
           <label>Encuadre en el teléfono</label>
           <div className="tabs3">{LAYOUTS.map(([k, l]) => (
