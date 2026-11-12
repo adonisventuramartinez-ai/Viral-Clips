@@ -41,7 +41,7 @@ export function parseEmbed(url: string, startSec = 0): Embed {
 }
 
 /** Lo que el worker calcula igual (render.py): mantén estas medidas en sincronía. */
-export const SPLIT_TOP = 760;
+export const SPLIT_TOP = 1312; // arriba tu cara/cámara; abajo (608 px) el gameplay completo en 16:9
 export const SPLIT_BOT = 1920 - SPLIT_TOP;
 export const ASPECT_CAM = 1080 / SPLIT_TOP; // panel de arriba (cámara)
 export const ASPECT_GAME = 1080 / SPLIT_BOT; // panel de abajo (juego)
@@ -58,7 +58,7 @@ export function centerBox(aspect: number): Box {
 }
 
 export const DEFAULT_CROP: Box = centerBox(ASPECT_VERT);
-export const DEFAULT_CAM: Box = { x: 69, y: 61, w: 30, h: boxH(30, ASPECT_CAM) }; // esquina inferior derecha
+export const DEFAULT_CAM: Box = { x: 72, y: 43, w: 26, h: boxH(26, ASPECT_CAM) }; // esquina inferior derecha
 export const GAME_BOX: Box = centerBox(ASPECT_GAME);
 
 export const round2 = (b: Box): Box => ({ x: +b.x.toFixed(2), y: +b.y.toFixed(2), w: +b.w.toFixed(2), h: +b.h.toFixed(2) });

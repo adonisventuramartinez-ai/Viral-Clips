@@ -5,6 +5,10 @@ export type Clip = {
   end: string;
   score: number; // 0-100 probabilidad viral
   sizeMb: number;
+  seconds?: number;
+  path?: string;
+  startSec?: number;
+  endSec?: number;
   captions: string; // solo demo: texto superpuesto
   thumb: string; // solo demo: gradiente
   videoUrl?: string; // clips reales: URL firmada de Supabase Storage

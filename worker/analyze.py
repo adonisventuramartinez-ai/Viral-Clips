@@ -17,9 +17,11 @@ frases citables, reacciones fuertes, giros inesperados. Cada clip debe:
 - terminar al cerrar una idea completa;
 - entenderse solo, sin contexto previo.
 
+Las líneas con 🔊 tuvieron un pico de volumen (gritos, risas fuertes) y las que tienen 💬 hicieron explotar el chat:
+son buenas pistas de que pasó algo, pero decide tú por el contenido.
 Usa EXACTAMENTE los segundos de las marcas [..] para start y end.
 Responde SOLO con JSON, sin texto extra:
-{{"moments":[{{"start":<seg>,"end":<seg>,"title":"título corto y llamativo (máx 70 car.)","score":<0-100 probabilidad viral>,"reason":"por qué funciona, 1 frase"}}]}}
+{{"moments":[{{"start":<seg>,"end":<seg>,"title":"título corto y llamativo (máx 70 car.)","hook":"frase gancho de 3 a 7 palabras que sale arriba del clip al empezar (provoca curiosidad, sin spoilear)","score":<0-100 probabilidad viral>,"reason":"por qué funciona, 1 frase"}}]}}
 
 TRANSCRIPCIÓN:
 {text}
@@ -54,7 +56,7 @@ def _parse_moments(txt):
 
 
 def _build_prompt(chunk, want, secs):
-    text = "\n".join(f"[{int(s['start'])}] {s['text']}" for s in chunk)
+    text = "\n".join(f"[{int(s['start'])}]{(' ' + s['hot']) if s.get('hot') else ''} {s['text']}" for s in chunk)
     return PROMPT.format(want=want, secs=secs, lo=int(secs * 0.75), hi=int(secs * 1.3), text=text)
 
 
@@ -97,7 +99,20 @@ def _clean(m, secs, duration):
     if end - start < 5:
         return None
     return {"start": start, "end": end, "score": score,
-            "title": str(m.get("title", "Clip"))[:80], "reason": str(m.get("reason", ""))}
+            "title": str(m.get("title", "Clip"))[:80], "reason": str(m.get("reason", "")),
+            "hook": str(m.get("hook", "") or "").strip()[:70]}
+
+
+def _boost(cands, segments, bonus=6):
+    """Sube el puntaje (máx. 100) de los momentos que tienen picos de volumen o chat explotando."""
+    hot = [s for s in segments if s.get("hot")]
+    if not hot:
+        return
+    for m in cands:
+        inside = [s for s in hot if s["end"] > m["start"] and s["start"] < m["end"]]
+        if inside:
+            m["score"] = min(100, m["score"] + bonus)
+            m["reason"] = (m["reason"] + " " + "".join(sorted({c for s in inside for c in s["hot"]}))).strip()
 
 
 def find_moments(segments, n_clips, secs):
@@ -110,6 +125,7 @@ def find_moments(segments, n_clips, secs):
             c = _clean(m, secs, duration)
             if c:
                 cands.append(c)
+    _boost(cands, segments)
     return select_moments(cands, n_clips)
 
 

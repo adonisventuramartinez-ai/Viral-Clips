@@ -13,6 +13,7 @@ export default function Biblioteca() {
   const [worker, setWorker] = useState<boolean | null>(null);
   const [sort, setSort] = useState<"viral" | "new" | "old">("viral");
   const [q, setQ] = useState("");
+  const [editing, setEditing] = useState(0);
   const [minScore, setMinScore] = useState(0);
   const [cleaning, setCleaning] = useState(false);
   const [note, setNote] = useState("");
@@ -36,14 +37,15 @@ export default function Biblioteca() {
           setClips((prev) =>
             (j.clips as Clip[]).map((c) => {
               const old = prev.find((p) => p.id === c.id);
-              return old ? { ...c, videoUrl: old.videoUrl ?? c.videoUrl, downloadUrl: old.downloadUrl ?? c.downloadUrl } : c;
+              return old && old.path === c.path ? { ...c, videoUrl: old.videoUrl ?? c.videoUrl, downloadUrl: old.downloadUrl ?? c.downloadUrl } : c;
             }),
           );
           setSources(j.sources);
           setDemo(!!j.demo);
           setWorker(j.worker ?? null);
           setErr("");
-          active = (j.sources as SourceRow[]).some((s) => ACTIVE.includes(s.status));
+          active = (j.sources as SourceRow[]).some((s) => ACTIVE.includes(s.status)) || (j.editing ?? 0) > 0;
+          setEditing(j.editing ?? 0);
         }
       } catch {
         if (alive) setErr("No se pudo conectar con el servidor");
@@ -107,6 +109,7 @@ export default function Biblioteca() {
       {demo && <div className="banner">Supabase no está conectado, no hay clips reales que mostrar.</div>}
       {err && <div className="banner">{err}</div>}
       {note && <div className="banner ok">{note}</div>}
+      {editing > 0 && <div className="banner ok">Ajustando {editing} clip(s)… se actualizan solos cuando el worker termine.</div>}
       {worker === false && stuck.length > 0 && (
         <div className="banner">Hay trabajos en cola pero el worker está apagado. Enciéndelo en tu PC (docker run …) y empezará solo.</div>
       )}
@@ -163,7 +166,7 @@ export default function Biblioteca() {
         </div>
       )}
 
-      <div className="clips">{shown.map((c) => <ClipCard key={c.id} clip={c} onDeleted={(id) => setClips((p) => p.filter((x) => x.id !== id))} />)}</div>
+      <div className="clips">{shown.map((c) => <ClipCard key={c.id} clip={c} onDeleted={(id) => setClips((p) => p.filter((x) => x.id !== id))} onAdjusted={() => reload.current()} />)}</div>
 
       {loaded && !demo && clips.length === 0 && working.length === 0 && failed.length === 0 && (
         <div className="card" style={{ marginTop: 16 }}>

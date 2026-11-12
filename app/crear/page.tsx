@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import CropPreview from "@/components/CropPreview";
 import CommunityFeed from "@/components/CommunityFeed";
 import PhonePreview, { type Layout } from "@/components/PhonePreview";
+import { useBrand } from "@/lib/useBrand";
 import { ASPECT_CAM, ASPECT_VERT, DEFAULT_CAM, DEFAULT_CROP, parseEmbed, round2, toSeconds, type Box } from "@/lib/embed";
 
 type Src = "twitch" | "kick" | "archivo";
@@ -20,19 +21,29 @@ export default function Crear() {
   const [manualCrop, setManualCrop] = useState(false); // vertical: false = sigue a la persona (automático)
   const [manualCam, setManualCam] = useState(true); // dividido: true = tú marcas dónde está la cámara
   const [name, setName] = useState("");
+  const [secs, setSecs] = useState("45");
+  const [count, setCount] = useState("5");
+  const [quality, setQuality] = useState("1080p");
+  const [multi, setMulti] = useState(false); // varios links a la vez (uno por línea)
+  const [presets, setPresets] = useState<Record<string, any>>({});
+  const [presetName, setPresetName] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const { brand, logoUrl } = useBrand();
   const [stats, setStats] = useState<{ clips: number; creators: number; users: number } | null>(null);
 
   useEffect(() => {
     try { setName(localStorage.getItem("cf_clipper") || ""); } catch {}
+    try { setPresets(JSON.parse(localStorage.getItem("cf_presets") || "{}")); } catch {}
     fetch("/api/hub/stats").then((r) => r.json()).then((j) => j.stats && setStats(j.stats)).catch(() => {});
   }, []);
 
   const startSec = toSeconds(from);
-  const embed = useMemo(() => parseEmbed(url, startSec), [url, startSec]);
+  const links = useMemo(() => url.split(/[\s,]+/).filter(Boolean), [url]);
+  const first = links[0] ?? "";
+  const embed = useMemo(() => parseEmbed(first, startSec), [first, startSec]);
   const live = embed.kind !== "none";
-  const isKick = /kick\.com/i.test(url);
+  const isKick = /kick\.com/i.test(first);
 
   // Recuadro que realmente se enviará al worker (null = que lo decida la IA)
   const sentBox: Box | null = !live ? null : layout === "crop" ? (manualCrop ? cropBox : null) : layout === "split" ? (manualCam ? camBox : null) : null;
@@ -41,30 +52,58 @@ export default function Crear() {
 
   const step = !url ? 1 : msg?.ok ? 4 : layout !== "crop" || manualCrop ? 2 : 3;
 
+  function savePresets(next: Record<string, any>) {
+    setPresets(next);
+    try { localStorage.setItem("cf_presets", JSON.stringify(next)); } catch {}
+  }
+  function savePreset() {
+    const n = presetName.trim().slice(0, 30);
+    if (!n) return setMsg({ ok: false, text: "Ponle un nombre a tu configuración." });
+    savePresets({ ...presets, [n]: { layout, secs, count, quality, manualCrop, cropBox, manualCam, camBox } });
+    setPresetName("");
+    setMsg({ ok: true, text: `Guardé “${n}”. La puedes cargar cuando quieras.` });
+  }
+  function loadPreset(n: string) {
+    const p = presets[n];
+    if (!p) return;
+    setLayout(p.layout); setSecs(p.secs); setCount(p.count); setQuality(p.quality);
+    setManualCrop(!!p.manualCrop); setCropBox(p.cropBox ?? DEFAULT_CROP); setManualCam(p.manualCam !== false); setCamBox(p.camBox ?? DEFAULT_CAM);
+    setMsg({ ok: true, text: `Cargué “${n}”.` });
+  }
+  function deletePreset(n: string) {
+    const { [n]: _x, ...rest } = presets;
+    savePresets(rest);
+  }
+
   async function paste() {
     try { setUrl(await navigator.clipboard.readText()); } catch { setMsg({ ok: false, text: "No pude leer el portapapeles: pega con Ctrl+V." }); }
   }
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!url.trim()) return setMsg({ ok: false, text: "Pega el link del stream primero." });
+    if (!links.length) return setMsg({ ok: false, text: "Pega el link del stream primero." });
     setBusy(true); setMsg(null);
-    const f = new FormData(e.currentTarget);
     const clipper = name.trim();
     try { if (clipper) localStorage.setItem("cf_clipper", clipper); } catch {}
+    let sent = 0;
     try {
-      const res = await fetch("/api/jobs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          kind: "vod_url", url: url.trim(), range_from: from || null, range_to: to || null,
-          clip_seconds: Number(f.get("secs")), clips: Number(f.get("count")), quality: f.get("quality"),
-          layout, custom_crop: sentBox ? round2(sentBox) : null, clipper,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok && !data.demo) { window.location.href = "/biblioteca"; return; }
-      setMsg(res.ok ? { ok: true, text: data.message } : { ok: false, text: data.error ?? "Error" });
+      for (const link of links.slice(0, 10)) {
+        const res = await fetch("/api/jobs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            kind: "vod_url", url: link, range_from: links.length === 1 ? from || null : null, range_to: links.length === 1 ? to || null : null,
+            clip_seconds: Number(secs), clips: Number(count), quality,
+            layout, custom_crop: sentBox ? round2(sentBox) : null, clipper,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (data.demo) { setMsg({ ok: true, text: data.message }); setBusy(false); return; }
+        if (!res.ok) { setMsg({ ok: false, text: `${sent ? `Se enviaron ${sent}, pero el link ${sent + 1} falló: ` : ""}${data.error ?? "Error"}` }); setBusy(false); return; }
+        sent++;
+      }
+      window.location.href = "/biblioteca";
+      return;
     } catch {
       setMsg({ ok: false, text: "No se pudo conectar con el servidor." });
     }
@@ -95,19 +134,25 @@ export default function Crear() {
             {src === "archivo" ? "Pega el link del video" : "Pegá el link del stream"}
           </label>
           <div className="pasterow">
-            <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={PH[src]} />
+            {multi
+              ? <textarea value={url} onChange={(e) => setUrl(e.target.value)} placeholder={"Un link por línea (máx. 10)\n" + PH[src]} rows={4} style={{ border: 0, background: "transparent", resize: "vertical" }} />
+              : <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={PH[src]} />}
             <button type="button" className="btn ghost sm" onClick={paste}>Pegar</button>
           </div>
-          <small style={{ display: "block", textAlign: "center", color: "var(--muted)", margin: "8px 0 16px" }}>Ejemplo: twitch.tv/videos/123456789, un clip o un link de YouTube</small>
+          <small style={{ display: "block", textAlign: "center", color: "var(--muted)", margin: "8px 0 16px" }}>
+            Ejemplo: twitch.tv/videos/123456789, un clip o un link de YouTube ·{" "}
+            <a href="#" onClick={(e) => { e.preventDefault(); setMulti(!multi); }} style={{ color: "var(--cyan)" }}>{multi ? "un solo link" : "varios links a la vez"}</a>
+            {links.length > 1 && ` · ${links.length} links (se procesan en cola con los mismos ajustes)`}
+          </small>
 
           <div className="row" style={{ gridTemplateColumns: "repeat(4,1fr)" }}>
             <div><label>Desde</label><input value={from} onChange={(e) => setFrom(e.target.value)} placeholder="0:00" /></div>
             <div><label>Hasta</label><input value={to} onChange={(e) => setTo(e.target.value)} placeholder="1:00" /></div>
-            <div><label>Duración</label><select name="secs" defaultValue="45"><option value="30">30 s</option><option value="45">45 s</option><option value="60">60 s</option><option value="75">75 s</option><option value="90">90 s</option></select></div>
-            <div><label>Cantidad</label><select name="count" defaultValue="5"><option>1</option><option>3</option><option>5</option><option>10</option><option>15</option><option>20</option><option>30</option><option>50</option></select></div>
+            <div><label>Duración</label><select name="secs" value={secs} onChange={(e) => setSecs(e.target.value)}><option value="30">30 s</option><option value="45">45 s</option><option value="60">60 s</option><option value="75">75 s</option><option value="90">90 s</option></select></div>
+            <div><label>Cantidad</label><select name="count" value={count} onChange={(e) => setCount(e.target.value)}><option>1</option><option>3</option><option>5</option><option>10</option><option>15</option><option>20</option><option>30</option><option>50</option></select></div>
           </div>
           <div className="row" style={{ gridTemplateColumns: "1fr 1fr" }}>
-            <div><label>Calidad</label><select name="quality" defaultValue="1080p"><option value="720p">720p</option><option value="1080p">1080p</option><option value="1440p">1440p (2K)</option><option value="2160p">2160p (4K)</option></select></div>
+            <div><label>Calidad</label><select name="quality" value={quality} onChange={(e) => setQuality(e.target.value)}><option value="720p">720p</option><option value="1080p">1080p</option><option value="1440p">1440p (2K)</option><option value="2160p">2160p (4K)</option></select></div>
             <div><label>Tu nombre (ranking)</label><input value={name} onChange={(e) => setName(e.target.value)} placeholder="ej. Juan" maxLength={40} /></div>
           </div>
 
@@ -116,7 +161,26 @@ export default function Crear() {
             <button type="button" key={k} className={`tab ${layout === k ? "on" : ""}`} style={{ fontSize: 12 }} onClick={() => setLayout(k)}>{l}</button>
           ))}</div>
 
-          <button className="btn" style={{ width: "100%", marginTop: 6 }} disabled={busy}>{busy ? "Importando…" : "Importar link y generar clips"}</button>
+          <div style={{ border: "1px dashed var(--line)", borderRadius: 12, padding: 12, margin: "6px 0 12px" }}>
+            <label style={{ marginTop: 0 }}>Mis configuraciones guardadas</label>
+            {Object.keys(presets).length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+                {Object.keys(presets).map((n) => (
+                  <span key={n} className="pill ghost" style={{ display: "inline-flex", gap: 6, alignItems: "center", cursor: "pointer" }}>
+                    <span onClick={() => loadPreset(n)}>{n}</span>
+                    <b onClick={() => deletePreset(n)} title="Borrar" style={{ opacity: .6 }}>×</b>
+                  </span>
+                ))}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 8 }}>
+              <input value={presetName} onChange={(e) => setPresetName(e.target.value)} placeholder="Nombre (ej. Mis clips dividido)" maxLength={30} />
+              <button type="button" className="btn ghost sm" onClick={savePreset}>Guardar</button>
+            </div>
+            <small style={{ color: "var(--muted)" }}>Guarda encuadre, duración, cantidad y calidad actuales.</small>
+          </div>
+
+          <button className="btn" style={{ width: "100%", marginTop: 6 }} disabled={busy}>{busy ? "Importando…" : links.length > 1 ? `Importar ${links.length} links y generar clips` : "Importar link y generar clips"}</button>
           {msg && <div className={`banner ${msg.ok ? "ok" : ""}`} style={{ marginTop: 14, marginBottom: 0 }}>{msg.text}</div>}
 
           {stats && (
@@ -128,7 +192,7 @@ export default function Crear() {
         <div className="card neon" style={{ padding: 0, overflow: "hidden" }}>
           <h3 style={{ padding: "16px 20px", fontSize: 15, color: "#b79bff", borderBottom: "1px solid var(--line)" }}>📱 ASÍ SE VEN TUS CLIPS</h3>
           <div style={{ padding: 20 }}>
-            <PhonePreview layout={layout} embed={embed} cropBox={previewCrop} camBox={previewCam} />
+            <PhonePreview layout={layout} embed={embed} cropBox={previewCrop} camBox={previewCam} brand={brand} logoUrl={logoUrl} />
 
             {!live && (
               <small style={{ display: "block", textAlign: "center", color: "var(--muted)", margin: "14px 0 0" }}>
@@ -151,7 +215,7 @@ export default function Crear() {
                 <small style={{ display: "block", color: "var(--muted)", marginBottom: 8, textAlign: "center" }}>
                   {layout === "crop"
                     ? manual ? "Arrastra el recuadro para elegir qué parte se ve en vertical." : "La IA sigue a la persona que habla."
-                    : manual ? "Arrastra el recuadro sobre tu cámara (esquina para agrandar). Arriba va la cámara y abajo el juego." : "La IA buscará tu cara para el panel de arriba."}
+                    : manual ? "Arrastra el recuadro sobre tu cámara (esquina para agrandar). Arriba va tu cara y abajo el gameplay completo." : "La IA buscará tu cara para el panel de arriba; abajo va el gameplay completo."}
                 </small>
                 {manual && (
                   layout === "crop"

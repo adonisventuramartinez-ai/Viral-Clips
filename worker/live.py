@@ -8,6 +8,7 @@ import uuid
 import config
 import db
 from analyze import review_window
+import brand
 from render import render_clip
 from transcribe import transcribe
 
@@ -179,7 +180,8 @@ def process_live(job):
         
         out = work / f"{cid}.mp4"
         render_clip(win, rel_words, m["start"] - base, end - base, out, work,
-                    custom_crop=src.get("custom_crop"), layout=src.get("layout"))
+                    custom_crop=src.get("custom_crop"), layout=src.get("layout"), brand=st.get("brand"),
+                    hook=m.get("hook") or m["title"])
         path = f"{sid}/{cid}.mp4"
         db.upload_clip(path, out)
         m["abs_start"], m["abs_end"] = m["start"], end
@@ -222,6 +224,7 @@ def process_live(job):
 
     try:
         db.set_source(sid, error=None, progress={})
+        st["brand"] = brand.load(work)
         inputs, maps, title = _resolve(src["url"], quality)
         proc = _start_ffmpeg(inputs, maps, seg_dir, logf)
         db.set_source(sid, title=title, status="recording")

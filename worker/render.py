@@ -1,34 +1,56 @@
 """Corta un tramo, lo pone vertical 9:16 y le quema subtítulos palabra por palabra."""
+import re
 import subprocess
 from pathlib import Path
 
 import config
 
-ASS_HEADER = """[Script Info]
+# ---------------------------------------------------------------- subtítulos (ASS)
+# Estilo por defecto = "Clásico". La web (Ajustes > Subtítulos) manda sus valores en brand["subs"].
+DEFAULT_SUBS = {"text": "FFFFFF", "active": "FFE000", "outline": "000000", "size": 86, "outline_w": 7,
+                "upper": True, "pop": True, "offset": 0}
+
+# Medidas de los encuadres (suman 1920)
+SPLIT_TOP_H = 1312   # arriba: tu cara/cámara grande. Abajo: el gameplay completo en 16:9 (1080x608)
+SPLIT_BOT_H = 1920 - SPLIT_TOP_H
+DUO_H = 960   # dos personas: dos paneles iguales de 1080x960
+
+# Altura (MargenV) de los subtítulos según el encuadre: en dividido y dos personas quedan a caballo sobre la unión
+SUB_MARGIN = {"crop": 520, "blur": 520, "split": 578, "duo": 890}
+
+
+def _hex(c: str, default: str = "FFFFFF") -> str:
+    """'#RRGGBB' -> 'BBGGRR' (ASS usa BGR)."""
+    c = str(c or "").lstrip("#")
+    if not re.fullmatch(r"[0-9a-fA-F]{6}", c):
+        c = default
+    return (c[4:6] + c[2:4] + c[0:2]).upper()
+
+
+def _subs(style):
+    st = {**DEFAULT_SUBS, **{k: v for k, v in (style or {}).items() if v is not None}}
+    st["size"] = int(min(140, max(40, float(st["size"]))))
+    st["outline_w"] = int(min(14, max(0, float(st["outline_w"]))))
+    st["offset"] = int(min(600, max(-400, float(st["offset"]))))
+    return st
+
+
+def _header(layout: str, st: dict) -> str:
+    margin = max(40, SUB_MARGIN.get(layout, 520) + st["offset"])
+    return f"""[Script Info]
 ScriptType: v4.00+
 PlayResX: 1080
 PlayResY: 1920
+WrapStyle: 0
 
 [V4+ Styles]
 Format: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding
-Style: Cap,DejaVu Sans,86,&H00FFFFFF,&H00FFFFFF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,7,2,2,60,60,520,1
+Style: Cap,DejaVu Sans,{st['size']},&H00{_hex(st['text'])},&H00{_hex(st['text'])},&H00{_hex(st['outline'], '000000')},&H80000000,-1,0,0,0,100,100,0,0,1,{st['outline_w']},2,2,60,60,{margin},1
+Style: Hook,DejaVu Sans,64,&H00000000,&H00000000,&H00FFFFFF,&H00FFFFFF,-1,0,0,0,100,100,0,0,3,16,0,8,90,90,230,1
 
 [Events]
 Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
 """
-
-# En modo dividido los subtítulos quedan sobre la unión de los dos paneles (MargenV 1000)
-ASS_HEADER_SPLIT = ASS_HEADER.replace("60,60,520,1", "60,60,1000,1")
-# En dos personas la unión de los paneles está en y=960: el texto queda a caballo entre las dos
-ASS_HEADER_DUO = ASS_HEADER.replace("60,60,520,1", "60,60,890,1")
-
-# Medidas del modo dividido (suman 1920): arriba la cámara, abajo el juego
-SPLIT_TOP_H = 760
-SPLIT_BOT_H = 1920 - SPLIT_TOP_H
-DUO_H = 960   # dos personas: dos paneles iguales de 1080x960
-
-YELLOW = "{\\c&H00E0FF&}"  # ASS usa BGR
-WHITE = "{\\c&HFFFFFF&}"
 
 
 def _t(sec: float) -> str:
@@ -38,12 +60,25 @@ def _t(sec: float) -> str:
     return f"{int(h)}:{int(m):02d}:{s:05.2f}"
 
 
-def build_ass(words, start, end, group=3, is_split=False, is_duo=False):
-    """words: lista global [{w,start,end}]. Genera eventos relativos al inicio del clip."""
+def _esc(text: str, upper: bool) -> str:
+    text = text.upper() if upper else text
+    return text.replace("{", "(").replace("}", ")").replace("\\", "/")
+
+
+def build_ass(words, start, end, group=3, layout="crop", style=None, hook=None, hook_sec=3.5):
+    """words: lista global [{w,start,end}]. Genera eventos relativos al inicio del clip.
+    hook = frase gancho que sale arriba los primeros `hook_sec` segundos (None = sin gancho)."""
+    st = _subs(style)
     ws = [w for w in words if w["start"] >= start - 0.05 and w["end"] <= end + 0.3]
-    lines = [ASS_HEADER_DUO if is_duo else ASS_HEADER_SPLIT if is_split else ASS_HEADER]
-    
-    POP_EFFECT = "{\\fscx120\\fscy120\\t(0,100,\\fscx100\\fscy100)}"
+    lines = [_header(layout, st)]
+
+    yellow = "{\\c&H" + _hex(st["active"], "00E0FF") + "&}"
+    white = "{\\c&H" + _hex(st["text"]) + "&}"
+    pop = "{\\fscx120\\fscy120\\t(0,100,\\fscx100\\fscy100)}" if st["pop"] else ""
+
+    if hook and str(hook).strip():
+        h = _esc(str(hook).strip()[:70], True)
+        lines.append(f"Dialogue: 1,{_t(0.15)},{_t(max(1.0, min(hook_sec, end - start - 0.2)))},Hook,,0,0,0,,{h}\n")
 
     for i in range(0, len(ws), group):
         g = ws[i : i + group]
@@ -52,16 +87,10 @@ def build_ass(words, start, end, group=3, is_split=False, is_duo=False):
             t1 = (g[j + 1]["start"] if j + 1 < len(g) else w["end"]) - start
             if t1 <= t0:
                 t1 = t0 + 0.1
-            
             partes = []
             for k, x in enumerate(g):
-                if k == j:
-                    partes.append(f"{YELLOW}{POP_EFFECT}{x['w'].upper().replace('{', '(').replace('}', ')')}")
-                else:
-                    partes.append(f"{WHITE}{x['w'].upper().replace('{', '(').replace('}', ')')}")
-            
-            text = " ".join(partes)
-            lines.append(f"Dialogue: 0,{_t(t0)},{_t(t1)},Cap,,0,0,0,,{text}\n")
+                partes.append((f"{yellow}{pop}" if k == j else white) + _esc(x["w"], st["upper"]))
+            lines.append(f"Dialogue: 0,{_t(t0)},{_t(t1)},Cap,,0,0,0,,{' '.join(partes)}\n")
     return "".join(lines)
 
 
@@ -145,7 +174,7 @@ def _cam_box(source: Path, start: float, dur: float, sw: int, sh: int, custom_cr
             print("  Dividido: encontré la cámara por la cara", flush=True)
             return box
     print("  Dividido: no encontré la cámara, uso la esquina inferior derecha (márcala a mano en la web)", flush=True)
-    w = 30.0
+    w = 26.0
     h = min(100.0, w * sw / (sh * aspect))
     return {"x": 100 - w - 1, "y": 100 - h - 1, "w": w, "h": h}
 
@@ -164,9 +193,12 @@ def _duo_boxes(source: Path, start: float, dur: float, sw: int, sh: int):
     return ({"x": 0.0, "y": (100 - h) / 2, "w": 50.0, "h": h}, {"x": 50.0, "y": (100 - h) / 2, "w": 50.0, "h": h})
 
 
-def _ass_for(words, start, end, workdir: Path, stem: str, split: bool, duo: bool = False) -> Path:
+def _ass_for(words, start, end, workdir: Path, stem: str, layout: str, brand: dict = None, hook: str = None) -> Path:
     ass = workdir / f"{stem}.ass"
-    ass.write_text(build_ass(words, start, end, is_split=split, is_duo=duo), encoding="utf-8")
+    b = brand or {}
+    ass.write_text(build_ass(words, start, end, layout=layout, style=b.get("subs"),
+                             hook=hook if b.get("hook", True) else None, hook_sec=float(b.get("hook_sec", 3.5))),
+                   encoding="utf-8")
     return ass
 
 
@@ -192,11 +224,10 @@ def build_filter(layout: str, source: Path, start: float, dur: float, ass_name: 
     if layout == "split":
         sw, sh = _probe(source)
         cam = _box_filter(sw, sh, _cam_box(source, start, dur, sw, sh, custom_crop))
-        game = _fit_filter(sw, sh, 1080 / SPLIT_BOT_H, config.CLIP_FOCUS_X)
         return (
             "[0:v]split=2[a][b];"
             f"[a]{cam},scale=1080:{SPLIT_TOP_H}:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:{SPLIT_TOP_H},setsar=1[t];"
-            f"[b]{game},scale=1080:{SPLIT_BOT_H}:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:{SPLIT_BOT_H},setsar=1[g];"
+            f"[b]scale=1080:{SPLIT_BOT_H}:force_original_aspect_ratio=decrease:flags=lanczos,pad=1080:{SPLIT_BOT_H}:(ow-iw)/2:(oh-ih)/2:black,setsar=1[g];"
             f"[t][g]vstack=inputs=2,subtitles={ass_name}"
         )
     sharpen = f"unsharp=5:5:{config.CLIP_SHARPEN:.2f}:5:5:0.0," if config.CLIP_SHARPEN > 0 else ""
@@ -207,20 +238,35 @@ def build_filter(layout: str, source: Path, start: float, dur: float, ass_name: 
     )
 
 
+_LOGO_POS = {
+    "bc": "(W-w)/2:H-h-{m}", "bl": "40:H-h-{m}", "br": "W-w-40:H-h-{m}",
+    "tc": "(W-w)/2:60", "tl": "40:60", "tr": "W-w-40:60",
+}
+
+
+def _logo_graph(graph: str, brand: dict) -> str:
+    """Pega el logo sobre el video. brand = {path, pos, size (% del ancho), opacity (0-100), margin}."""
+    pos = _LOGO_POS.get(brand.get("pos", "bc"), _LOGO_POS["bc"]).format(m=int(brand.get("margin", 110)))
+    width = max(40, int(1080 * min(60, max(5, float(brand.get("size", 24)))) / 100)) // 2 * 2
+    alpha = min(1.0, max(0.1, float(brand.get("opacity", 100)) / 100))
+    return (f"{graph}[v];[1:v]scale={width}:-1,format=rgba,colorchannelmixer=aa={alpha:.2f}[logo];"
+            f"[v][logo]overlay={pos}:format=auto[out]")
+
+
 def render_clip(source: Path, words, start: float, end: float, out: Path, workdir: Path,
-                custom_crop: dict = None, layout: str = None):
+                custom_crop: dict = None, layout: str = None, brand: dict = None, hook: str = None):
     dur = end - start
     layout = (layout or config.CLIP_LAYOUT or "crop").strip().lower()
     if layout not in ("crop", "split", "blur", "duo"):
         layout = "crop"
 
-    ass = _ass_for(words, start, end, workdir, out.stem, split=(layout == "split"), duo=(layout == "duo"))
+    ass = _ass_for(words, start, end, workdir, out.stem, layout, brand, hook)
     graph = build_filter(layout, source, start, dur, ass.name, custom_crop)
 
-    logo = (workdir / config.LOGO_PATH) if getattr(config, "LOGO_PATH", "") else None
+    logo = Path(brand["path"]) if brand and brand.get("path") else None
     if logo and logo.exists():
-        graph = f"{graph}[v];[1:v]scale=150:-1[logo];[v][logo]overlay=W-w-20:20[out]"
-        inputs = ["-i", str(source.resolve()), "-i", str(logo)]
+        graph = _logo_graph(graph, brand)
+        inputs = ["-i", str(source.resolve()), "-i", str(logo.resolve())]
     else:
         graph = f"{graph}[out]"
         inputs = ["-i", str(source.resolve())]

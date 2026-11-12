@@ -17,7 +17,7 @@ def requeue_stale(hours=3):
     sb.table("jobs").update({"status": "queued"}).eq("status", "running").lt("locked_at", limit).execute()
 
 
-def claim_job(types=("download", "record")):
+def claim_job(types=("download", "record", "clip")):
     res = (sb.table("jobs").select("*").eq("status", "queued").in_("type", list(types))
            .order("created_at").limit(1).execute())
     if not res.data:
@@ -85,6 +85,22 @@ def save_clip(source, user_id, m, storage_path, size_bytes, words_in_clip):
         "reason": m["reason"], "captions": words_in_clip,
         "storage_path": storage_path, "size_bytes": size_bytes,
     }).execute()
+
+
+def get_clip(clip_id):
+    res = sb.table("clips").select("*").eq("id", clip_id).limit(1).execute()
+    return res.data[0] if res.data else None
+
+
+def update_clip(clip_id, **fields):
+    sb.table("clips").update(fields).eq("id", clip_id).execute()
+
+
+def remove_file(path):
+    try:
+        sb.storage.from_("clips").remove([path])
+    except Exception:  # noqa: BLE001
+        pass
 
 
 _hb_warned = False

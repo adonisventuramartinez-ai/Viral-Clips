@@ -9,7 +9,10 @@ import db
 from analyze import find_moments
 from download import download
 import live
+import rerender
 import selfcheck
+import brand
+import energy
 from render import render_clip
 from transcribe import transcribe
 
@@ -53,18 +56,28 @@ def process(job):
 
         alive()
         db.set_source(sid, status="analyzing")
+        try:
+            dur_v = segments[-1]["end"]
+            loud = energy.loud_seconds(video)
+            chat = energy.chat_seconds(src["url"], work, offset, dur_v)
+            n_hot = energy.annotate(segments, loud, chat)
+            print(f"  Pistas: {len(loud)} s con volumen alto, {n_hot} frase(s) marcada(s)", flush=True)
+        except Exception as e:  # noqa: BLE001  (las pistas son un extra: nunca deben tumbar el trabajo)
+            print(f"  Pistas: no pude calcularlas ({type(e).__name__}: {e})", flush=True)
         chosen, rejected = find_moments(segments, n_clips, secs)
         db.save_rejected(sid, rejected)
         if not chosen:
             raise RuntimeError("La IA no encontró momentos para clips")
 
         db.set_source(sid, status="clipping")
+        logo = brand.load(work)
         for m in sorted(chosen, key=lambda x: x["start"]):
             alive()
             cid = str(uuid.uuid4())
             out = work / f"{cid}.mp4"
             
-            render_clip(video, words, m["start"], m["end"], out, work, custom_crop=custom_crop, layout=clip_layout)
+            render_clip(video, words, m["start"], m["end"], out, work, custom_crop=custom_crop, layout=clip_layout, brand=logo,
+                        hook=m.get("hook") or m["title"])
             
             path = f"{sid}/{cid}.mp4"
             db.upload_clip(path, out)
@@ -106,6 +119,8 @@ def main():
             print(f"Trabajo {job['id']} → fuente {job['source_id']}", flush=True)
             if job["type"] == "record":
                 live.process_live(job)
+            elif job["type"] == "clip":
+                rerender.process_rerender(job)
             else:
                 process(job)
         else:
