@@ -27,8 +27,8 @@ CLIP_LAYOUT = (os.environ.get("CLIP_LAYOUT") or "crop").strip().lower()
 # Encuadre: "auto" = sigue la cara de quien habla (necesita scikit-image); "center" = fijo según CLIP_FOCUS_X
 CLIP_FRAMING = (os.environ.get("CLIP_FRAMING") or "auto").strip().lower()
 # Calidad: CRF más bajo = más nítido y más pesado (17-20 va bien); nitidez 0 = apagada, 0.5 suave, 1.0 fuerte
-CLIP_CRF = int(os.environ.get("CLIP_CRF") or 18)
-CLIP_PRESET = (os.environ.get("CLIP_PRESET") or "fast").strip()   # ultrafast ... veryfast, fast, medium, slow
+CLIP_CRF = int(os.environ.get("CLIP_CRF") or 17)
+CLIP_PRESET = (os.environ.get("CLIP_PRESET") or "medium").strip()   # ultrafast ... veryfast, fast, medium, slow
 try:
     CLIP_SHARPEN = min(1.5, max(0.0, float(os.environ.get("CLIP_SHARPEN") or 0.5)))
 except ValueError:
@@ -62,3 +62,16 @@ SNAP_CUTS = (os.environ.get("SNAP_CUTS") or "1").strip().lower() not in ("0", "f
 
 # --- Quién habla (opcional): necesita `pip install pyannote.audio` y una llave gratis de huggingface.co ---
 HF_TOKEN = os.environ.get("HF_TOKEN", "").strip()
+
+# --- Modo Original (Facebook premia aporte propio; ver original.py) ---
+ORIGINAL_MODE = (os.environ.get("ORIGINAL_MODE") or "1").strip().lower() not in ("0", "false", "no", "off")
+SHOW_NAME = os.environ.get("SHOW_NAME", "La Casa de Alofoke 3")
+PAGE_NAME = os.environ.get("PAGE_NAME", "Tu página")
+CREDIT_LINE = os.environ.get("CREDIT_LINE", "Contenido de La Casa de Alofoke, usado con permiso de Alofoke.")
+NARRATOR_VOICE = os.environ.get("NARRATOR_VOICE", "es-DO-EmilioNeural")   # es-DO-RamonaNeural = voz femenina dominicana
+# --- Publicación automática en Facebook (opcional) ---
+FB_AUTOPUBLISH = (os.environ.get("FB_AUTOPUBLISH") or "0").strip().lower() in ("1", "true", "yes", "on")
+FB_PAGE_ID = os.environ.get("FB_PAGE_ID", "").strip()
+FB_PAGE_TOKEN = os.environ.get("FB_PAGE_TOKEN", "").strip()
+FB_MIN_SCORE = int(os.environ.get("FB_MIN_SCORE") or 75)       # solo publica clips con este puntaje o más
+FB_MAX_PER_JOB = int(os.environ.get("FB_MAX_PER_JOB") or 3)    # tope por video procesado

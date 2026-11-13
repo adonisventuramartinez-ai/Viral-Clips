@@ -1,7 +1,7 @@
 FROM python:3.11-slim
 
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ffmpeg fonts-dejavu-core ca-certificates \
+ && apt-get install -y --no-install-recommends ffmpeg fonts-dejavu-core fonts-montserrat ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 
 # yt-dlp necesita un runtime de JavaScript (Deno) para resolver YouTube

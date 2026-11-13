@@ -7,7 +7,7 @@ import config
 
 # ---------------------------------------------------------------- subtítulos (ASS)
 # Estilo por defecto = "Clásico". La web (Ajustes > Subtítulos) manda sus valores en brand["subs"].
-DEFAULT_SUBS = {"text": "FFFFFF", "active": "FFE000", "outline": "000000", "size": 86, "outline_w": 7,
+DEFAULT_SUBS = {"text": "FFFFFF", "active": "FFE000", "outline": "000000", "size": 78, "outline_w": 6,
                 "upper": True, "pop": True, "offset": 0}
 
 # Medidas de los encuadres (suman 1920)
@@ -19,7 +19,7 @@ SPLIT_TOPS = {"split": 1312, "split_eq": 1000, "split_game": 780}
 DUO_H = 960   # dos personas: dos paneles iguales de 1080x960
 
 # Altura (MargenV) de los subtítulos según el encuadre: en dividido y dos personas quedan a caballo sobre la unión
-SUB_MARGIN = {"crop": 520, "blur": 520, "duo": 890}
+SUB_MARGIN = {"crop": 600, "blur": 600, "duo": 890}
 
 
 def _hex(c: str, default: str = "FFFFFF") -> str:
@@ -49,7 +49,7 @@ WrapStyle: 0
 
 [V4+ Styles]
 Format: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding
-Style: Cap,DejaVu Sans,{st['size']},&H00{_hex(st['text'])},&H00{_hex(st['text'])},&H00{_hex(st['outline'], '000000')},&H80000000,-1,0,0,0,100,100,0,0,1,{st['outline_w']},2,2,60,60,{margin},1
+Style: Cap,Montserrat,{st['size']},&H00{_hex(st['text'])},&H00{_hex(st['text'])},&H00{_hex(st['outline'], '000000')},&H80000000,-1,0,0,0,100,100,0,0,1,{st['outline_w']},2,2,60,60,{margin},1
 Style: Hook,DejaVu Sans,64,&H00000000,&H00000000,&H00FFFFFF,&H00FFFFFF,-1,0,0,0,100,100,0,0,3,16,0,8,90,90,230,1
 
 [Events]
@@ -69,7 +69,7 @@ def _esc(text: str, upper: bool) -> str:
     return text.replace("{", "(").replace("}", ")").replace("\\", "/")
 
 
-def build_ass(words, start, end, group=3, layout="crop", style=None, hook=None, hook_sec=3.5):
+def build_ass(words, start, end, group=2, layout="crop", style=None, hook=None, hook_sec=3.5):
     """words: lista global [{w,start,end}]. Genera eventos relativos al inicio del clip.
     hook = frase gancho que sale arriba los primeros `hook_sec` segundos (None = sin gancho)."""
     st = _subs(style)
@@ -112,8 +112,8 @@ def _probe(path: Path):
 
 
 def _bitrate(dur: float) -> int:
-    total = 44_000_000 * 8 / max(dur, 1.0)
-    return int(min(12_000_000, max(3_000_000, total - 192_000)))
+    total = 60_000_000 * 8 / max(dur, 1.0)
+    return int(min(14_000_000, max(6_000_000, total - 192_000)))
 
 
 def _even(v: float) -> int:
@@ -138,7 +138,7 @@ def _fit_filter(sw: int, sh: int, aspect: float, fx: float = 0.5) -> str:
     return f"crop=w={cw}:h={ch}:x='(iw-ow)*{fx:.3f}':y='(ih-oh)/2'"
 
 
-def _crop_filter(source: Path, start: float, dur: float, custom_crop: dict = None):
+def _crop_filter(source: Path, start: float, dur: float, custom_crop: dict = None, keys=None):
     """Modo vertical: recorte 9:16 manual, siguiendo caras, o centrado."""
     sw, sh = _probe(source)
 
@@ -148,8 +148,7 @@ def _crop_filter(source: Path, start: float, dur: float, custom_crop: dict = Non
     if sw / sh > 9 / 16:
         cw, ch = int(sh * 9 / 16) // 2 * 2, sh
         crop_frac = cw / sw
-        keys = None
-        if config.CLIP_FRAMING == "auto":
+        if keys is None and config.CLIP_FRAMING == "auto":
             import framing
             keys = framing.camera_keys(source, start, dur, sw, sh, crop_frac)
             if keys:
@@ -206,7 +205,7 @@ def _ass_for(words, start, end, workdir: Path, stem: str, layout: str, brand: di
     return ass
 
 
-def build_filter(layout: str, source: Path, start: float, dur: float, ass_name: str, custom_crop: dict = None) -> str:
+def build_filter(layout: str, source: Path, start: float, dur: float, ass_name: str, custom_crop: dict = None, keys=None) -> str:
     """Devuelve el grafo de filtros (sin etiqueta final) para el encuadre pedido."""
     if layout == "blur":
         return (
@@ -243,7 +242,7 @@ def build_filter(layout: str, source: Path, start: float, dur: float, ass_name: 
         )
     sharpen = f"unsharp=5:5:{config.CLIP_SHARPEN:.2f}:5:5:0.0," if config.CLIP_SHARPEN > 0 else ""
     return (
-        "[0:v]" + _crop_filter(source, start, dur, custom_crop)
+        "[0:v]" + _crop_filter(source, start, dur, custom_crop, keys)
         + ",scale=1080:1920:flags=lanczos+accurate_rnd+full_chroma_int,"
         + sharpen + f"setsar=1,subtitles={ass_name}"
     )
@@ -279,8 +278,17 @@ def render_clip(source: Path, words, start: float, end: float, out: Path, workdi
     if layout not in ("crop", "blur", "duo", *SPLIT_TOPS):
         layout = "crop"
 
+    keys = None
+    if layout == "crop" and not custom_crop and config.CLIP_FRAMING == "auto":
+        sw, sh = _probe(source)
+        if sw / sh > 9 / 16:
+            import framing
+            keys = framing.camera_keys(source, start, dur, sw, sh, int(sh * 9 / 16) // 2 * 2 / sw)
+            if not keys:   # no vi a nadie: mejor video completo con fondo borroso que mostrar paisaje vacío
+                print("  Encuadre: no encontré personas, uso fondo borroso (blur)", flush=True)
+                layout = "blur"
     ass = _ass_for(words, start, end, workdir, out.stem, layout, brand, hook)
-    graph = build_filter(layout, source, start, dur, ass.name, custom_crop)
+    graph = build_filter(layout, source, start, dur, ass.name, custom_crop, keys)
 
     logo = Path(brand["path"]) if brand and brand.get("path") else None
     use_logo = bool(logo and logo.exists())

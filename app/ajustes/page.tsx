@@ -137,6 +137,62 @@ function SubsSection() {
   );
 }
 
+
+type Orig = { enabled: boolean; show: string; page: string; credit: string; narrate: boolean; voice: string; meter: boolean; poll: boolean; top: boolean; top_n: number };
+const ORIG_DEFAULT: Orig = { enabled: true, show: "La Casa de Alofoke 3", page: "", credit: "", narrate: true, voice: "es-DO-EmilioNeural", meter: true, poll: true, top: true, top_n: 5 };
+const VOICE_LABELS: Record<string, string> = {
+  "es-DO-EmilioNeural": "Dominicano (hombre)", "es-DO-RamonaNeural": "Dominicana (mujer)", "es-MX-JorgeNeural": "México (hombre)",
+  "es-MX-DaliaNeural": "México (mujer)", "es-US-AlonsoNeural": "Latino EE. UU. (hombre)", "es-ES-AlvaroNeural": "España (hombre)",
+};
+
+function OriginalSection() {
+  const [o, setO] = useState<Orig>(ORIG_DEFAULT);
+  const [voices, setVoices] = useState<string[]>(Object.keys(VOICE_LABELS));
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    fetch("/api/original").then((r) => r.json()).then((j) => { if (j.settings) setO({ ...ORIG_DEFAULT, ...j.settings }); if (j.voices) setVoices(j.voices); }).catch(() => {});
+  }, []);
+  const set = (p: Partial<Orig>) => setO((x) => ({ ...x, ...p }));
+  async function save() {
+    setBusy(true); setMsg(null);
+    const r = await fetch("/api/original", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(o) }).catch(() => null);
+    const j = await r?.json().catch(() => ({}));
+    setMsg(r?.ok ? { ok: true, text: "Guardado. El worker lo usa en los próximos clips." } : { ok: false, text: j?.error ?? "No se pudo guardar" });
+    setBusy(false);
+  }
+  const chk = (label: string, key: keyof Orig, hint: string) => (
+    <label style={{ display: "flex", gap: 10, alignItems: "flex-start", textTransform: "none", fontSize: 14, color: "var(--text)", margin: "10px 0" }}>
+      <input type="checkbox" checked={Boolean(o[key])} onChange={(e) => set({ [key]: e.target.checked } as Partial<Orig>)} style={{ width: "auto", marginTop: 3 }} />
+      <span><b>{label}</b><br /><span style={{ color: "var(--muted)", fontSize: 13 }}>{hint}</span></span>
+    </label>
+  );
+  return (
+    <div className="card neon" style={{ maxWidth: 720, marginBottom: 18 }}>
+      <h3 style={{ marginBottom: 6 }}>🎬 Modo Original (sin mostrar tu cara ni hablar)</h3>
+      <p className="sub" style={{ marginBottom: 10, fontSize: 13 }}>
+        Cada clip sale con aporte propio hecho por la IA: contexto con voz narradora, dramómetro, encuesta A/B y descripción. Facebook premia lo original; esto ayuda, pero no garantiza la monetización.
+      </p>
+      {chk("Activar Modo Original", "enabled", "Si lo apagas, los clips salen como antes.")}
+      <label style={{ marginTop: 8 }}>Nombre del programa</label>
+      <input value={o.show} onChange={(e) => set({ show: e.target.value })} maxLength={80} />
+      <label style={{ marginTop: 12 }}>Nombre de tu página (sale en la tarjeta final)</label>
+      <input value={o.page} onChange={(e) => set({ page: e.target.value })} maxLength={60} placeholder="Tu página" />
+      <label style={{ marginTop: 12 }}>Línea de crédito/permiso (va en la descripción)</label>
+      <input value={o.credit} onChange={(e) => set({ credit: e.target.value })} maxLength={200} />
+      <hr style={{ border: 0, borderTop: "1px solid var(--line)", margin: "16px 0" }} />
+      {chk("Voz narradora con IA", "narrate", "Lee el contexto y la encuesta. Necesita internet en el PC del worker. Si falla, el clip sale sin voz.")}
+      {o.narrate && (<><label>Voz</label><select value={o.voice} onChange={(e) => set({ voice: e.target.value })}>{voices.map((v) => <option key={v} value={v}>{VOICE_LABELS[v] ?? v}</option>)}</select></>)}
+      {chk("Dramómetro", "meter", "Una barra con el nivel de drama del momento, arriba a la derecha los primeros segundos.")}
+      {chk("Encuesta A/B al final", "poll", "Pregunta de “¿quién tiene la razón?” para que la gente comente A o B.")}
+      {chk("TOP automático", "top", "Después de cada video arma un TOP con los mejores momentos y cuenta regresiva.")}
+      {o.top && (<><label>Cuántos clips lleva el TOP: {o.top_n}</label><input type="range" min={3} max={10} value={o.top_n} onChange={(e) => set({ top_n: Number(e.target.value) })} /></>)}
+      <div style={{ marginTop: 14 }}><button className="btn sm" onClick={save} disabled={busy}>{busy ? "Guardando…" : "Guardar Modo Original"}</button></div>
+      {msg && <div className={`banner ${msg.ok ? "ok" : ""}`} style={{ marginTop: 12, marginBottom: 0 }}>{msg.text}</div>}
+    </div>
+  );
+}
+
 export default function Ajustes() {
   const rows: [string, string, string][] = [
     ["Quién elige los clips", "LLM_PROVIDER", "groq (gratis) o anthropic"],
@@ -153,6 +209,7 @@ export default function Ajustes() {
   return (
     <>
       <h1>Ajustes de IA</h1>
+      <OriginalSection />
       <LogoSection />
       <SubsSection />
       <p className="sub">Por ahora estos ajustes se cambian en el archivo <code>worker/.env</code> y se aplican al reiniciar el worker.</p>

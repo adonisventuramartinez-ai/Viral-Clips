@@ -21,17 +21,42 @@ MIN_GAP = 2.0      # segundos mínimos entre dos paneos
 RAMP = 0.5         # duración del paneo
 MIN_COVERAGE = 0.2  # si hay caras en menos de esta fracción del clip, se usa el centro
 
-_cascade = None
+_det = None
 
 
 def _load():
-    global _cascade
-    if _cascade is None:
-        from skimage.data import lbp_frontal_face_cascade_filename
-        from skimage.feature import Cascade
+    """Detectores de OpenCV: cara de frente + de perfil (izq y der). Ven gente con gorra, lentes o de lado.
+    Si no hay OpenCV, cae al detector viejo de scikit-image."""
+    global _det
+    if _det is None:
+        try:
+            import cv2
+            d = cv2.data.haarcascades
+            _det = ("cv2", cv2.CascadeClassifier(d + "haarcascade_frontalface_alt2.xml"),
+                    cv2.CascadeClassifier(d + "haarcascade_profileface.xml"))
+        except Exception:  # noqa: BLE001
+            from skimage.data import lbp_frontal_face_cascade_filename
+            from skimage.feature import Cascade
+            _det = ("sk", Cascade(lbp_frontal_face_cascade_filename()), None)
+    return _det
 
-        _cascade = Cascade(lbp_frontal_face_cascade_filename())
-    return _cascade
+
+def _raw_boxes(gray):
+    """Lista de (x, y, w, h) en pixeles."""
+    import numpy as np
+    h, w = gray.shape
+    kind, a, b = _load()
+    if kind == "sk":
+        raw = a.detect_multi_scale(gray, scale_factor=1.2, step_ratio=1, min_size=(int(w * 0.045),) * 2,
+                                   max_size=(int(w * 0.4),) * 2)
+        return [(r["c"], r["r"], r["width"], r["height"]) for r in raw]
+    import cv2
+    g = cv2.equalizeHist(np.ascontiguousarray(gray))
+    ms = (int(w * 0.05),) * 2
+    out = [tuple(r) for r in a.detectMultiScale(g, 1.1, 4, minSize=ms)]
+    out += [tuple(r) for r in b.detectMultiScale(g, 1.1, 4, minSize=ms)]
+    out += [(w - x - bw, y, bw, bh) for x, y, bw, bh in b.detectMultiScale(cv2.flip(g, 1), 1.1, 4, minSize=ms)]
+    return out
 
 
 # ---------------------------------------------------------------- lectura y detección
@@ -59,15 +84,11 @@ def _read_frames(source, start, dur, src_w, src_h):
 
 def _detect(gray):
     h, w = gray.shape
-    raw = _load().detect_multi_scale(gray, scale_factor=1.2, step_ratio=1,
-                                     min_size=(int(w * 0.045),) * 2, max_size=(int(w * 0.4),) * 2)
     faces = []
-    for r in raw:
-        if r["r"] + r["height"] / 2 > h * 0.8:   # caras muy abajo suelen ser falsos positivos
+    for (x, y, bw, bh) in _raw_boxes(gray):
+        if y + bh / 2 > h * 0.8:   # caras muy abajo suelen ser falsos positivos
             continue
-        faces.append({"x": (r["c"] + r["width"] / 2) / w, "w": r["width"] / w,
-                      "y": (r["r"] + r["height"] / 2) / h,
-                      "box": (r["r"], r["c"], r["width"], r["height"])})
+        faces.append({"x": (x + bw / 2) / w, "w": bw / w, "y": (y + bh / 2) / h, "box": (y, x, bw, bh)})
     # quita cajas repetidas (misma cara detectada dos veces)
     out = []
     for f in sorted(faces, key=lambda f: -f["w"]):

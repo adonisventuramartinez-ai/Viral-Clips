@@ -15,6 +15,8 @@ import watcher
 import brand
 import energy
 import profiles
+import original
+import publisher
 from render import render_clip
 from transcribe import transcribe
 
@@ -83,6 +85,8 @@ def process(job):
         db.set_source(sid, status="clipping")
         logo = brand.load(work)
         logo["progress_bar"] = bool(opts.get("progress_bar"))
+        ocfg = original.load(work)
+        made, published = [], 0
         for m in sorted(chosen, key=lambda x: x["start"]):
             alive()
             cid = str(uuid.uuid4())
@@ -91,14 +95,49 @@ def process(job):
             render_clip(video, words, m["start"], m["end"], out, work, custom_crop=custom_crop, layout=clip_layout, brand=logo,
                         hook=m.get("hook") or m["title"])
             
+            if ocfg["enabled"] and opts.get("original", True):
+                try:   # aporte propio: voz narradora, dramómetro, encuesta A/B y descripción con tu punto de vista
+                    raw = work / f"{cid}_raw.mp4"
+                    shutil.copy(out, raw)
+                    txt = " ".join(w["w"] for w in words if m["start"] <= w["start"] <= m["end"])
+                    ex = original.extras(txt, ocfg)
+                    wrapped = work / f"{cid}_orig.mp4"
+                    original.wrap_clip(out, ex, wrapped, work, ocfg, score=m.get("score", 75))
+                    out.unlink(missing_ok=True)
+                    wrapped.rename(out)
+                    m["description"] = original.description(m, ex, ocfg)
+                    made.append((m.get("score", 0), m["title"], raw, dict(m)))
+                except Exception as e:  # noqa: BLE001  (si falla, sube el clip normal)
+                    print(f"  Modo Original: no pude envolver el clip ({type(e).__name__}: {str(e)[:120]})", flush=True)
             path = f"{sid}/{cid}.mp4"
             db.upload_clip(path, out)
             m["abs_start"], m["abs_end"] = m["start"] + offset, m["end"] + offset
             in_clip = [{"w": w["w"], "start": w["start"] - m["start"], "end": w["end"] - m["start"]}
                        for w in words if m["start"] <= w["start"] <= m["end"]]
             db.save_clip(sid, src.get("user_id"), m, path, out.stat().st_size, in_clip)
+            if config.FB_AUTOPUBLISH and published < config.FB_MAX_PER_JOB and m.get("score", 0) >= config.FB_MIN_SCORE:
+                if publisher.publish_reel(out, m.get("description") or m["title"]):
+                    published += 1
             out.unlink(missing_ok=True)
             print(f"  clip listo: {m['title']} ({m['score']}%)", flush=True)
+
+        if ocfg["enabled"] and ocfg["top"] and len(made) >= 3:
+            try:   # TOP automático con cuenta regresiva (#N … #1)
+                best = sorted(made, key=lambda x: -x[0])[: ocfg["top_n"]]
+                best = list(reversed(best))
+                cid = str(uuid.uuid4())
+                out = work / f"{cid}.mp4"
+                head = f"TOP {len(best)} MOMENTOS"
+                original.compilation([(t, p) for _, t, p, _m in best], head, out, work, ocfg)
+                mm = dict(best[-1][3])
+                mm.update({"title": f"{head}: {best[-1][1]}"[:80], "reason": "Compilación automática de los mejores momentos",
+                           "description": original.description(mm, {"caption": f"Los {len(best)} mejores momentos de {ocfg['show']}. ¿Cuál fue el tuyo?"}, ocfg)})
+                path = f"{sid}/{cid}.mp4"
+                db.upload_clip(path, out)
+                db.save_clip(sid, src.get("user_id"), mm, path, out.stat().st_size, [])
+                print(f"  TOP listo: {head}", flush=True)
+            except Exception as e:  # noqa: BLE001
+                print(f"  TOP: no pude armarlo ({type(e).__name__}: {str(e)[:120]})", flush=True)
 
         db.set_source(sid, status="done")
         db.finish_job(job["id"], ok=True)

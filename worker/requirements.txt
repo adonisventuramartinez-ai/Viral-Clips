@@ -7,3 +7,5 @@ python-dotenv
 numpy
 scikit-image
 chat-downloader
+opencv-python-headless
+edge-tts
