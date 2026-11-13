@@ -11,12 +11,12 @@ RATE = 8000
 ACTION_TEXT = "[acción sin voz]"
 
 
-def loud_seconds(video: Path, min_db_over=6.0, z=2.2, max_minutes=240) -> set:
-    """Segundos (enteros, relativos al video) con volumen claramente por encima de lo normal. Vacío si falla."""
+def audio_levels(video: Path, max_minutes=240) -> list:
+    """Volumen de cada segundo del video en dB (una lista, un valor por segundo). Vacía si falla."""
     try:
         import numpy as np
     except ImportError:
-        return set()
+        return []
     cmd = ["ffmpeg", "-v", "error", "-i", str(video), "-vn", "-ac", "1", "-ar", str(RATE), "-t", str(max_minutes * 60),
            "-f", "s16le", "-"]
     levels = []
@@ -32,7 +32,12 @@ def loud_seconds(video: Path, min_db_over=6.0, z=2.2, max_minutes=240) -> set:
         p.stdout.close()
         p.wait()
     except Exception:  # noqa: BLE001
-        return set()
+        return []
+    return levels
+
+
+def loud_from_levels(levels, min_db_over=6.0, z=2.2) -> set:
+    """Segundos (índices de la lista) con volumen claramente por encima de lo normal."""
     if len(levels) < 20:
         return set()
     # suaviza 2 s para que un golpe suelto no cuente
@@ -40,6 +45,11 @@ def loud_seconds(video: Path, min_db_over=6.0, z=2.2, max_minutes=240) -> set:
     med = statistics.median(sm)
     mad = statistics.median(abs(x - med) for x in sm) * 1.4826 or 1.0
     return {i for i, x in enumerate(sm) if x - med >= min_db_over and (x - med) / mad >= z}
+
+
+def loud_seconds(video: Path, min_db_over=6.0, z=2.2, max_minutes=240) -> set:
+    """Segundos (enteros, relativos al video) con volumen claramente por encima de lo normal. Vacío si falla."""
+    return loud_from_levels(audio_levels(video, max_minutes), min_db_over, z)
 
 
 def scene_levels(video: Path, max_minutes=240) -> list:
@@ -66,15 +76,19 @@ def scene_levels(video: Path, max_minutes=240) -> list:
     return [statistics.fmean(per.get(i, [0.0])) for i in range(max(per) + 1)]
 
 
-def motion_seconds(video: Path, min_score=0.05, z=2.5, min_over=0.03) -> set:
-    """Segundos con un cambio de imagen claramente mayor al normal (explosiones, jugadas, cortes bruscos)."""
-    lv = scene_levels(video)
+def motion_from_levels(lv, min_score=0.05, z=2.5, min_over=0.03) -> set:
+    """Segundos (índices de la lista) con un cambio de imagen claramente mayor al normal."""
     if len(lv) < 20:
         return set()
     sm = [statistics.fmean(lv[max(0, i - 1): i + 2]) for i in range(len(lv))]
     med = statistics.median(sm)
     mad = statistics.median(abs(x - med) for x in sm) * 1.4826 or 0.01
     return {i for i, x in enumerate(sm) if x >= min_score and x - med >= min_over and (x - med) / mad >= z}
+
+
+def motion_seconds(video: Path, min_score=0.05, z=2.5, min_over=0.03) -> set:
+    """Segundos con un cambio de imagen claramente mayor al normal (explosiones, jugadas, cortes bruscos)."""
+    return motion_from_levels(scene_levels(video), min_score, z, min_over)
 
 
 def add_action_markers(segments, loud: set, motion: set, chat: set = None, gap=3, min_gap_to_speech=1.5):
@@ -152,6 +166,33 @@ def chat_seconds(url: str, workdir: Path, offset: float, duration: float, bin_s=
     except Exception as e:  # noqa: BLE001
         print(f"  Chat: no pude leerlo ({type(e).__name__}); sigo sin esa pista.", flush=True)
         return set()
+
+
+def hot_from_times(times, lo: float, hi: float, bin_s=10, z=2.0, min_msgs=6, baseline_s=600) -> set:
+    """Chat en vivo: recibe los segundos (de la línea de tiempo de la grabación) en que llegó cada mensaje y devuelve los
+    segundos de [lo, hi) donde el chat explotó. La referencia 'normal' son los últimos `baseline_s` segundos antes de hi.
+    Un trozo de `bin_s` segundos cuenta si tiene al menos `min_msgs` mensajes, más del doble de lo normal y z robusto >= z."""
+    if hi - lo < bin_s or not times:
+        return set()
+    base_lo = max(0.0, hi - baseline_s)
+    first = int(base_lo // bin_s) * bin_s
+    n = int((hi - first) // bin_s) + 1
+    bins = [0] * n
+    for t in times:
+        if first <= t < hi:
+            bins[int((t - first) // bin_s)] += 1
+    if sum(bins) < 15:      # muy poco chat: no hay referencia confiable
+        return set()
+    med = statistics.median(bins)
+    mad = statistics.median(abs(x - med) for x in bins) * 1.4826 or 1.0
+    hot = set()
+    for i, c in enumerate(bins):
+        a = first + i * bin_s
+        if a + bin_s <= lo or a >= hi:
+            continue
+        if c >= min_msgs and c >= med * 2 and (c - med) / mad >= z:
+            hot.update(range(max(int(lo), a), min(int(hi), a + bin_s)))
+    return hot
 
 
 def annotate(segments, loud: set, chat: set, motion: set = None):

@@ -24,7 +24,8 @@ export async function POST(req: Request) {
     clipper = null, // Nombre público de quien crea el clip (ranking Clipeadores)
     content_type = "auto", // auto | podcast | entrevista | juego | directo
     game = null, // nombre del juego (ayuda a la IA a entender las jugadas)
-    progress_bar = false // barra de progreso abajo del clip
+    progress_bar = false, // barra de progreso abajo del clip
+    max_new = 3 // en vivo: máximo de clips nuevos por revisión
   } = body;
 
   if (!url) return NextResponse.json({ error: kind === "live" ? "Falta el link del directo" : "Falta el link del video" }, { status: 400 });
@@ -37,6 +38,7 @@ export async function POST(req: Request) {
     clips: num(clips, 5, 1, 50),
     quality: ["720p", "1080p", "1440p", "2160p"].includes(quality) ? quality : "1080p",
     review_minutes: num(review_minutes, 2, 1, 10),
+    ...(kind === "live" ? { max_new: num(max_new, 3, 1, 10) } : {}),
   };
   const safeType = ["auto", "podcast", "entrevista", "juego", "directo"].includes(content_type) ? content_type : "auto";
   const safeGame = typeof game === "string" && game.trim() ? game.trim().slice(0, 60) : null;

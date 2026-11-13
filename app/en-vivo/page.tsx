@@ -2,10 +2,11 @@
 import { useCallback, useEffect, useState } from "react";
 import Ring from "@/components/Ring";
 import ClipCard from "@/components/ClipCard";
+import WatchChannels from "@/components/WatchChannels";
 import { ACTIVE, fmtTime } from "@/lib/format";
 import type { Clip, LiveStep, Rejected } from "@/lib/types";
 
-type Progress = { recorded_sec?: number; transcribed_sec?: number; reviews?: number; clips?: number };
+type Progress = { recorded_sec?: number; transcribed_sec?: number; reviews?: number; clips?: number; reconnects?: number; state?: string; chat_msgs?: number; pending_now?: number };
 type Src = { id: string; title: string | null; url: string | null; status: string; error: string | null; progress: Progress | null };
 
 function buildSteps(s: Src, clipCount: number): LiveStep[] {
@@ -30,6 +31,8 @@ export default function EnVivo() {
   const [demo, setDemo] = useState(false);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const [ctype, setCtype] = useState("auto");
+  const [nowMsg, setNowMsg] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -77,6 +80,10 @@ export default function EnVivo() {
         quality: f.get("quality"),
         review_minutes: Number(f.get("review")),
         layout: f.get("layout"),
+        content_type: ctype,
+        game: ctype === "juego" ? String(f.get("game") ?? "").trim() : "",
+        max_new: Number(f.get("max_new")),
+        progress_bar: f.get("bar") === "on",
         clipper: (() => { try { return localStorage.getItem("cf_clipper") || null; } catch { return null; } })(),
       }),
     });
@@ -91,6 +98,17 @@ export default function EnVivo() {
     if (!source) return;
     setBusy(true);
     await fetch("/api/live/stop", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source_id: source.id }) });
+    await load();
+    setBusy(false);
+  }
+
+  async function clipNow() {
+    if (!source) return;
+    setBusy(true);
+    setNowMsg("");
+    const r = await fetch("/api/live/clip", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source_id: source.id, seconds: 45 }) });
+    const j = await r.json().catch(() => ({}));
+    setNowMsg(r.ok ? "Pedido enviado: el clip sale en cuanto termine el trozo que se está grabando (menos de un minuto)." : j.error ?? "No se pudo pedir el clip");
     await load();
     setBusy(false);
   }
@@ -136,6 +154,20 @@ export default function EnVivo() {
             </select>
           </div>
 
+          <div className="row" style={{ marginTop: 14, gridTemplateColumns: "1fr 1fr" }}>
+            <div><label>Tipo de contenido</label>
+              <select value={ctype} onChange={(e) => setCtype(e.target.value)}>
+                <option value="auto">General</option><option value="juego">Juegos</option><option value="directo">Directo (charla)</option>
+                <option value="podcast">Podcast</option><option value="entrevista">Entrevista</option>
+              </select></div>
+            <div><label>Clips nuevos por revisión (máx.)</label>
+              <select name="max_new" defaultValue="3"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="5">5</option><option value="8">8</option></select></div>
+          </div>
+          {ctype === "juego" && <input name="game" placeholder="¿Qué juego es? (ej. Valorant, Fortnite, GTA)" maxLength={60} style={{ marginTop: 10 }} />}
+          <label style={{ display: "flex", gap: 8, alignItems: "center", textTransform: "none", fontSize: 13, color: "var(--text)", margin: "12px 0 0" }}>
+            <input type="checkbox" name="bar" style={{ width: "auto" }} /> Barra de progreso abajo del clip
+          </label>
+
           <div style={{ marginTop: 16 }}><button className="btn" disabled={busy}>{busy ? "Conectando…" : "Empezar a grabar"}</button></div>
         </form>
       )}
@@ -145,6 +177,13 @@ export default function EnVivo() {
           <div className="card red">
             <Ring time={fmtTime(p.recorded_sec ?? 0)} label={active ? "EN VIVO" : source.status === "error" ? "ERROR" : "TERMINADO"} />
             <p className="sub" style={{ textAlign: "center", margin: "0 0 4px" }}>{source.title ?? source.url}</p>
+            {active && (p.reconnects || p.chat_msgs || p.state === "reconnecting") ? (
+              <p className="sub" style={{ textAlign: "center", fontSize: 12, margin: "2px 0 0" }}>
+                {p.state === "reconnecting" ? "↻ Reconectando con el directo… " : ""}
+                {p.reconnects ? `Reconexiones: ${p.reconnects} · ` : ""}
+                {p.chat_msgs ? `Chat leído: ${p.chat_msgs} mensajes` : ""}
+              </p>
+            ) : null}
             {source.status === "error" && <div className="banner" style={{ marginTop: 12 }}><b>Falló:</b> {source.error}</div>}
             <div className="steps">
               {buildSteps(source, clips.length).map((s) => (
@@ -164,7 +203,10 @@ export default function EnVivo() {
             </div>
             {active && (
               <div style={{ marginTop: 14 }}>
+                <button className="btn sm" onClick={clipNow} disabled={busy || source.status !== "recording"}>✂ Clip ahora</button>{" "}
                 <button className="btn sm ghost" onClick={stop} disabled={busy}>■ Parar</button>
+                {!!p.pending_now && <span style={{ marginLeft: 10, fontSize: 12, color: "var(--muted)" }}>{p.pending_now} clip(s) en camino…</span>}
+                {nowMsg && <div style={{ marginTop: 8, fontSize: 12, color: "var(--muted)" }}>{nowMsg}</div>}
               </div>
             )}
           </div>
@@ -178,6 +220,8 @@ export default function EnVivo() {
           </div>
         </div>
       )}
+
+      <WatchChannels />
     </>
   );
 }

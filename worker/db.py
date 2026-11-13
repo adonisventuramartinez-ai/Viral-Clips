@@ -146,3 +146,67 @@ def stop_requested(source_id) -> bool:
 
 def set_progress(source_id, **p):
     sb.table("sources").update({"progress": p}).eq("id", source_id).execute()
+
+
+# ----------------------------------------------------------------------------- Parte 2: directos
+_LIVE_ACTIVE = ["queued", "downloading", "recording", "transcribing", "analyzing", "clipping"]
+_cmd_warned = False
+
+
+def pending_commands(source_id):
+    """Pedidos de 'Clip ahora' que la web dejó para este directo (tabla live_commands, migración 0006)."""
+    global _cmd_warned
+    try:
+        res = (sb.table("live_commands").select("*").eq("source_id", source_id).eq("status", "pending")
+               .order("created_at").limit(10).execute())
+        return res.data or []
+    except Exception as e:  # noqa: BLE001
+        if not _cmd_warned:
+            print(f"  Aviso: no pude leer live_commands ({str(e)[:80]}). Corre 0006_envivo.sql para activar 'Clip ahora'.", flush=True)
+            _cmd_warned = True
+        return []
+
+
+def finish_command(cmd_id, ok=True, message=None, clip_id=None):
+    fields = {"status": "done" if ok else "error", "message": (message or "")[:300], "done_at": now()}
+    if clip_id:
+        fields["clip_id"] = clip_id
+    try:
+        sb.table("live_commands").update(fields).eq("id", cmd_id).execute()
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def active_channels():
+    return sb.table("watch_channels").select("*").eq("active", True).order("created_at").execute().data or []
+
+
+def update_channel(channel_id, **fields):
+    try:
+        sb.table("watch_channels").update(fields).eq("id", channel_id).execute()
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def live_active() -> bool:
+    """True si ya hay un directo en cola o grabando (el worker graba uno a la vez)."""
+    res = sb.table("sources").select("id").eq("kind", "live").in_("status", _LIVE_ACTIVE).limit(1).execute()
+    return bool(res.data)
+
+
+def create_live_source(ch, found):
+    """Crea la fuente y el trabajo de grabación para un canal que entró en vivo. Devuelve el id de la fuente."""
+    options = {"content_type": ch.get("content_type") or "auto", "game": ch.get("game"),
+               "progress_bar": bool(ch.get("progress_bar"))}
+    row = {"kind": "live", "url": found["url"], "title": found.get("title"), "status": "queued",
+           "layout": ch.get("layout") or "crop", "clipper": ch.get("clipper")}
+    try:
+        src = sb.table("sources").insert({**row, "options": options}).execute().data[0]
+    except Exception:  # noqa: BLE001  (aún no existe la columna options)
+        src = sb.table("sources").insert(row).execute().data[0]
+    payload = {"clip_seconds": int(ch.get("clip_seconds") or 45), "quality": ch.get("quality") or "720p",
+               "review_minutes": int(ch.get("review_minutes") or 2), **options}
+    if ch.get("max_new"):
+        payload["max_new"] = int(ch["max_new"])
+    sb.table("jobs").insert({"source_id": src["id"], "type": "record", "payload": payload}).execute()
+    return src["id"]

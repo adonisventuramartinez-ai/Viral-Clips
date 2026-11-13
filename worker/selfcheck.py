@@ -30,6 +30,19 @@ def run():
         except Exception:  # noqa: BLE001
             fatal.append("Falta la migración 0003_live.sql: pégala en Supabase > SQL Editor y ejecútala.")
 
+    try:
+        db.sb.table("live_commands").select("id").limit(1).execute()
+        db.sb.table("watch_channels").select("id").limit(1).execute()
+    except Exception:  # noqa: BLE001
+        warn.append("Faltan las tablas de la Parte 2 (botón 'Clip ahora' y canales automáticos): "
+                    "pega supabase/migrations/0006_envivo.sql en Supabase > SQL Editor. Lo demás funciona igual.")
+
+    if config.LIVE_CHAT:
+        try:
+            import chat_downloader  # noqa: F401
+        except ImportError:
+            warn.append("Falta chat-downloader: el chat en vivo no se leerá. Reconstruye el worker (INICIAR-WORKER.bat).")
+
     if config.GROQ_API_KEY and not config.GROQ_API_KEY.startswith("gsk_"):
         warn.append("Tu GROQ_API_KEY no empieza con 'gsk_': probablemente no es una llave de Groq.")
 

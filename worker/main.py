@@ -11,6 +11,7 @@ from download import download
 import live
 import rerender
 import selfcheck
+import watcher
 import brand
 import energy
 import profiles
@@ -118,7 +119,7 @@ def main():
     config.WORK_DIR.mkdir(parents=True, exist_ok=True)
     import llm
     print(f"IA en orden de uso: {' → '.join(llm.configured())}", flush=True)
-    print("Worker listo (encuadres: vertical, dividido, dos personas, difuminado), esperando trabajos…", flush=True)
+    print("Worker listo (encuadres: vertical, dividido, dos personas, difuminado; directos con reconexión y chat), esperando trabajos…", flush=True)
     last_clean = 0.0
     while True:
         db.heartbeat()
@@ -135,6 +136,10 @@ def main():
             else:
                 process(job)
         else:
+            try:
+                watcher.tick()      # ¿alguno de tus canales entró en vivo? (solo cuando el worker está libre)
+            except Exception as e:  # noqa: BLE001  (vigilar canales es un extra: nunca debe tumbar al worker)
+                print(f"Canales automáticos: error ({type(e).__name__}: {str(e)[:100]})", flush=True)
             time.sleep(config.POLL_SECONDS)
 
 
