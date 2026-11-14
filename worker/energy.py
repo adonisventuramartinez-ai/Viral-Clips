@@ -91,11 +91,14 @@ def motion_seconds(video: Path, min_score=0.05, z=2.5, min_over=0.03) -> set:
     return motion_from_levels(scene_levels(video), min_score, z, min_over)
 
 
-def add_action_markers(segments, loud: set, motion: set, chat: set = None, gap=3, min_gap_to_speech=1.5):
+def add_action_markers(segments, loud: set, motion: set, chat: set = None, gap=3, min_gap_to_speech=1.5, extra=None, labels=None):
     """Para juegos: agrega líneas '[acción sin voz]' donde hubo picos (🔊/🎮/💬) pero nadie hablaba,
     para que la IA pueda elegir jugadas sin voz. Devuelve una lista NUEVA ordenada; no toca la transcripción guardada."""
     chat = chat or set()
-    secs = sorted(loud | motion | chat)
+    extra = extra or {}          # {'💥': {segundos}, '📺': {segundos}, ...}
+    labels = labels or {}        # {segundo: 'WASTED'}
+    allx = set().union(*extra.values()) if extra else set()
+    secs = sorted(loud | motion | chat | allx)
     if not secs:
         return list(segments)
     groups, cur = [], [secs[0]]
@@ -114,8 +117,13 @@ def add_action_markers(segments, loud: set, motion: set, chat: set = None, gap=3
         if speech:
             continue
         marks = ("🔊" if any(t in loud for t in g) else "") + ("🎮" if any(t in motion for t in g) else "") \
-            + ("💬" if any(t in chat for t in g) else "")
-        out.append({"start": float(a), "end": float(b), "text": ACTION_TEXT, "hot": marks})
+            + ("💬" if any(t in chat for t in g) else "") \
+            + "".join(m for m, ss in extra.items() if any(t in ss for t in g))
+        seg = {"start": float(a), "end": float(b), "text": ACTION_TEXT, "hot": marks}
+        note = _note(range(a, b), labels)
+        if note:
+            seg["note"] = note
+        out.append(seg)
     out.sort(key=lambda s: s["start"])
     return out
 
@@ -195,8 +203,19 @@ def hot_from_times(times, lo: float, hi: float, bin_s=10, z=2.0, min_msgs=6, bas
     return hot
 
 
-def annotate(segments, loud: set, chat: set, motion: set = None):
+def _note(rng, labels):
+    """Texto corto para la IA con los eventos de pantalla vistos en esos segundos (p. ej. 'pantalla: WASTED')."""
+    found = []
+    for t in rng:
+        v = labels.get(t)
+        if v and v not in found:
+            found.append(v)
+    return ("pantalla: " + ", ".join(found)) if found else ""
+
+
+def annotate(segments, loud: set, chat: set, motion: set = None, extra=None, labels=None):
     """Marca cada frase: s['hot'] = '🔊' (volumen), '🎮' (acción en pantalla), '💬' (chat) o varios (vacío si nada).
+    extra = marcas adicionales {'💥': segundos, '📺': segundos, '🗯': segundos}; labels = {segundo: 'WASTED'} para dar contexto.
     Devuelve cuántas marcó."""
     n = 0
     for s in segments:
@@ -208,6 +227,12 @@ def annotate(segments, loud: set, chat: set, motion: set = None):
             marks += "🎮"
         if chat and any(t in chat for t in range(a, b + 1)):
             marks += "💬"
+        for mark, secs_set in (extra or {}).items():
+            if secs_set and any(t in secs_set for t in range(a, b + 1)):
+                marks += mark
         s["hot"] = marks
+        note = _note(range(a, b + 1), labels or {})
+        if note:
+            s["note"] = note
         n += bool(marks)
     return n

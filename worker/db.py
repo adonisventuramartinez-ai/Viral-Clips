@@ -104,6 +104,26 @@ def save_clip(source, user_id, m, storage_path, size_bytes, words_in_clip):
     sb.table("clips").insert(row).execute()
 
 
+def recent_clip_texts(user_id, hours=48, limit=80):
+    """Textos hablados de los clips que este usuario creó en las últimas `hours` horas (para no repetir el mismo momento
+    visto desde otra cámara). Lista vacía si algo falla."""
+    try:
+        from datetime import datetime, timedelta, timezone
+        since = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
+        q = sb.table("clips").select("captions").gte("created_at", since).order("created_at", desc=True).limit(limit)
+        if user_id:
+            q = q.eq("user_id", user_id)
+        out = []
+        for row in (q.execute().data or []):
+            caps = row.get("captions") or []
+            txt = " ".join(str(c.get("w", "")) for c in caps if isinstance(c, dict)).strip()
+            if txt:
+                out.append(txt)
+        return out
+    except Exception:  # noqa: BLE001
+        return []
+
+
 def get_clip(clip_id):
     res = sb.table("clips").select("*").eq("id", clip_id).limit(1).execute()
     return res.data[0] if res.data else None

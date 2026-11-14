@@ -10,7 +10,11 @@ import unicodedata
 import config
 
 
-# bonus = puntos que suma cada pista si cae dentro del momento (🔊 volumen, 🎮 acción en pantalla, 💬 chat)
+# bonus = puntos que suma cada pista si cae dentro del momento:
+#   🔊 volumen (loud), 🎮 cambio de imagen (motion), 💬 chat, 💥 tiroteo/explosión por audio (combat),
+#   📺 WASTED/BUSTED/MISSION PASSED/estrellas en pantalla (screen), 🗯 discusión (argument)
+# signals = qué detectores extra corre el worker para ese tipo (Parte 3); dedupe = quitar clips repetidos;
+# verify = permitir la verificación con imágenes (ver VERIFY_IMAGES en .env)
 PROFILES = {
     "auto": {
         "label": "General", "ideal": 45, "kind": "un podcast/directo/video",
@@ -52,7 +56,8 @@ PROFILES = {
             "(la frase que lo enciende) y termina en el punto más fuerte o en la reacción. Evita tiempos muertos, rutinas de comida o limpieza, "
             "conversaciones sin conflicto y charla que necesita contexto de días anteriores."),
         "preroll": 3.0, "tail": 1.5, "question": False, "action": False,
-        "bonus": {"loud": 8, "motion": 0, "chat": 9},
+        "bonus": {"loud": 8, "motion": 0, "chat": 9, "argument": 10},
+        "signals": {"argument": True}, "dedupe": True, "verify": True,
         "keywords": ["pelea", "pelear", "discusión", "discutir", "traición", "traicionó", "traidor", "traidora", "dime a ver",
                      "mentiroso", "mentirosa", "falso", "falsa", "hipócrita", "chisme", "te lo dije", "en mi cara", "respétame",
                      "no me grites", "me tienes harto", "me tienes harta", "habla claro", "cállate", "lárgate",
@@ -68,7 +73,8 @@ PROFILES = {
                   "las marcas 🎮 (cambio brusco de imagen), 🔊 (pico de volumen) y las líneas [acción sin voz] indican que pasó algo en pantalla. "
                   "Empieza unos segundos ANTES de la jugada para que se entienda el contexto."),
         "preroll": 6.0, "tail": 2.5, "question": False, "action": True,
-        "bonus": {"loud": 7, "motion": 8, "chat": 8},
+        "bonus": {"loud": 7, "motion": 8, "chat": 8, "combat": 6},
+        "signals": {"combat": True}, "verify": True,
         "keywords": ["clutch", "ace", "pentakill", "no way", "no puede ser", "qué locura", "increíble", "imposible", "wtf",
                      "insane", "let's go", "lets go", "vamos", "nooo", "mira eso", "last second", "gané", "ganamos", "victoria",
                      "headshot", "1v", "booyah"],
@@ -85,7 +91,8 @@ PROFILES = {
             "NO es acción; dale más peso al volumen y a lo que dicen. El clip empieza unos segundos ANTES de la jugada para que se entienda "
             "y termina en el desenlace o la reacción. Corto y directo: ideal 15 a 30 segundos."),
         "preroll": 5.0, "tail": 2.5, "question": False, "action": True,
-        "bonus": {"loud": 9, "motion": 4, "chat": 8},
+        "bonus": {"loud": 9, "motion": 4, "chat": 8, "combat": 10, "screen": 9},
+        "signals": {"combat": True, "screen": True}, "verify": True,
         "keywords": ["wasted", "busted", "mission passed", "me mataron", "me mató", "me explotó", "explotó", "explosión", "choque",
                      "persecución", "policía", "los pacos", "la policía", "cinco estrellas", "5 estrellas", "tanque", "avión",
                      "helicóptero", "helicoptero", "headshot", "no puede ser", "qué locura", "increíble", "imposible", "wtf",
@@ -102,7 +109,8 @@ PROFILES = {
             "Las explosiones o persecuciones solo cuentan si vienen con diálogo fuerte. Evita conducir en silencio, menús, "
             "esperas, y charla técnica del servidor o de reglas. Ideal 30 a 50 segundos."),
         "preroll": 2.0, "tail": 1.5, "question": False, "action": False,
-        "bonus": {"loud": 7, "motion": 0, "chat": 9},
+        "bonus": {"loud": 7, "motion": 0, "chat": 9, "screen": 5},
+        "signals": {"screen": True},
         "keywords": ["manos arriba", "alto ahí", "quieto", "al suelo", "te voy a arrestar", "estás detenido", "tengo derecho",
                      "abogado", "rehén", "rehen", "dame todo", "esto es un atraco", "te voy a matar", "no me dispares",
                      "no dispares", "fail rp", "rompí el rol", "no rolees", "nuevo en la ciudad", "te lo juro oficial",
@@ -120,6 +128,11 @@ PROFILES = {
 }
 
 KEYWORD_BONUS = 4   # una sola vez, aunque haya varias palabras
+
+# marca en la transcripción -> nombre de la pista en "bonus"
+MARKS = (("🔊", "loud"), ("🎮", "motion"), ("💬", "chat"), ("💥", "combat"), ("📺", "screen"), ("🗯", "argument"))
+# marca de cada detector extra
+EXTRA_MARK = {"combat": "💥", "screen": "📺", "argument": "🗯"}
 
 # Nombres de tipo que la web y el worker aceptan (la web los valida con la misma lista)
 TYPES = ["auto", "reality", "podcast", "entrevista", "juego", "gta", "gta_rp", "directo"]

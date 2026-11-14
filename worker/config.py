@@ -126,3 +126,23 @@ def whisper_prompt():
     txt = (f"Conversación en español dominicano con {names}. "
            "Dicen: klk, qué lo qué, vaina, tíguere, dime a ver, manín, jevi, pariguayo, chercha, colmado, guagua, mi hermano.")
     return txt[:700]
+
+
+# --- Parte 3: detección mejorada ---
+def _flag(name, default="1"):
+    return (os.environ.get(name) or default).strip().lower() not in ("0", "false", "no", "off")
+
+
+DETECT_AUDIO = _flag("DETECT_AUDIO")          # disparos/explosiones por audio (GTA y juegos)
+DETECT_SCREEN = _flag("DETECT_SCREEN")        # WASTED / BUSTED / MISSION PASSED / estrellas (GTA)
+DETECT_ARGUMENT = _flag("DETECT_ARGUMENT")    # discusiones (Reality)
+DEDUPE = _flag("DEDUPE")                      # quitar clips repetidos (otra cámara, mismo momento)
+try:
+    DEDUPE_THRESHOLD = min(0.95, max(0.3, float(os.environ.get("DEDUPE_THRESHOLD") or 0.55)))
+except ValueError:
+    DEDUPE_THRESHOLD = 0.55
+DEDUPE_HOURS = int(os.environ.get("DEDUPE_HOURS") or 48)     # compara con los clips de las últimas N horas
+# Verificación con imágenes: auto = solo GTA/juegos/reality y solo si hay un modelo con visión; 1 = siempre; 0 = apagada
+VERIFY_IMAGES = (os.environ.get("VERIFY_IMAGES") or "auto").strip().lower()
+VERIFY_TOP = int(os.environ.get("VERIFY_TOP") or 12)         # cuántos candidatos revisa con imágenes (los mejores)
+VERIFY_FRAMES = min(5, max(2, int(os.environ.get("VERIFY_FRAMES") or 3)))

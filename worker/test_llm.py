@@ -11,6 +11,9 @@ for k in list(os.environ):
 os.environ.update(GROQ_API_KEY="gsk_x", CEREBRAS_API_KEY="csk_x", GEMINI_API_KEY="g_x", LLM_MAX_WAIT="3",
                   GROQ_KEYS_FILE=os.devnull)
 
+import dotenv  # noqa: E402
+dotenv.load_dotenv = lambda *a, **k: False   # la prueba no debe leer tu worker/.env real
+
 import llm  # noqa: E402
 
 calls = []

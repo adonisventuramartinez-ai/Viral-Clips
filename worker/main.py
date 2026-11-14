@@ -6,6 +6,7 @@ import uuid
 
 import config
 import db
+import detect
 from analyze import find_moments
 from download import download
 import live
@@ -23,6 +24,30 @@ from transcribe import transcribe
 
 class Cancelled(Exception):
     """La fuente se quitó desde la web (botón Limpiar) mientras se procesaba."""
+
+
+def detect_signals(video, prof, words, levels, chat=None, lo=0):
+    """Detectores extra de la Parte 3 según el tipo de contenido. Devuelve ({marca: segundos}, {segundo: 'WASTED'}).
+    Cada uno es opcional: si falla o está apagado en .env (DETECT_AUDIO / DETECT_SCREEN / DETECT_ARGUMENT) se omite."""
+    sig = prof.get("signals") or {}
+    extra, labels = {}, {}
+    if sig.get("combat") and config.DETECT_AUDIO:
+        shots, booms = detect.combat_seconds(video)
+        if shots or booms:
+            extra[profiles.EXTRA_MARK["combat"]] = shots | booms
+        print(f"  Audio: {len(shots)} s de tiroteo, {len(booms)} s con explosión", flush=True)
+    if sig.get("screen") and config.DETECT_SCREEN:
+        ev = detect.screen_events(video)
+        if ev:
+            extra[profiles.EXTRA_MARK["screen"]] = set(ev)
+            labels = {t: detect.SCREEN_MARK[k] for t, k in ev.items()}
+        print(f"  Pantalla: {len(ev)} s con WASTED/BUSTED/MISSION PASSED/estrellas", flush=True)
+    if sig.get("argument") and config.DETECT_ARGUMENT:
+        arg = detect.argument_seconds(words, levels, chat, lo=lo)
+        if arg:
+            extra[profiles.EXTRA_MARK["argument"]] = arg
+        print(f"  Discusiones: {len(arg)} s con pelea o discusión", flush=True)
+    return extra, labels
 
 
 def process(job):
@@ -68,16 +93,20 @@ def process(job):
         ai_segments = segments
         try:
             dur_v = segments[-1]["end"]
-            loud = energy.loud_seconds(video)
+            levels = energy.audio_levels(video)
+            loud = energy.loud_from_levels(levels)
             motion = energy.motion_seconds(video) if prof["bonus"].get("motion") else set()
             chat = energy.chat_seconds(src["url"], work, offset, dur_v)
-            n_hot = energy.annotate(segments, loud, chat, motion)
+            extra, labels = detect_signals(video, prof, words, levels, chat)
+            n_hot = energy.annotate(segments, loud, chat, motion, extra=extra, labels=labels)
             print(f"  Pistas: {len(loud)} s con volumen alto, {len(motion)} s de acción en pantalla, {n_hot} frase(s) marcada(s)", flush=True)
             if prof.get("action"):
-                ai_segments = energy.add_action_markers(segments, loud, motion, chat)
+                ai_segments = energy.add_action_markers(segments, loud, motion, chat, extra=extra, labels=labels)
         except Exception as e:  # noqa: BLE001  (las pistas son un extra: nunca deben tumbar el trabajo)
             print(f"  Pistas: no pude calcularlas ({type(e).__name__}: {e})", flush=True)
-        chosen, rejected = find_moments(ai_segments, n_clips, secs, words=words, profile=prof, game=game)
+        known = db.recent_clip_texts(src.get("user_id"), config.DEDUPE_HOURS) if (prof.get("dedupe") and config.DEDUPE) else []
+        chosen, rejected = find_moments(ai_segments, n_clips, secs, words=words, profile=prof, game=game,
+                                        video=video, known_texts=known)
         db.save_rejected(sid, rejected)
         if not chosen:
             raise RuntimeError("La IA no encontró momentos para clips")

@@ -8,9 +8,11 @@ import math
 import re
 
 import config
+import detect
 import llm
 import profiles
 import snap
+import vision
 
 WINDOW = 900  # segundos de transcripción por llamada
 
@@ -25,8 +27,10 @@ Cada clip debe:
 - terminar al cerrar una idea completa;
 - entenderse solo, sin contexto previo.
 
-Las líneas con 🔊 tuvieron un pico de volumen (gritos, risas fuertes), las que tienen 🎮 un cambio brusco de imagen (acción en pantalla)
-y las que tienen 💬 hicieron explotar el chat: son buenas pistas de que pasó algo, pero decide tú por el contenido.
+Las líneas con 🔊 tuvieron un pico de volumen (gritos, risas fuertes), las que tienen 🎮 un cambio brusco de imagen (acción en pantalla),
+las que tienen 💬 hicieron explotar el chat, 💥 significa tiroteo o explosión detectados en el audio, 📺 una pantalla de juego
+(WASTED, BUSTED, MISSION PASSED o estrellas de policía; el detalle va entre paréntesis) y 🗯 una discusión (varias personas hablando
+fuerte y rápido). Son buenas pistas de que pasó algo, pero decide tú por el contenido.
 Usa EXACTAMENTE los segundos de las marcas [..] para start y end.
 Responde SOLO con JSON, sin texto extra:
 {{"moments":[{{"start":<seg>,"end":<seg>,"title":"título corto y llamativo (máx 70 car.)","hook":"frase gancho de 3 a 7 palabras que sale arriba del clip al empezar (provoca curiosidad, sin spoilear)","score":<0-100 probabilidad viral>,"reason":"por qué funciona, 1 frase","description":"descripción para redes, 1 o 2 frases con gancho","hashtags":["#tema1","#tema2","#tema3","#tema4","#tema5"]}}]}}
@@ -99,7 +103,8 @@ def _parse_scores(txt):
 
 def _line(s):
     spk = f" {s['spk']}:" if s.get("spk") else ""
-    return f"[{int(s['start'])}]{(' ' + s['hot']) if s.get('hot') else ''}{spk} {s['text']}"
+    note = f" ({s['note']})" if s.get("note") else ""
+    return f"[{int(s['start'])}]{(' ' + s['hot']) if s.get('hot') else ''}{spk} {s['text']}{note}"
 
 
 def _build_prompt(chunk, want, secs, prof=None, game=None):
@@ -195,7 +200,7 @@ def _boost(cands, segments, prof=None, bonus=None):
         inside = [s for s in hot if s["end"] > m["start"] and s["start"] < m["end"]]
         for s in inside:
             tags.update(c for c in s["hot"])
-        for mark, key in (("🔊", "loud"), ("🎮", "motion"), ("💬", "chat")):
+        for mark, key in profiles.MARKS:
             if mark in tags:
                 add += per.get(key, 0)
         hits = keyword_hits(m, segments, prof)
@@ -246,7 +251,8 @@ def rerank(cands, segments, n_clips, prof=None, max_items=60):
 
 
 # ----------------------------------------------------------------------------- API pública
-def find_moments(segments, n_clips, secs, words=None, profile=None, game=None):
+def find_moments(segments, n_clips, secs, words=None, profile=None, game=None, video=None, known_texts=None):
+    """video = ruta del video (para verificar con imágenes); known_texts = textos de clips ya hechos (para no repetir otra cámara)."""
     prof = profiles.get(profile) if not isinstance(profile, dict) else profile
     duration = segments[-1]["end"] if segments else 0
     chunks = _chunks(segments)
@@ -260,10 +266,19 @@ def find_moments(segments, n_clips, secs, words=None, profile=None, game=None):
     cands = _snap_all(cands, words, segments, secs, duration, prof)
     _boost(cands, segments, prof)
     rerank(cands, segments, n_clips, prof)
-    return select_moments(cands, n_clips)
+    if video is not None:
+        vision.verify(cands, video, prof, lambda m, lim=None: _text_of(m, segments, lim))
+    dropped = []
+    if prof.get("dedupe") and config.DEDUPE:
+        ranked = sorted(cands, key=lambda m: m["score"], reverse=True)
+        cands, dropped = detect.drop_repeats(ranked, lambda m: _text_of(m, segments), known_texts or [], config.DEDUPE_THRESHOLD)
+        if dropped:
+            print(f"  Repetidos: quité {len(dropped)} candidato(s) que cuentan lo mismo que otro clip", flush=True)
+    chosen, rejected = select_moments(cands, n_clips)
+    return chosen, rejected + dropped
 
 
-def review_window(segments, secs, existing, duration, min_score=None, max_new=None, words=None, profile=None, game=None):
+def review_window(segments, secs, existing, duration, min_score=None, max_new=None, words=None, profile=None, game=None, known_texts=None):
     """Revisión en vivo: mira la ventana reciente y devuelve (nuevos_clips, descartados).
 
     existing = clips ya creados (para no repetir el mismo momento).
@@ -280,8 +295,12 @@ def review_window(segments, secs, existing, duration, min_score=None, max_new=No
                 cands.append(c)
     cands = _snap_all(cands, words, segments, secs, duration, prof)
     _boost(cands, segments, prof)
+    ranked = sorted(cands, key=lambda x: x["score"], reverse=True)
     chosen, rejected = [], []
-    for m in sorted(cands, key=lambda x: x["score"], reverse=True):
+    if prof.get("dedupe") and config.DEDUPE and known_texts:
+        ranked, dup = detect.drop_repeats(ranked, lambda m: _text_of(m, segments), known_texts, config.DEDUPE_THRESHOLD)
+        rejected.extend(dup)
+    for m in ranked:
         if any(_overlap(m, c) > 0.3 for c in existing + chosen):
             rejected.append({"title": m["title"], "score": m["score"], "reason": "Ese momento o tema ya tiene clip"})
         elif m["score"] < min_score:

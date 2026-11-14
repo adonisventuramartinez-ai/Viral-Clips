@@ -16,6 +16,7 @@ import uuid
 import brand
 import config
 import db
+import detect
 import energy
 import profiles
 import snap
@@ -176,6 +177,7 @@ def process_live(job):
     seen_rej = set()
     done = set()
     lv_audio, lv_scene = {}, {}      # volumen (dB) y cambio de imagen por segundo de la grabación
+    ev_combat, ev_screen = set(), {}   # segundos con tiroteo/explosión y {segundo: 'WASTED'...} (Parte 3)
     waiting = {}                     # pedidos de "Clip ahora" esperando el próximo trozo: id -> {offset, since, secs}
     st = {"offset": 0.0, "last_review": 0.0, "reviews": 0, "clips": 0, "reconnects": 0, "session": 1, "state": "recording"}
     t0 = time.time()
@@ -213,6 +215,13 @@ def process_live(job):
             if prof["bonus"].get("motion"):
                 for i, v in enumerate(energy.scene_levels(f)):
                     lv_scene[base + i] = v
+            sig = prof.get("signals") or {}
+            if sig.get("combat") and config.DETECT_AUDIO:
+                shots, booms = detect.combat_seconds(f)
+                ev_combat.update(base + t for t in (shots | booms))
+            if sig.get("screen") and config.DETECT_SCREEN:
+                for t, k in detect.screen_events(f).items():
+                    ev_screen[base + t] = k
         except Exception as e:  # noqa: BLE001  (las pistas son un extra)
             print(f"  aviso: no pude calcular pistas de {f.name} ({type(e).__name__})", flush=True)
         segs.append({"path": f, "start": start, "end": start + dur, "session": sess})
@@ -231,6 +240,25 @@ def process_live(job):
             except Exception:  # noqa: BLE001
                 hot_chat = set()
         return loud, motion, hot_chat
+
+    def extras(lo, hi, words_win, hot_chat):
+        """Marcas de la Parte 3 dentro de [lo, hi): 💥 tiroteo/explosión, 📺 pantalla de GTA, 🗯 discusión."""
+        extra, labels = {}, {}
+        sig = prof.get("signals") or {}
+        if sig.get("combat"):
+            c = {t for t in ev_combat if lo <= t < hi}
+            if c:
+                extra[profiles.EXTRA_MARK["combat"]] = c
+        if sig.get("screen"):
+            sel = {t: k for t, k in ev_screen.items() if lo <= t < hi}
+            if sel:
+                extra[profiles.EXTRA_MARK["screen"]] = set(sel)
+                labels = {t: detect.SCREEN_MARK[k] for t, k in sel.items()}
+        if sig.get("argument") and config.DETECT_ARGUMENT:
+            arg = detect.argument_seconds(words_win, _fill(lv_audio, lo, hi), hot_chat, lo=lo, hi=hi)
+            if arg:
+                extra[profiles.EXTRA_MARK["argument"]] = arg
+        return extra, labels
 
     # ------------------------------------------------------------------ clips
     def make_clip(m):
@@ -292,13 +320,17 @@ def process_live(job):
         try:
             lo, hi = int(window_from), int(st["offset"])
             loud, motion, hot_chat = signals(lo, hi)
-            n_hot = energy.annotate(win, loud, hot_chat, motion)
-            ai_win = energy.add_action_markers(win, loud, motion, hot_chat) if prof.get("action") else win
+            words_win = [w for w in all_words if w["end"] >= window_from]
+            extra, labels = extras(lo, hi, words_win, hot_chat)
+            n_hot = energy.annotate(win, loud, hot_chat, motion, extra=extra, labels=labels)
+            ai_win = (energy.add_action_markers(win, loud, motion, hot_chat, extra=extra, labels=labels)
+                      if prof.get("action") else win)
             print(f"  Pistas: {len(loud)} s de volumen alto, {len(motion)} s de acción, {len(hot_chat)} s de chat, "
                   f"{n_hot} frase(s) marcada(s)", flush=True)
-            words_win = [w for w in all_words if w["end"] >= window_from]
+            known = [" ".join(s2["text"] for s2 in all_segments if s2["end"] > c["start"] and s2["start"] < c["end"])
+                     for c in chosen_all[-30:]] if (prof.get("dedupe") and config.DEDUPE) else []
             new, rej = review_window(ai_win, secs, chosen_all, st["offset"], min_score=min_score, max_new=max_new,
-                                     words=words_win, profile=prof, game=game)
+                                     words=words_win, profile=prof, game=game, known_texts=known)
             fresh = [r for r in rej if r["title"] not in seen_rej]
             seen_rej.update(r["title"] for r in fresh)
             db.save_rejected(sid, fresh)
