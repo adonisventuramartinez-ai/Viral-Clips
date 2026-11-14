@@ -169,3 +169,12 @@ CLIP_FACECAM = _flag("CLIP_FACECAM")          # buscar el recuadro de la cámara
 CLIP_ENCODER = (os.environ.get("CLIP_ENCODER") or "auto").strip().lower()
 # Subtítulos con un color por persona: auto = solo si hay pyannote + HF_TOKEN; 1 = intentar siempre; 0 = apagado
 SUBS_PER_SPEAKER = (os.environ.get("SUBS_PER_SPEAKER") or "auto").strip().lower()
+
+
+# --- Parte 5: quién habla ---
+VOICES = _flag("VOICES")                      # separar voces por timbre y tono (P1, P2...) sin instalar nada
+VOICE_MAX = min(10, max(2, int(os.environ.get("VOICE_MAX") or 6)))      # máximo de personas distintas
+try:
+    VOICE_THRESHOLD = min(6.0, max(0.5, float(os.environ.get("VOICE_THRESHOLD") or 1.6)))   # más bajo = separa más (y se equivoca más)
+except ValueError:
+    VOICE_THRESHOLD = 1.6

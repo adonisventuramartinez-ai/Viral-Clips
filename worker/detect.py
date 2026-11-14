@@ -256,7 +256,8 @@ def argument_from_signals(words, levels, chat=None, lo=0, hi=None, win=8, min_wp
     """Segundos (enteros) donde hay una DISCUSIÓN. Se exige que coincidan al menos 2 de estas 3 pistas en una ventana de `win` s:
       a) mucha palabra por segundo (>= min_wps: la gente habla rápido y encima de otra),
       b) volumen sostenido por encima de lo normal (no un pico suelto),
-      c) el chat explotó (💬).
+      c) el chat explotó (💬),
+      d) la conversación salta de una persona a otra a cada rato (>= 4 cambios de voz; solo si las palabras traen 'spk', Parte 5).
     Las palabras traen 'start'/'end' (segundos absolutos); levels[0] es el segundo `lo`. Sin diarización no se puede contar voces a la vez; esto es la mejor señal barata."""
     if not words or len(levels) < 20:
         return set()
@@ -272,6 +273,7 @@ def argument_from_signals(words, levels, chat=None, lo=0, hi=None, win=8, min_wp
     med = statistics.median(sm_lv)
     chat = chat or set()
     out = set()
+    spoken = [w for w in words if w.get("spk") is not None]
     for a in range(lo, hi - win + 1, 2):
         rate = sum(wps[a - lo: a - lo + win]) / win
         vals = sm_lv[a - lo: a - lo + win] if a - lo >= 0 and a - lo + win <= len(sm_lv) else []
@@ -279,7 +281,11 @@ def argument_from_signals(words, levels, chat=None, lo=0, hi=None, win=8, min_wp
         a_ok = rate >= min_wps
         b_ok = loud_frac >= 0.6
         c_ok = sum(1 for t in range(a, a + win) if t in chat) >= win // 2
-        if (a_ok + b_ok + c_ok) >= 2:
+        d_ok = False
+        if spoken:
+            seq = [w["spk"] for w in spoken if a <= w["start"] < a + win]
+            d_ok = sum(1 for x, y in zip(seq, seq[1:]) if x != y) >= 4
+        if (a_ok + b_ok + c_ok + d_ok) >= 2:
             out.update(range(a, a + win))
     return out
 

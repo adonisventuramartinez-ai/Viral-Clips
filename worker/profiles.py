@@ -15,9 +15,11 @@ import config
 #   📺 WASTED/BUSTED/MISSION PASSED/estrellas en pantalla (screen), 🗯 discusión (argument)
 # signals = qué detectores extra corre el worker para ese tipo (Parte 3); dedupe = quitar clips repetidos;
 # verify = permitir la verificación con imágenes (ver VERIFY_IMAGES en .env)
+# voices = separar voces (P1, P2...) para la IA, las discusiones y los subtítulos por persona (Parte 5; VOICES en .env)
 # fx = efectos de la Parte 4: zoom (punch-in) y/o slow = cámara lenta en explosiones (ver CLIP_ZOOM / CLIP_SLOWMO en .env)
 PROFILES = {
     "auto": {
+        "voices": True,
         "label": "General", "ideal": 45, "kind": "un podcast/directo/video",
         "guide": "Busca polémica, humor, confesiones, historias con gancho, frases citables, reacciones fuertes y giros inesperados.",
         "preroll": 0.0, "tail": 0.4, "question": False, "action": False,
@@ -25,6 +27,7 @@ PROFILES = {
         "keywords": [],
     },
     "podcast": {
+        "voices": True,
         "label": "Podcast", "ideal": 75, "kind": "un podcast de conversación",
         "guide": ("Es un podcast de conversación. Busca opiniones fuertes o polémicas, confesiones, anécdotas con inicio-giro-final, "
                   "choques de posturas, datos sorprendentes, frases citables y humor. Evita saludos, presentaciones, publicidad, "
@@ -35,6 +38,7 @@ PROFILES = {
                      "no lo vas a creer", "te juro", "me arrepiento"],
     },
     "entrevista": {
+        "voices": True,
         "label": "Entrevista", "ideal": 75, "kind": "una entrevista (entrevistador y entrevistado)",
         "guide": ("Es una entrevista. Una respuesta casi nunca se entiende sin la pregunta: el clip debe EMPEZAR en la pregunta "
                   "(o en una frase que la resuma) y seguir con la respuesta completa. Busca revelaciones, confesiones, polémica, "
@@ -46,6 +50,7 @@ PROFILES = {
                      "no me arrepiento", "lo que nadie sabe", "polémica"],
     },
     "reality": {
+        "voices": True,
         "label": "Reality (Casa de Alofoke)", "ideal": 45,
         "kind": "un reality show 24/7 en vivo (La Casa de Alofoke 3) con varios participantes conviviendo",
         "guide": (
@@ -103,6 +108,7 @@ PROFILES = {
                      "nooo", "vamos", "let's go", "lets go", "mira eso", "me tumbó", "atraco", "heist"],
     },
     "gta_rp": {
+        "voices": True,
         "label": "GTA RP (roleplay)", "ideal": 40, "game": "GTA 5 RP",
         "kind": "un directo o video de GTA 5 Roleplay (servidor RP) con personas interpretando personajes",
         "guide": (
@@ -123,6 +129,7 @@ PROFILES = {
                      "no lo puedo creer", "qué vergüenza", "traición", "me traicionó", "mentira"],
     },
     "directo": {
+        "voices": True,
         "label": "Directo (charla)", "ideal": 45, "kind": "un directo de charla (just chatting)",
         "guide": ("Es un directo de charla. Busca reacciones, momentos graciosos, historias, interacción con el chat, polémicas "
                   "y cosas inesperadas. Evita tiempos muertos y lecturas largas del chat."),

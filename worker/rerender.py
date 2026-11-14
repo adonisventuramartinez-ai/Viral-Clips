@@ -7,6 +7,7 @@ import brand
 import config
 import db
 import profiles
+import voices
 from download import download
 from render import render_clip
 from transcribe import transcribe
@@ -37,6 +38,9 @@ def process_rerender(job):
         print(f"  Re-render del clip {cid}: {start:.1f}-{end:.1f}s, encuadre {layout}", flush=True)
         video, _title, offset = download(src["url"], work, p.get("quality", "1080p"), str(rf), str(end + PAD))
         _segments, words = transcribe(video, work)
+        prof = profiles.get((src.get("options") or {}).get("content_type"))
+        if prof.get("voices"):
+            voices.label(video, _segments, words)
 
         out = work / f"{cid}.mp4"
         render_clip(video, words, start - offset, end - offset, out, work, custom_crop=custom, layout=layout,

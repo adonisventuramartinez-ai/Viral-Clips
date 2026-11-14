@@ -15,6 +15,7 @@ import selfcheck
 import watcher
 import brand
 import energy
+import voices
 import profiles
 import original
 import publisher
@@ -87,6 +88,9 @@ def process(job):
             raise RuntimeError("No se detectó voz en el video")
         
         db.save_transcript(sid, [{**s, "start": s["start"] + offset, "end": s["end"] + offset} for s in segments])
+        if prof.get("voices"):   # Parte 5: quién habla (P1, P2...) para la IA, las discusiones y los colores de subtítulos
+            n_voices = voices.label(video, segments, words)
+            print(f"  Voces: {n_voices} persona(s) distintas" if n_voices >= 2 else "  Voces: no distingo más de una (sigo sin etiquetas)", flush=True)
 
         alive()
         db.set_source(sid, status="analyzing")

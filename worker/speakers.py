@@ -103,6 +103,9 @@ def diarize(source, start, end, workdir):
 
 def label_words(source, words, start, end, workdir):
     """Palabras del clip con 'spk' si hay 2 o más personas; si no, devuelve las palabras sin tocar. Siempre (palabras, n_personas)."""
+    inside0 = [w for w in words if w["start"] >= start - 0.05 and w["end"] <= end + 0.3 and w.get("spk") is not None]
+    if len({w["spk"] for w in inside0}) >= 2:        # ya etiquetadas por voices.py (Parte 5): colores consistentes en todo el video
+        return words, max(w["spk"] for w in inside0) + 1
     if not available():
         return words, 0
     inside = [w for w in words if w["start"] >= start - 0.05 and w["end"] <= end + 0.3]
