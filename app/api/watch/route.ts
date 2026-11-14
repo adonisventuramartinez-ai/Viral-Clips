@@ -7,7 +7,7 @@ export const fetchCache = "force-no-store";
 
 // Canales automáticos: el worker los vigila y graba solo cuando entran en vivo.
 const COLS = "id,name,url,active,content_type,game,layout,clip_seconds,quality,review_minutes,max_new,progress_bar,last_checked,last_status";
-const TYPES = ["auto", "reality", "podcast", "entrevista", "juego", "gta", "gta_rp", "directo"];
+const TYPES = ["auto", "reality", "podcast", "entrevista", "juego", "gta", "gta6", "gta_rp", "directo"];
 const LAYOUTS = ["crop", "split", "split_eq", "split_game", "blur", "duo"];
 const num = (v: unknown, d: number, lo: number, hi: number) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, Math.round(n))) : d; };
 const msg = (m: string) => (/watch_channels/i.test(m) ? "Falta ejecutar 0006_envivo.sql en Supabase" : m);

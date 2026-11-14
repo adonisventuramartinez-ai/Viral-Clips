@@ -9,7 +9,14 @@ import { ASPECT_VERT, DEFAULT_CAM, DEFAULT_CROP, aspectCam, boxH, isSplit, parse
 type Src = "twitch" | "kick" | "archivo";
 const LAYOUTS: [Layout, string][] = [["crop", "Vertical"], ["split_eq", "Dividido"], ["duo", "Dos personas"], ["blur", "Fondo difuminado"]];
 const PROPS: [Layout, string][] = [["split", "Cara grande"], ["split_eq", "Equilibrado"], ["split_game", "Juego grande"]];
-const TYPES: [string, string][] = [["auto", "General"], ["reality", "Reality (Casa de Alofoke)"], ["podcast", "Podcast"], ["entrevista", "Entrevista"], ["juego", "Juegos"], ["gta", "GTA 5 acción"], ["gta_rp", "GTA RP"], ["directo", "Directo (charla)"]];
+const FX_DEFAULT: Record<string, string> = { bleep: "auto", loudnorm: "auto", zoom: "auto", slowmo: "auto" };
+const FX_OPTIONS: [string, string, string][] = [
+  ["bleep", "Pitido en groserías", "Tapa la palabra con un pitido y censura el subtítulo (p***)."],
+  ["loudnorm", "Volumen parejo", "Deja todos los clips al mismo volumen (-14 LUFS)."],
+  ["zoom", "Zoom en el momento fuerte", "Acercamiento corto en explosiones, ráfagas de disparos o picos de volumen."],
+  ["slowmo", "Cámara lenta", "Un segundo en cámara lenta sobre una explosión."],
+];
+const TYPES: [string, string][] = [["auto", "General"], ["reality", "Reality (Casa de Alofoke)"], ["podcast", "Podcast"], ["entrevista", "Entrevista"], ["juego", "Juegos"], ["gta", "GTA 5 acción"], ["gta6", "GTA 6 acción"], ["gta_rp", "GTA RP"], ["directo", "Directo (charla)"]];
 const TYPE_HELP: Record<string, string> = {
   auto: "La IA busca lo más viral sin suponer nada del contenido.",
   podcast: "Busca polémica, confesiones y anécdotas; el clip arranca en la pregunta si la hubo.",
@@ -18,6 +25,7 @@ const TYPE_HELP: Record<string, string> = {
   directo: "Prioriza reacciones, historias y los momentos donde explota el chat.",
   reality: "Busca peleas, discusiones, traiciones, chisme y reacciones fuertes; arranca justo antes del conflicto. Clips de ~45 s.",
   gta: "GTA 5 con acción: tiroteos, persecuciones, explosiones y reacciones. Clips cortos de ~25 s que empiezan antes de la jugada.",
+  gta6: "GTA 6: prioriza la primera reacción, los descubrimientos, tiroteos, persecuciones, explosiones y bugs graciosos. Clips de ~25 s.",
   gta_rp: "GTA Roleplay: prioriza el diálogo y la actuación (escenas graciosas o tensas con remate). Clips de ~40 s.",
 };
 const PH: Record<Src, string> = { twitch: "https://www.twitch.tv/videos/…", kick: "https://kick.com/…/videos/…", archivo: "https://… (YouTube o enlace directo .mp4)" };
@@ -39,6 +47,7 @@ export default function Crear() {
   const [ctype, setCtype] = useState("auto");
   const [game, setGame] = useState("");
   const [bar, setBar] = useState(false);
+  const [fx, setFx] = useState<Record<string, string>>({ ...FX_DEFAULT }); // audio y efectos: auto = lo decide el tipo de contenido / el .env del worker
   const [multi, setMulti] = useState(false); // varios links a la vez (uno por línea)
   const [presets, setPresets] = useState<Record<string, any>>({});
   const [presetName, setPresetName] = useState("");
@@ -77,7 +86,7 @@ export default function Crear() {
   function savePreset() {
     const n = presetName.trim().slice(0, 30);
     if (!n) return setMsg({ ok: false, text: "Ponle un nombre a tu configuración." });
-    savePresets({ ...presets, [n]: { layout, secs, count, quality, manualCrop, cropBox, manualCam, camBox, ctype, game, bar } });
+    savePresets({ ...presets, [n]: { layout, secs, count, quality, manualCrop, cropBox, manualCam, camBox, ctype, game, bar, fx } });
     setPresetName("");
     setMsg({ ok: true, text: `Guardé “${n}”. La puedes cargar cuando quieras.` });
   }
@@ -85,7 +94,7 @@ export default function Crear() {
     const p = presets[n];
     if (!p) return;
     setLayout(p.layout); setSecs(p.secs); setCount(p.count); setQuality(p.quality);
-    setCtype(p.ctype ?? "auto"); setGame(p.game ?? ""); setBar(!!p.bar);
+    setCtype(p.ctype ?? "auto"); setGame(p.game ?? ""); setBar(!!p.bar); setFx({ ...FX_DEFAULT, ...(p.fx ?? {}) });
     setManualCrop(!!p.manualCrop); setCropBox(p.cropBox ?? DEFAULT_CROP); setManualCam(p.manualCam !== false); setCamBox(p.camBox ?? DEFAULT_CAM);
     setMsg({ ok: true, text: `Cargué “${n}”.` });
   }
@@ -114,7 +123,7 @@ export default function Crear() {
             kind: "vod_url", url: link, range_from: links.length === 1 ? from || null : null, range_to: links.length === 1 ? to || null : null,
             clip_seconds: Number(secs), clips: Number(count), quality,
             layout, custom_crop: sentBox ? round2(sentBox) : null, clipper,
-            content_type: ctype, game: ctype === "juego" ? game.trim() : "", progress_bar: bar,
+            content_type: ctype, game: ctype === "juego" ? game.trim() : "", progress_bar: bar, ...fx,
           }),
         });
         const data = await res.json().catch(() => ({}));
@@ -187,6 +196,22 @@ export default function Crear() {
           <label style={{ display: "flex", gap: 8, alignItems: "center", textTransform: "none", fontSize: 13, color: "var(--text)", margin: "0 0 12px" }}>
             <input type="checkbox" checked={bar} onChange={(e) => setBar(e.target.checked)} style={{ width: "auto" }} /> Barra de progreso abajo del clip (retiene más gente)
           </label>
+          <details style={{ margin: "0 0 12px" }}>
+            <summary style={{ cursor: "pointer", fontSize: 13 }}>Audio y efectos (pitido, volumen, zoom, cámara lenta)</summary>
+            <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
+              {FX_OPTIONS.map(([k, l, help]) => (
+                <label key={k} style={{ display: "block", textTransform: "none", fontSize: 13, color: "var(--text)" }}>
+                  {l}
+                  <select value={fx[k] ?? "auto"} onChange={(e) => setFx({ ...fx, [k]: e.target.value })} style={{ marginTop: 4 }}>
+                    <option value="auto">Automático (según el tipo de contenido)</option>
+                    <option value="1">Siempre</option>
+                    <option value="0">Nunca</option>
+                  </select>
+                  <small style={{ display: "block", color: "var(--muted)" }}>{help}</small>
+                </label>
+              ))}
+            </div>
+          </details>
 
           <label>Encuadre en el teléfono</label>
           <div className="tabs3">{LAYOUTS.map(([k, l]) => (

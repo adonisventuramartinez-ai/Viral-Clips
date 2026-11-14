@@ -100,8 +100,10 @@ def read_features(video, max_minutes=240):
     return np.concatenate(T), np.concatenate(M), np.concatenate(F), np.concatenate(V)
 
 
-def segment_embeddings(segments, feats):
-    """Un vector por frase (media del mel en tramas con voz, menos la media global, + tono). None si la frase no tiene voz suficiente."""
+def segment_embeddings(segments, feats, shape=False):
+    """Un vector por frase (media del mel en tramas con voz, menos la media global, + tono). None si la frase no tiene voz suficiente.
+    shape=True (modo en vivo): en vez de restar la media global del trozo —que cambia de trozo a trozo— se resta la media entre bandas de la propia
+    frase, así solo cuenta la forma del espectro y el volumen no mueve el vector."""
     import numpy as np
     t, m, f, v = feats
     gm = m[v].mean(axis=0) if v.any() else m.mean(axis=0)
@@ -112,7 +114,8 @@ def segment_embeddings(segments, feats):
         if vv.sum() < MIN_VOICED:
             out.append(None)
             continue
-        mel = m[i0:i1][vv].mean(axis=0) - gm
+        mel = m[i0:i1][vv].mean(axis=0)
+        mel = mel - (mel.mean() if shape else gm)
         pitch = float(np.median(f[i0:i1][vv & (f[i0:i1] > 0)]))
         out.append(np.concatenate([mel, [np.log2(pitch) * 6.0]]).astype(np.float32))   # 1 octava de tono pesa como el timbre
     return out
@@ -158,6 +161,58 @@ def _fill_gaps(labels, segments, max_gap=6.0):
     return out
 
 
+def _apply(segments, words, labs):
+    """Escribe las etiquetas: frases 'P1'.. y palabras 0.. (la palabra toma la frase donde empieza)."""
+    import bisect
+    for s, l in zip(segments, labs):
+        if l is not None:
+            s["spk"] = f"P{l + 1}"
+    starts = [s["start"] for s in segments]
+    for w in words:
+        k = bisect.bisect_right(starts, w["start"] + 0.05) - 1
+        if k >= 0 and labs[k] is not None and w["start"] <= segments[k]["end"] + 0.5:
+            w["spk"] = labs[k]
+
+
+class Tracker:
+    """Modo en vivo: recuerda las voces ya oídas (una huella por persona) para que P1 siga siendo la misma persona en el trozo siguiente.
+    Cada frase nueva se asigna a la huella más cercana, o crea una persona nueva si ninguna se parece (hasta VOICE_MAX)."""
+
+    def __init__(self):
+        self.cent = []      # [vector, cuántas frases]
+
+    def label(self, path, segments, words, max_minutes=240):
+        if not config.VOICES or not segments:
+            return 0
+        try:
+            import numpy as np
+            feats = read_features(path, max_minutes)
+            if feats is None:
+                return len(self.cent)
+            embs = segment_embeddings(segments, feats, shape=True)
+            thr = config.VOICE_THRESHOLD * np.sqrt(NMEL + 1)
+            labs = []
+            for e in embs:
+                if e is None:
+                    labs.append(None)
+                    continue
+                d = [float(np.linalg.norm(e - c[0])) for c in self.cent]
+                k = int(np.argmin(d)) if d else -1
+                if k < 0 or (d[k] > thr and len(self.cent) < config.VOICE_MAX):
+                    self.cent.append([e.copy(), 1])
+                    k = len(self.cent) - 1
+                else:
+                    c = self.cent[k]
+                    c[0] = (c[0] * c[1] + e) / (c[1] + 1)
+                    c[1] += 1
+                labs.append(k)
+            labs = _fill_gaps(labs, segments)
+            _apply(segments, words, labs)
+        except Exception as e:  # noqa: BLE001
+            print(f"  Voces: no pude separarlas en este trozo ({type(e).__name__}: {str(e)[:100]})", flush=True)
+        return len(self.cent)
+
+
 def label(video, segments, words, max_minutes=240):
     """Pone seg['spk'] = 'P1'.. en las frases y w['spk'] = 0.. en las palabras (mismo orden). Devuelve cuántas personas oyó (0 = no se tocó nada)."""
     if not config.VOICES or not segments:
@@ -170,15 +225,7 @@ def label(video, segments, words, max_minutes=240):
         n = len({l for l in labs if l is not None})
         if n < 2:
             return n
-        for s, l in zip(segments, labs):
-            if l is not None:
-                s["spk"] = f"P{l + 1}"
-        starts = [s["start"] for s in segments]
-        import bisect
-        for w in words:
-            k = bisect.bisect_right(starts, w["start"] + 0.05) - 1
-            if k >= 0 and labs[k] is not None and w["start"] <= segments[k]["end"] + 0.5:
-                w["spk"] = labs[k]
+        _apply(segments, words, labs)
         return n
     except Exception as e:  # noqa: BLE001
         print(f"  Voces: no pude separarlas ({type(e).__name__}: {str(e)[:100]})", flush=True)

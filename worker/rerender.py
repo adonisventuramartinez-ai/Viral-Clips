@@ -38,14 +38,14 @@ def process_rerender(job):
         print(f"  Re-render del clip {cid}: {start:.1f}-{end:.1f}s, encuadre {layout}", flush=True)
         video, _title, offset = download(src["url"], work, p.get("quality", "1080p"), str(rf), str(end + PAD))
         _segments, words = transcribe(video, work)
-        prof = profiles.get((src.get("options") or {}).get("content_type"))
+        prof = profiles.get((src.get("options") or {}).get("content_type"), (src.get("options") or {}).get("game"))
         if prof.get("voices"):
             voices.label(video, _segments, words)
 
         out = work / f"{cid}.mp4"
         render_clip(video, words, start - offset, end - offset, out, work, custom_crop=custom, layout=layout,
                     brand=brand.load(work), hook=clip.get("title"),
-                    profile=profiles.get((src.get("options") or {}).get("content_type")), opts=src.get("options"))
+                    profile=profiles.get((src.get("options") or {}).get("content_type"), (src.get("options") or {}).get("game")), opts=src.get("options"))
 
         path = f"{clip['source_id']}/{cid}_{int(time.time())}.mp4"
         db.upload_clip(path, out)

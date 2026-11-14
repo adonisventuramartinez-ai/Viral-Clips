@@ -6,7 +6,7 @@ type Ch = {
   layout: string; clip_seconds: number; last_checked: string | null; last_status: string | null;
 };
 
-const TYPE_LABEL: Record<string, string> = { auto: "General", reality: "Reality (Casa de Alofoke)", podcast: "Podcast", entrevista: "Entrevista", juego: "Juegos", gta: "GTA 5 acción", gta_rp: "GTA RP", directo: "Directo (charla)" };
+const TYPE_LABEL: Record<string, string> = { auto: "General", reality: "Reality (Casa de Alofoke)", podcast: "Podcast", entrevista: "Entrevista", juego: "Juegos", gta: "GTA 5 acción", gta6: "GTA 6 acción", gta_rp: "GTA RP", directo: "Directo (charla)" };
 
 function ago(iso: string | null) {
   if (!iso) return "sin revisar";

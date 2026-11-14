@@ -1,6 +1,6 @@
 """Perfiles por tipo de contenido: qué busca la IA, cuánto contexto añadir antes/después y cuánto pesan las pistas.
 
-Tipos: auto (general), reality (La Casa de Alofoke), podcast, entrevista, juego, gta (acción), gta_rp (roleplay), directo.
+Tipos: auto (general), reality (La Casa de Alofoke), podcast, entrevista, juego, gta (acción), gta6 (GTA 6 acción), gta_rp (roleplay), directo.
 
 "ideal" = largo ideal del clip en segundos para ese tipo (se usa cuando en la web eliges "Automática").
 """
@@ -107,6 +107,31 @@ PROFILES = {
                      "helicóptero", "helicoptero", "headshot", "no puede ser", "qué locura", "increíble", "imposible", "wtf",
                      "nooo", "vamos", "let's go", "lets go", "mira eso", "me tumbó", "atraco", "heist"],
     },
+    "gta6": {
+        "label": "GTA 6 · acción", "ideal": 25, "game": "GTA 6",
+        "kind": "un directo o video de GTA 6 (Grand Theft Auto VI, en Leonida y Vice City) con personas jugando",
+        "guide": (
+            "Es GTA 6 (Grand Theft Auto VI) con personas jugando, recién salido. Lo viral: la PRIMERA REACCIÓN a algo que sorprende "
+            "(gráficos, detalles de Vice City y Leonida, la IA de la gente, la física, cómo reaccionan los NPC), tiroteos y persecuciones "
+            "policiales, explosiones, choques y saltos imposibles, escapes de último segundo, fails y bugs/glitches graciosos, y las "
+            "reacciones exageradas de los jugadores (gritos, risas, 'no puede ser'). Son días de estreno: valen mucho los descubrimientos "
+            "('mira lo que pasa si...') y los momentos donde el juego hace algo inesperado. Muchos momentos tienen poca voz: las marcas "
+            "🎮 (cambio brusco de imagen), 🔊 (pico de volumen), 💥 (disparos/explosiones) y las líneas [acción sin voz] indican que pasó "
+            "algo. Ojo: la cámara se mueve siempre, así que un cambio de imagen solo NO es acción; dale más peso al volumen y a lo que "
+            "dicen. El clip empieza unos segundos ANTES de la jugada para que se entienda y termina en el desenlace o la reacción. "
+            "Corto y directo: ideal 15 a 30 segundos."),
+        "preroll": 5.0, "tail": 2.5, "question": False, "action": True,
+        "bonus": {"loud": 9, "motion": 4, "chat": 8, "combat": 10, "screen": 0},
+        # screen=False: las pantallas WASTED/BUSTED se reconocen por color y posición de GTA 5; la de GTA 6 no la he visto, así que no se
+        # usa hasta calibrarla. La verificación con imágenes (verify) hace de segunda opinión mientras tanto.
+        "signals": {"combat": True}, "verify": True,
+        "fx": {"zoom": True, "slow": True},
+        "keywords": ["vice city", "leonida", "jason", "lucia", "lucía", "gta 6", "gta vi", "primera vez", "mira eso", "glitch", "bug",
+                     "gráficos", "graficos", "wasted", "busted", "me mataron", "me mató", "explotó", "explosión", "choque",
+                     "persecución", "policía", "los pacos", "cinco estrellas", "5 estrellas", "tanque", "avión", "helicóptero",
+                     "helicoptero", "headshot", "no puede ser", "qué locura", "increíble", "imposible", "wtf", "nooo", "vamos",
+                     "let's go", "lets go", "me tumbó", "atraco", "heist"],
+    },
     "gta_rp": {
         "voices": True,
         "label": "GTA RP (roleplay)", "ideal": 40, "game": "GTA 5 RP",
@@ -147,7 +172,7 @@ MARKS = (("🔊", "loud"), ("🎮", "motion"), ("💬", "chat"), ("💥", "comba
 EXTRA_MARK = {"combat": "💥", "screen": "📺", "argument": "🗯"}
 
 # Nombres de tipo que la web y el worker aceptan (la web los valida con la misma lista)
-TYPES = ["auto", "reality", "podcast", "entrevista", "juego", "gta", "gta_rp", "directo"]
+TYPES = ["auto", "reality", "podcast", "entrevista", "juego", "gta", "gta6", "gta_rp", "directo"]
 
 
 def norm(text):
@@ -167,11 +192,17 @@ def resolve_secs(requested, prof, lo=15, hi=120):
     return max(lo, min(hi, n))
 
 
-def get(name):
-    """Devuelve el perfil pedido (o 'auto' si no existe), con su nombre en 'name'."""
+_GTA6 = re.compile(r"\bgta\s*(?:6|vi)\b|grand\s+theft\s+auto\s*(?:6|vi)\b|vice\s+city\b.*\bleonida|leonida", re.I)
+
+
+def get(name, game=None):
+    """Devuelve el perfil pedido (o 'auto' si no existe), con su nombre en 'name'.
+    Si el tipo es juego/GTA/general y el nombre del juego dice GTA 6 / GTA VI / Leonida, usa el perfil gta6 solo."""
     key = str(name or "auto").strip().lower()
     if key not in PROFILES:
         key = "auto"
+    if key in ("juego", "gta", "auto") and game and _GTA6.search(str(game)) and not re.search(r"\brp\b|roleplay|role play", str(game), re.I):
+        key = "gta6"
     prof = {**PROFILES[key], "name": key}
     if prof.get("cast") and config.CAST_NAMES:
         prof["guide"] += (" Elenco conocido (úsalo para saber quién es quién y escribe los nombres bien): "

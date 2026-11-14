@@ -158,7 +158,7 @@ export default function EnVivo() {
             <div><label>Tipo de contenido</label>
               <select value={ctype} onChange={(e) => setCtype(e.target.value)}>
                 <option value="auto">General</option><option value="reality">Reality (Casa de Alofoke)</option><option value="juego">Juegos</option>
-                <option value="gta">GTA 5 acción</option><option value="gta_rp">GTA RP (roleplay)</option><option value="directo">Directo (charla)</option>
+                <option value="gta">GTA 5 acción</option><option value="gta6">GTA 6 acción</option><option value="gta_rp">GTA RP (roleplay)</option><option value="directo">Directo (charla)</option>
                 <option value="podcast">Podcast</option><option value="entrevista">Entrevista</option>
               </select></div>
             <div><label>Clips nuevos por revisión (máx.)</label>

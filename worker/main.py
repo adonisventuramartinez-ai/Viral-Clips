@@ -59,7 +59,7 @@ def process(job):
     quality = payload.get("quality", "1080p")
     # Opciones de contenido: lo que mandó la web en el trabajo manda sobre lo guardado en la fuente
     opts = {**(src.get("options") or {}), **{k: v for k, v in payload.items() if v is not None}}
-    prof = profiles.get(opts.get("content_type"))
+    prof = profiles.get(opts.get("content_type"), opts.get("game"))
     game = opts.get("game") or prof.get("game")
     secs = profiles.resolve_secs(payload.get("clip_seconds"), prof)
     print(f"  Tipo de contenido: {prof['label']}" + (f" · juego: {game}" if game else "") + f" · clips de ~{secs} s", flush=True)

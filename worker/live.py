@@ -18,6 +18,7 @@ import config
 import db
 import detect
 import energy
+import voices
 import profiles
 import snap
 from analyze import review_window, title_for
@@ -152,7 +153,7 @@ def process_live(job):
     payload = job.get("payload") or {}
     # lo que mandó la web en el trabajo manda sobre lo guardado en la fuente (igual que en Crear clips)
     opts = {**(src.get("options") or {}), **{k: v for k, v in payload.items() if v is not None}}
-    prof = profiles.get(opts.get("content_type"))
+    prof = profiles.get(opts.get("content_type"), opts.get("game"))
     game = opts.get("game") or prof.get("game")
     secs = profiles.resolve_secs(payload.get("clip_seconds"), prof)
     quality = payload.get("quality", "720p")
@@ -172,6 +173,7 @@ def process_live(job):
 
     segs = []          # trozos ya transcritos: {path,start,end,session}
     all_segments = []  # transcripción global (tiempos desde que empezó la grabación)
+    tracker = voices.Tracker()   # Parte 5: la misma persona conserva su P1/P2 entre trozos
     all_words = []
     chosen_all = []
     seen_rej = set()
@@ -201,6 +203,8 @@ def process_live(job):
         except Exception as e:  # noqa: BLE001  (un trozo malo no debe cortar el directo)
             print(f"  aviso: no pude transcribir {f.name}: {e}", flush=True)
             segments, words = [], []
+        if segments and prof.get("voices"):
+            tracker.label(f, segments, words)      # antes de sumar el desfase: los tiempos aún son del trozo
         segments = [{**s, "start": s["start"] + start, "end": s["end"] + start} for s in segments]
         words = [{**w, "start": w["start"] + start, "end": w["end"] + start} for w in words]
         if segments:

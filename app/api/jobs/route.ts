@@ -22,9 +22,10 @@ export async function POST(req: Request) {
     layout = "crop",
     custom_crop = null, // Recibe el encuadre
     clipper = null, // Nombre público de quien crea el clip (ranking Clipeadores)
-    content_type = "auto", // auto | reality | podcast | entrevista | juego | gta | gta_rp | directo
+    content_type = "auto", // auto | reality | podcast | entrevista | juego | gta | gta6 | gta_rp | directo
     game = null, // nombre del juego (ayuda a la IA a entender las jugadas)
     progress_bar = false, // barra de progreso abajo del clip
+    bleep = "auto", loudnorm = "auto", zoom = "auto", slowmo = "auto", // audio y efectos: "auto" | "1" | "0"
     max_new = 3 // en vivo: máximo de clips nuevos por revisión
   } = body;
 
@@ -40,9 +41,10 @@ export async function POST(req: Request) {
     review_minutes: num(review_minutes, 2, 1, 10),
     ...(kind === "live" ? { max_new: num(max_new, 3, 1, 10) } : {}),
   };
-  const safeType = ["auto", "reality", "podcast", "entrevista", "juego", "gta", "gta_rp", "directo"].includes(content_type) ? content_type : "auto";
+  const safeType = ["auto", "reality", "podcast", "entrevista", "juego", "gta", "gta6", "gta_rp", "directo"].includes(content_type) ? content_type : "auto";
   const safeGame = typeof game === "string" && game.trim() ? game.trim().slice(0, 60) : null;
-  const options = { content_type: safeType, game: safeGame, progress_bar: progress_bar === true };
+  const tri = (v: unknown) => (v === "1" || v === true ? "1" : v === "0" || v === false ? "0" : "auto");
+  const options = { content_type: safeType, game: safeGame, progress_bar: progress_bar === true, bleep: tri(bleep), loudnorm: tri(loudnorm), zoom: tri(zoom), slowmo: tri(slowmo) };
   Object.assign(safe, options);
   const safeLayout = ["crop", "split", "split_eq", "split_game", "blur", "duo"].includes(layout) ? layout : "crop";
 
