@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     layout = "crop",
     custom_crop = null, // Recibe el encuadre
     clipper = null, // Nombre público de quien crea el clip (ranking Clipeadores)
-    content_type = "auto", // auto | podcast | entrevista | juego | directo
+    content_type = "auto", // auto | reality | podcast | entrevista | juego | gta | gta_rp | directo
     game = null, // nombre del juego (ayuda a la IA a entender las jugadas)
     progress_bar = false, // barra de progreso abajo del clip
     max_new = 3 // en vivo: máximo de clips nuevos por revisión
@@ -34,13 +34,13 @@ export async function POST(req: Request) {
 
   const num = (v: unknown, d: number, lo: number, hi: number) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, Math.round(n))) : d; };
   const safe = {
-    clip_seconds: num(clip_seconds, 45, 15, 120),
+    clip_seconds: Number(clip_seconds) === 0 || clip_seconds === "auto" ? 0 : num(clip_seconds, 0, 15, 120), // 0 = automática: el worker usa el largo ideal del tipo
     clips: num(clips, 5, 1, 50),
     quality: ["720p", "1080p", "1440p", "2160p"].includes(quality) ? quality : "1080p",
     review_minutes: num(review_minutes, 2, 1, 10),
     ...(kind === "live" ? { max_new: num(max_new, 3, 1, 10) } : {}),
   };
-  const safeType = ["auto", "podcast", "entrevista", "juego", "directo"].includes(content_type) ? content_type : "auto";
+  const safeType = ["auto", "reality", "podcast", "entrevista", "juego", "gta", "gta_rp", "directo"].includes(content_type) ? content_type : "auto";
   const safeGame = typeof game === "string" && game.trim() ? game.trim().slice(0, 60) : null;
   const options = { content_type: safeType, game: safeGame, progress_bar: progress_bar === true };
   Object.assign(safe, options);

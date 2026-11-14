@@ -6,7 +6,6 @@ import time
 import config  # noqa: F401  (carga worker/.env)
 
 MAX_WAIT = int(os.environ.get("LLM_MAX_WAIT", "180") or 180)
-DEFAULT_ORDER = "groq,cerebras,gemini,mistral,openrouter,github,groq8b,anthropic"
 
 _DAILY = re.compile(r"per day|daily|per_day|perday|\btpd\b|\brpd\b|per-day", re.I)
 
@@ -31,8 +30,8 @@ def _env(name, default=""):
 
 def _providers():
     """Lista de proveedores. Las llaves de Groq se leen separadas por comas."""
-    groq_keys = [k.strip() for k in _env("GROQ_API_KEY").split(",") if k.strip()]
-    
+    groq_keys = config.groq_keys()
+
     table = {
         "cerebras": dict(kind="openai", url="https://api.cerebras.ai/v1", key=_env("CEREBRAS_API_KEY"),
                          model=_env("CEREBRAS_MODEL", "gpt-oss-120b"), json=True, max_tokens=6000),
@@ -63,17 +62,31 @@ def _providers():
             model=_env("GROQ_FALLBACK_MODEL", "llama-3.1-8b-instant"), json=True, max_tokens=3000
         )
 
-    # Orden por defecto: todas las Groq primero, luego el resto
-    default_order = []
-    for i in range(len(groq_keys)):
-        name = "groq" if i == 0 else f"groq_cuenta{i+1}"
-        default_order.extend([name, f"{name}_8b"])
-    default_order.extend(["cerebras", "gemini", "mistral", "openrouter", "github", "anthropic"])
+    # Todas las cuentas de Groq van en bloque: primero el modelo grande de CADA cuenta y después el chico de cada una.
+    g70 = ["groq" if i == 0 else f"groq_cuenta{i+1}" for i in range(len(groq_keys))]
+    block = g70 + [f"{n}_8b" for n in g70]
+    rest = ["cerebras", "gemini", "mistral", "openrouter", "github", "anthropic"]
+    default_order = block + [n for n in rest if n != "github"]
 
-    order = [n.strip().lower() for n in _env("LLM_ORDER", ",".join(default_order)).split(",") if n.strip()]
+    raw = [n.strip().lower() for n in _env("LLM_ORDER").split(",") if n.strip()]
+    if not raw:
+        order = default_order
+    else:
+        # Un LLM_ORDER fijo no deja fuera las cuentas nuevas: el primer nombre de Groq que aparezca
+        # se reemplaza por el bloque completo (las 20 cuentas) y los demás nombres de Groq se ignoran.
+        order, placed = [], False
+        for n in raw:
+            if n == "groq" or n.startswith("groq_") or n == "groq8b":
+                if not placed:
+                    order.extend(block)
+                    placed = True
+            else:
+                order.append(n)
+
     first = _env("LLM_PROVIDER").lower()
-    
-    if first in order:
+    if first in ("groq", "groq_all"):
+        order = block + [n for n in order if n not in block]
+    elif first in order:
         order.remove(first)
         order.insert(0, first)
 
@@ -198,6 +211,27 @@ def _note_used(p):
         _last = p["name"]
 
 
+_rr = {"70b": 0, "8b": 0}
+
+
+def _is_groq(name):
+    return name == "groq" or name.startswith("groq_")
+
+
+def _spread(avail):
+    """Reparte la carga entre las cuentas de Groq: cada pregunta empieza por una cuenta distinta,
+    así ninguna se agota antes que las demás. El resto del orden no cambia."""
+    out = list(avail)
+    for tag in ("70b", "8b"):
+        idx = [i for i, p in enumerate(out) if _is_groq(p["name"]) and p["name"].endswith("_8b") == (tag == "8b")]
+        if len(idx) > 1:
+            group = [out[i] for i in idx]
+            k = _rr[tag] % len(group)
+            for i, p in zip(idx, group[k:] + group[:k]):
+                out[i] = p
+    return out
+
+
 def ask(prompt, check=None):
     provs = _providers()
     if not provs:
@@ -215,13 +249,15 @@ def ask(prompt, check=None):
             print(f"  IA: todos sin cupo, espero {int(wait) + 1} s…", flush=True)
             time.sleep(wait + 1)
             continue
-        for p in avail:
+        for p in _spread(avail):
             try:
                 text = _call(p, prompt)
                 value = check(text) if check else text
                 if value is None:
                     raise _Fail("bad", "respuesta que no se pudo leer", 30)
                 _note_used(p)
+                if _is_groq(p["name"]):
+                    _rr["8b" if p["name"].endswith("_8b") else "70b"] += 1
                 return value
             except _Fail as f:
                 _mark(p, f)

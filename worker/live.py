@@ -152,8 +152,8 @@ def process_live(job):
     # lo que mandó la web en el trabajo manda sobre lo guardado en la fuente (igual que en Crear clips)
     opts = {**(src.get("options") or {}), **{k: v for k, v in payload.items() if v is not None}}
     prof = profiles.get(opts.get("content_type"))
-    game = opts.get("game")
-    secs = _clamp(payload.get("clip_seconds"), 45, 15, 120)
+    game = opts.get("game") or prof.get("game")
+    secs = profiles.resolve_secs(payload.get("clip_seconds"), prof)
     quality = payload.get("quality", "720p")
     review_sec = _clamp(payload.get("review_minutes"), config.REVIEW_MINUTES, 1, 10) * 60
     max_new = _clamp(payload.get("max_new"), config.LIVE_MAX_NEW, 1, 10)
@@ -317,7 +317,7 @@ def process_live(job):
     # ------------------------------------------------------------------ "Clip ahora"
     def serve_clip_now(c, info):
         end = st["offset"]
-        n = _clamp(info["secs"], 45, 15, 120)
+        n = _clamp(info["secs"], secs, 15, 120)
         start = max(0.0, end - n)
         text = " ".join(s["text"] for s in all_segments if s["end"] > start and s["start"] < end)
         words_win = [w for w in all_words if w["end"] >= start - 6 and w["start"] <= end]
@@ -336,7 +336,7 @@ def process_live(job):
     def handle_commands(force=False):
         for c in db.pending_commands(sid):
             if c["id"] not in waiting:
-                waiting[c["id"]] = {"offset": st["offset"], "since": time.time(), "secs": c.get("seconds") or 45, "cmd": c}
+                waiting[c["id"]] = {"offset": st["offset"], "since": time.time(), "secs": c.get("seconds") or secs, "cmd": c}
         for cid_, info in list(waiting.items()):
             c = info["cmd"]
             new_chunk = st["offset"] > info["offset"] + 0.5

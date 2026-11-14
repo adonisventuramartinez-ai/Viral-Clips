@@ -7,7 +7,7 @@ export const fetchCache = "force-no-store";
 
 // Canales automáticos: el worker los vigila y graba solo cuando entran en vivo.
 const COLS = "id,name,url,active,content_type,game,layout,clip_seconds,quality,review_minutes,max_new,progress_bar,last_checked,last_status";
-const TYPES = ["auto", "podcast", "entrevista", "juego", "directo"];
+const TYPES = ["auto", "reality", "podcast", "entrevista", "juego", "gta", "gta_rp", "directo"];
 const LAYOUTS = ["crop", "split", "split_eq", "split_game", "blur", "duo"];
 const num = (v: unknown, d: number, lo: number, hi: number) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, Math.round(n))) : d; };
 const msg = (m: string) => (/watch_channels/i.test(m) ? "Falta ejecutar 0006_envivo.sql en Supabase" : m);
@@ -34,7 +34,7 @@ export async function POST(req: Request) {
     content_type: TYPES.includes(b.content_type) ? b.content_type : "auto",
     game: typeof b.game === "string" && b.game.trim() ? b.game.trim().slice(0, 60) : null,
     layout: LAYOUTS.includes(b.layout) ? b.layout : "crop",
-    clip_seconds: num(b.clip_seconds, 45, 15, 120),
+    clip_seconds: Number(b.clip_seconds) === 0 ? 0 : num(b.clip_seconds, 0, 15, 120), // 0 = automática (largo ideal del tipo)
     quality: ["720p", "1080p", "1440p", "2160p"].includes(b.quality) ? b.quality : "720p",
     review_minutes: num(b.review_minutes, 2, 1, 10),
     max_new: num(b.max_new, 3, 1, 10),

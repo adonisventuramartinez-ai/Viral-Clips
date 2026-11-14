@@ -6,7 +6,7 @@ type Ch = {
   layout: string; clip_seconds: number; last_checked: string | null; last_status: string | null;
 };
 
-const TYPE_LABEL: Record<string, string> = { auto: "General", podcast: "Podcast", entrevista: "Entrevista", juego: "Juegos", directo: "Directo (charla)" };
+const TYPE_LABEL: Record<string, string> = { auto: "General", reality: "Reality (Casa de Alofoke)", podcast: "Podcast", entrevista: "Entrevista", juego: "Juegos", gta: "GTA 5 acción", gta_rp: "GTA RP", directo: "Directo (charla)" };
 
 function ago(iso: string | null) {
   if (!iso) return "sin revisar";
@@ -83,7 +83,7 @@ export default function WatchChannels() {
           <div style={{ minWidth: 0 }}>
             <b>{c.name || c.url}</b>{" "}
             <span style={{ color: "var(--muted)", fontSize: 12 }}>
-              · {TYPE_LABEL[c.content_type] ?? c.content_type}{c.game ? ` (${c.game})` : ""} · {c.clip_seconds}s
+              · {TYPE_LABEL[c.content_type] ?? c.content_type}{c.game ? ` (${c.game})` : ""} · {c.clip_seconds ? `${c.clip_seconds}s` : "largo automático"}
             </span>
             <div style={{ color: "var(--muted)", fontSize: 12 }}>
               {c.active ? `${c.last_status ?? "esperando"} · revisado ${ago(c.last_checked)}` : "pausado"}
@@ -107,7 +107,7 @@ export default function WatchChannels() {
               {Object.entries(TYPE_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
             </select></div>
           <div><label>Duración de cada clip</label>
-            <select name="secs" defaultValue="45"><option value="30">30 s</option><option value="45">45 s</option><option value="60">60 s</option><option value="90">90 s</option></select></div>
+            <select name="secs" defaultValue="0"><option value="0">Automática (según el tipo)</option><option value="20">20 s</option><option value="30">30 s</option><option value="45">45 s</option><option value="60">60 s</option><option value="90">90 s</option></select></div>
           <div><label>Formato</label>
             <select name="layout" defaultValue="crop"><option value="crop">Zoom a la cara</option><option value="split">Dividido: cara grande</option><option value="split_eq">Dividido: equilibrado</option><option value="split_game">Dividido: juego grande</option><option value="duo">Dos personas</option><option value="blur">Fondo borroso</option></select></div>
         </div>

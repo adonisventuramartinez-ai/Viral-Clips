@@ -1,4 +1,5 @@
 import os
+import re
 from pathlib import Path
 
 try:
@@ -11,7 +12,39 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL") or os.environ.get("NEXT_PUBLIC_SUP
 SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "").strip().strip("\"'").strip()
+
+
+def _clean_key(k):
+    return (k or "").strip().strip("\"'").strip()
+
+
+def groq_keys():
+    """Todas las llaves de Groq (sin límite: 3, 20, 50...), sin repetir y en orden.
+
+    Se leen de cualquiera de estos sitios (puedes mezclarlos):
+      GROQ_KEYS=gsk_a,gsk_b,gsk_c        (separadas por coma, espacio o salto de línea)
+      GROQ_API_KEY=gsk_a                 (también acepta varias separadas por coma)
+      GROQ_API_KEY_2=gsk_b ... GROQ_API_KEY_99=...
+      worker/groq_keys.txt               (una llave por línea; las líneas con # se ignoran)
+    Se lee en cada llamada, así que agregar una cuenta no requiere tocar el código.
+    """
+    raw = [os.environ.get("GROQ_KEYS", ""), os.environ.get("GROQ_API_KEY", "")]
+    raw += [os.environ.get(f"GROQ_API_KEY_{i}", "") for i in range(1, 100)]
+    path = Path(os.environ.get("GROQ_KEYS_FILE") or Path(__file__).with_name("groq_keys.txt"))
+    try:
+        raw.append("\n".join(l.split("#")[0] for l in path.read_text(encoding="utf-8").splitlines()))
+    except OSError:
+        pass
+    out = []
+    for blob in raw:
+        for k in re.split(r"[,\s;]+", blob or ""):
+            k = _clean_key(k)
+            if k and k not in out:
+                out.append(k)
+    return out
+
+
+GROQ_API_KEY = ",".join(groq_keys())   # compatibilidad: todas juntas
 CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-sonnet-5-5")
 GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
 
@@ -75,3 +108,21 @@ FB_PAGE_ID = os.environ.get("FB_PAGE_ID", "").strip()
 FB_PAGE_TOKEN = os.environ.get("FB_PAGE_TOKEN", "").strip()
 FB_MIN_SCORE = int(os.environ.get("FB_MIN_SCORE") or 75)       # solo publica clips con este puntaje o más
 FB_MAX_PER_JOB = int(os.environ.get("FB_MAX_PER_JOB") or 3)    # tope por video procesado
+
+
+# --- Transcripción: ayuda a Whisper con nombres propios y jerga (Groq acepta ~220 tokens) ---
+CAST_NAMES = [n.strip() for n in re.split(r"[,;\n]+", os.environ.get("CAST_NAMES", "")) if n.strip()]
+WHISPER_PROMPT = os.environ.get("WHISPER_PROMPT", "").strip()
+TRANSCRIBE_CHUNK = int(os.environ.get("TRANSCRIBE_CHUNK") or 600)       # segundos por llamada a Whisper
+TRANSCRIBE_PAD = int(os.environ.get("TRANSCRIBE_PAD") or 8)             # segundos extra a cada lado para no cortar palabras
+ANALYSIS_OVERLAP = int(os.environ.get("ANALYSIS_OVERLAP") or 90)        # solape entre ventanas que lee la IA
+
+
+def whisper_prompt():
+    """Texto que se le pasa a Whisper: nombres del elenco y jerga dominicana, para que no los escriba mal."""
+    if WHISPER_PROMPT:
+        return WHISPER_PROMPT[:700]
+    names = ", ".join(dict.fromkeys(["Alofoke"] + CAST_NAMES))
+    txt = (f"Conversación en español dominicano con {names}. "
+           "Dicen: klk, qué lo qué, vaina, tíguere, dime a ver, manín, jevi, pariguayo, chercha, colmado, guagua, mi hermano.")
+    return txt[:700]

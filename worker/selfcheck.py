@@ -43,8 +43,13 @@ def run():
         except ImportError:
             warn.append("Falta chat-downloader: el chat en vivo no se leerá. Reconstruye el worker (INICIAR-WORKER.bat).")
 
-    if config.GROQ_API_KEY and not config.GROQ_API_KEY.startswith("gsk_"):
-        warn.append("Tu GROQ_API_KEY no empieza con 'gsk_': probablemente no es una llave de Groq.")
+    gkeys = config.groq_keys()
+    bad = [k for k in gkeys if not k.startswith("gsk_")]
+    if bad:
+        warn.append(f"{len(bad)} de tus {len(gkeys)} llaves de Groq no empiezan con 'gsk_' (terminan en "
+                    + ", ".join("…" + k[-4:] for k in bad[:5]) + "): probablemente no son de Groq.")
+    if gkeys:
+        print(f"Groq: {len(gkeys)} cuenta(s) configurada(s).", flush=True)
 
     if config.CLIP_LAYOUT == "crop" and config.CLIP_FRAMING == "auto":
         try:
@@ -58,7 +63,7 @@ def run():
 
     names = llm.configured()
     if not names:
-        fatal.append("No hay ninguna llave de IA en worker/.env. Pon al menos una: GROQ_API_KEY (console.groq.com), "
+        fatal.append("No hay ninguna llave de IA en worker/.env. Pon al menos una: GROQ_KEYS (console.groq.com), "
                      "CEREBRAS_API_KEY, GEMINI_API_KEY, MISTRAL_API_KEY, OPENROUTER_API_KEY o GITHUB_MODELS_TOKEN.")
     else:
         print("Probando las llaves de IA (una petición mínima a cada una)…", flush=True)

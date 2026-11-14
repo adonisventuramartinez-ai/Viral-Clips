@@ -134,7 +134,7 @@ export default function EnVivo() {
           
           <div className="row">
             <div><label>Duración de cada clip</label>
-              <select name="secs" defaultValue="45"><option value="30">30 s</option><option value="45">45 s</option><option value="60">60 s</option><option value="75">75 s</option><option value="90">90 s</option></select></div>
+              <select name="secs" defaultValue="0"><option value="0">Automática (según el tipo)</option><option value="15">15 s</option><option value="20">20 s</option><option value="30">30 s</option><option value="45">45 s</option><option value="60">60 s</option><option value="75">75 s</option><option value="90">90 s</option></select></div>
             <div><label>Revisar cada</label>
               <select name="review" defaultValue="2"><option value="1">1 min</option><option value="2">2 min</option><option value="5">5 min</option></select></div>
             <div><label>Calidad</label>
@@ -157,7 +157,8 @@ export default function EnVivo() {
           <div className="row" style={{ marginTop: 14, gridTemplateColumns: "1fr 1fr" }}>
             <div><label>Tipo de contenido</label>
               <select value={ctype} onChange={(e) => setCtype(e.target.value)}>
-                <option value="auto">General</option><option value="juego">Juegos</option><option value="directo">Directo (charla)</option>
+                <option value="auto">General</option><option value="reality">Reality (Casa de Alofoke)</option><option value="juego">Juegos</option>
+                <option value="gta">GTA 5 acción</option><option value="gta_rp">GTA RP (roleplay)</option><option value="directo">Directo (charla)</option>
                 <option value="podcast">Podcast</option><option value="entrevista">Entrevista</option>
               </select></div>
             <div><label>Clips nuevos por revisión (máx.)</label>

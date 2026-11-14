@@ -50,16 +50,25 @@ from energy import ACTION_TEXT  # noqa: E402
 
 # ----------------------------------------------------------------------------- utilidades
 def _chunks(segments):
-    out, cur, t0 = [], [], None
-    for s in segments:
-        if t0 is None:
-            t0 = s["start"]
-        if s["start"] - t0 > WINDOW and cur:
-            out.append(cur)
-            cur, t0 = [], s["start"]
-        cur.append(s)
-    if cur:
-        out.append(cur)
+    """Ventanas de ~WINDOW segundos que se solapan ANALYSIS_OVERLAP segundos (90 por defecto):
+    un momento que cae en el borde entre dos ventanas aparece completo en una de las dos.
+    Los duplicados que salen del solape los quita select_moments."""
+    overlap = max(0, min(config.ANALYSIS_OVERLAP, WINDOW // 3))
+    out, i, n = [], 0, len(segments)
+    while i < n:
+        t0 = segments[i]["start"]
+        j = i
+        while j < n and (segments[j]["start"] - t0 <= WINDOW or j == i):
+            j += 1
+        out.append(segments[i:j])
+        if j >= n:
+            break
+        # la siguiente ventana arranca `overlap` segundos antes del final de esta (pero siempre avanza)
+        cut = segments[j - 1]["end"] - overlap
+        k = j - 1
+        while k > i and segments[k - 1]["end"] > cut:
+            k -= 1
+        i = max(k, i + 1)
     return out
 
 
@@ -170,8 +179,8 @@ def keyword_hits(m, segments, prof):
     words = prof.get("keywords") or []
     if not words:
         return []
-    txt = _text_of(m, segments).lower()
-    return [k for k in words if k in txt]
+    txt = profiles.norm(_text_of(m, segments))
+    return [k for k in words if profiles.norm(k) in txt]
 
 
 def _boost(cands, segments, prof=None, bonus=None):

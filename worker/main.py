@@ -30,13 +30,13 @@ def process(job):
     src = db.get_source(sid)
     payload = job.get("payload") or {}
     n_clips = int(payload.get("clips", 15))
-    secs = int(payload.get("clip_seconds", 45))
     quality = payload.get("quality", "1080p")
     # Opciones de contenido: lo que mandó la web en el trabajo manda sobre lo guardado en la fuente
     opts = {**(src.get("options") or {}), **{k: v for k, v in payload.items() if v is not None}}
     prof = profiles.get(opts.get("content_type"))
-    game = opts.get("game")
-    print(f"  Tipo de contenido: {prof['label']}" + (f" · juego: {game}" if game else ""), flush=True)
+    game = opts.get("game") or prof.get("game")
+    secs = profiles.resolve_secs(payload.get("clip_seconds"), prof)
+    print(f"  Tipo de contenido: {prof['label']}" + (f" · juego: {game}" if game else "") + f" · clips de ~{secs} s", flush=True)
 
     # Encuadre elegido en la web: crop | split | blur y, si lo marcó a mano, el recuadro en % del video
     clip_layout = src.get("layout") or config.CLIP_LAYOUT

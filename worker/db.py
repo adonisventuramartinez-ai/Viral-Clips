@@ -204,7 +204,7 @@ def create_live_source(ch, found):
         src = sb.table("sources").insert({**row, "options": options}).execute().data[0]
     except Exception:  # noqa: BLE001  (aún no existe la columna options)
         src = sb.table("sources").insert(row).execute().data[0]
-    payload = {"clip_seconds": int(ch.get("clip_seconds") or 45), "quality": ch.get("quality") or "720p",
+    payload = {"clip_seconds": int(ch.get("clip_seconds") or 0),   # 0 = automática (largo ideal del tipo) "quality": ch.get("quality") or "720p",
                "review_minutes": int(ch.get("review_minutes") or 2), **options}
     if ch.get("max_new"):
         payload["max_new"] = int(ch["max_new"])

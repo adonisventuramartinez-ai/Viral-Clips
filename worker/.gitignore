@@ -8,3 +8,6 @@ next-env.d.ts
 work/
 __pycache__/
 *cookies*.txt
+groq_keys.txt
+.env.*
+!.env.example

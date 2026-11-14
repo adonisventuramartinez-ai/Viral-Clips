@@ -9,13 +9,16 @@ import { ASPECT_VERT, DEFAULT_CAM, DEFAULT_CROP, aspectCam, boxH, isSplit, parse
 type Src = "twitch" | "kick" | "archivo";
 const LAYOUTS: [Layout, string][] = [["crop", "Vertical"], ["split_eq", "Dividido"], ["duo", "Dos personas"], ["blur", "Fondo difuminado"]];
 const PROPS: [Layout, string][] = [["split", "Cara grande"], ["split_eq", "Equilibrado"], ["split_game", "Juego grande"]];
-const TYPES: [string, string][] = [["auto", "General"], ["podcast", "Podcast"], ["entrevista", "Entrevista"], ["juego", "Juegos"], ["directo", "Directo (charla)"]];
+const TYPES: [string, string][] = [["auto", "General"], ["reality", "Reality (Casa de Alofoke)"], ["podcast", "Podcast"], ["entrevista", "Entrevista"], ["juego", "Juegos"], ["gta", "GTA 5 acción"], ["gta_rp", "GTA RP"], ["directo", "Directo (charla)"]];
 const TYPE_HELP: Record<string, string> = {
   auto: "La IA busca lo más viral sin suponer nada del contenido.",
   podcast: "Busca polémica, confesiones y anécdotas; el clip arranca en la pregunta si la hubo.",
   entrevista: "El clip empieza en la pregunta y sigue con la respuesta completa.",
   juego: "Da más peso a la acción en pantalla y al volumen, y empieza unos segundos antes de la jugada.",
   directo: "Prioriza reacciones, historias y los momentos donde explota el chat.",
+  reality: "Busca peleas, discusiones, traiciones, chisme y reacciones fuertes; arranca justo antes del conflicto. Clips de ~45 s.",
+  gta: "GTA 5 con acción: tiroteos, persecuciones, explosiones y reacciones. Clips cortos de ~25 s que empiezan antes de la jugada.",
+  gta_rp: "GTA Roleplay: prioriza el diálogo y la actuación (escenas graciosas o tensas con remate). Clips de ~40 s.",
 };
 const PH: Record<Src, string> = { twitch: "https://www.twitch.tv/videos/…", kick: "https://kick.com/…/videos/…", archivo: "https://… (YouTube o enlace directo .mp4)" };
 
@@ -30,7 +33,7 @@ export default function Crear() {
   const [manualCrop, setManualCrop] = useState(false); // vertical: false = sigue a la persona (automático)
   const [manualCam, setManualCam] = useState(true); // dividido: true = tú marcas dónde está la cámara
   const [name, setName] = useState("");
-  const [secs, setSecs] = useState("45");
+  const [secs, setSecs] = useState("0");
   const [count, setCount] = useState("5");
   const [quality, setQuality] = useState("1080p");
   const [ctype, setCtype] = useState("auto");
@@ -165,7 +168,7 @@ export default function Crear() {
           <div className="row" style={{ gridTemplateColumns: "repeat(4,1fr)" }}>
             <div><label>Desde</label><input value={from} onChange={(e) => setFrom(e.target.value)} placeholder="0:00" /></div>
             <div><label>Hasta</label><input value={to} onChange={(e) => setTo(e.target.value)} placeholder="1:00" /></div>
-            <div><label>Duración</label><select name="secs" value={secs} onChange={(e) => setSecs(e.target.value)}><option value="30">30 s</option><option value="45">45 s</option><option value="60">60 s</option><option value="75">75 s</option><option value="90">90 s</option></select></div>
+            <div><label>Duración</label><select name="secs" value={secs} onChange={(e) => setSecs(e.target.value)}><option value="0">Automática (según el tipo)</option><option value="15">15 s</option><option value="20">20 s</option><option value="30">30 s</option><option value="45">45 s</option><option value="60">60 s</option><option value="75">75 s</option><option value="90">90 s</option></select></div>
             <div><label>Cantidad</label><select name="count" value={count} onChange={(e) => setCount(e.target.value)}><option>1</option><option>3</option><option>5</option><option>10</option><option>15</option><option>20</option><option>30</option><option>50</option></select></div>
           </div>
           <div className="row" style={{ gridTemplateColumns: "1fr 1fr" }}>

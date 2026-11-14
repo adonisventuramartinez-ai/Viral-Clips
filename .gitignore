@@ -6,3 +6,9 @@ next-env.d.ts
 *.tsbuildinfo
 *cookies*.txt
 worker/.env
+worker/groq_keys.txt
+groq_keys.txt
+.env*
+!.env.example
+*.pem
+cookies*.txt

@@ -17,7 +17,8 @@ export default function Login() {
     });
     if (res.ok) window.location.href = "/crear";
     else {
-      setErr("Contraseña incorrecta");
+      const j = await res.json().catch(() => ({}));
+      setErr(j.error || "Contraseña incorrecta");
       setBusy(false);
     }
   }
