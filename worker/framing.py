@@ -41,18 +41,18 @@ def _load():
     return _det
 
 
-def _raw_boxes(gray):
-    """Lista de (x, y, w, h) en pixeles."""
+def _raw_boxes(gray, min_frac=0.05):
+    """Lista de (x, y, w, h) en pixeles. min_frac = tamaño mínimo de la cara como fracción del ancho."""
     import numpy as np
     h, w = gray.shape
     kind, a, b = _load()
     if kind == "sk":
-        raw = a.detect_multi_scale(gray, scale_factor=1.2, step_ratio=1, min_size=(int(w * 0.045),) * 2,
+        raw = a.detect_multi_scale(gray, scale_factor=1.2, step_ratio=1, min_size=(max(12, int(w * min_frac * 0.9)),) * 2,
                                    max_size=(int(w * 0.4),) * 2)
         return [(r["c"], r["r"], r["width"], r["height"]) for r in raw]
     import cv2
     g = cv2.equalizeHist(np.ascontiguousarray(gray))
-    ms = (int(w * 0.05),) * 2
+    ms = (max(12, int(w * min_frac)),) * 2
     out = [tuple(r) for r in a.detectMultiScale(g, 1.1, 4, minSize=ms)]
     out += [tuple(r) for r in b.detectMultiScale(g, 1.1, 4, minSize=ms)]
     out += [(w - x - bw, y, bw, bh) for x, y, bw, bh in b.detectMultiScale(cv2.flip(g, 1), 1.1, 4, minSize=ms)]
@@ -61,31 +61,31 @@ def _raw_boxes(gray):
 
 # ---------------------------------------------------------------- lectura y detección
 
-def _read_frames(source, start, dur, src_w, src_h):
+def _read_frames(source, start, dur, src_w, src_h, det_w=DET_W, fps=SAMPLE_FPS):
     import numpy as np
 
-    h = max(2, int(round(DET_W * src_h / src_w / 2)) * 2)
+    h = max(2, int(round(det_w * src_h / src_w / 2)) * 2)
     cmd = ["ffmpeg", "-v", "error", "-ss", f"{start:.2f}", "-t", f"{dur:.2f}", "-i", str(source),
-           "-vf", f"fps={SAMPLE_FPS},scale={DET_W}:{h}:flags=bilinear,format=gray",
+           "-vf", f"fps={fps},scale={det_w}:{h}:flags=bilinear,format=gray",
            "-f", "rawvideo", "-pix_fmt", "gray", "-"]
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-    size = DET_W * h
+    size = det_w * h
     try:
         while True:
             buf = p.stdout.read(size)
             if len(buf) < size:
                 break
-            yield np.frombuffer(buf, np.uint8).reshape(h, DET_W)
+            yield np.frombuffer(buf, np.uint8).reshape(h, det_w)
     finally:
         p.stdout.close()
         p.kill()
         p.wait()
 
 
-def _detect(gray):
+def _detect(gray, min_frac=0.05):
     h, w = gray.shape
     faces = []
-    for (x, y, bw, bh) in _raw_boxes(gray):
+    for (x, y, bw, bh) in _raw_boxes(gray, min_frac):
         if y + bh / 2 > h * 0.8:   # caras muy abajo suelen ser falsos positivos
             continue
         faces.append({"x": (x + bw / 2) / w, "w": bw / w, "y": (y + bh / 2) / h, "box": (y, x, bw, bh)})
@@ -302,4 +302,114 @@ def duo_boxes(source, start, dur, src_w, src_h, aspect):
         print("  Encuadre: falta scikit-image (pip install scikit-image).", flush=True)
     except Exception as e:  # noqa: BLE001
         print(f"  Encuadre: no pude ubicar a las dos personas ({type(e).__name__}: {str(e)[:100]}).", flush=True)
+    return None
+
+
+# ---------------------------------------------------------------- cámara del streamer (facecam)
+FACECAM_W = 960          # ancho de análisis (las caras de una cámara pequeña son diminutas)
+FACECAM_SECS = 12.0
+FACECAM_FPS = 2.0
+
+
+def _in_corner(f):
+    return (f["x"] < 0.42 or f["x"] > 0.58) and (f["y"] < 0.45 or f["y"] > 0.55)
+
+
+def facecam_pick(samples, n_frames):
+    """Lógica pura: de las caras vistas en varios cuadros saca la cara de la cámara del streamer (pequeña, en una esquina y
+    siempre en el mismo sitio) o None. Una cara grande o en el centro es un video de charla, no una cámara sobre un juego."""
+    cand = [f for s in samples for f in s if f["w"] <= 0.17 and _in_corner(f)]
+    if len(cand) < max(3, 0.4 * n_frames):
+        return None
+    mx = statistics.median(f["x"] for f in cand)
+    my = statistics.median(f["y"] for f in cand)
+    mw = statistics.median(f["w"] for f in cand)
+    same = [f for f in cand if abs(f["x"] - mx) <= max(0.03, mw * 0.8) and abs(f["y"] - my) <= max(0.05, mw * 1.2)]
+    if len(same) < max(3, 0.4 * n_frames):
+        return None
+    # si en los mismos cuadros hay otra cara claramente más grande, la cámara es el contenido principal, no un recuadro
+    for s in samples:
+        if any(f["w"] > 0.22 for f in s):
+            return None
+    return {"x": statistics.median(f["x"] for f in same), "y": statistics.median(f["y"] for f in same),
+            "w": statistics.median(f["w"] for f in same)}
+
+
+def facecam_rect(stack, face):
+    """Rectángulo (x0, y0, x1, y1) en fracciones del cuadro: el recuadro de la cámara.
+    Primero busca la zona CONECTADA a la cara que casi no cambia entre cuadros (el juego se mueve; el marco de la cámara, no).
+    Si esa zona no tiene forma de recuadro, estima uno alrededor de la cara (~2.8 veces el ancho de la cara) pegado al borde
+    del video si la cara está cerca de él. stack = array (n, alto, ancho) en grises."""
+    import numpy as np
+    n, h, w = stack.shape
+    fx, fy, fw = face["x"], face["y"], face["w"]
+    rect = None
+    try:
+        import cv2
+        std = stack.astype(np.float32).std(axis=0)
+        thr = max(5.0, 0.6 * float(np.median(std)))
+        mask = (std < thr).astype(np.uint8)
+        k = max(3, int(w * 0.006)) | 1
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((k, k), np.uint8))
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((k, k), np.uint8))
+        cnt, lab, stats, _ = cv2.connectedComponentsWithStats(mask, connectivity=4)
+        li = lab[min(h - 1, max(0, int(fy * h))), min(w - 1, max(0, int(fx * w)))]
+        if li > 0:
+            x, y, bw, bh, _a = stats[li]
+            rw, rh = bw / w, bh / h
+            ok = fw * 1.5 <= rw <= fw * 7 and rw * rh <= 0.35 and 0.5 <= bw / max(bh, 1) <= 3.0
+            if ok:
+                rect = (x / w, y / h, (x + bw) / w, (y + bh) / h)
+    except ImportError:
+        pass
+    if rect is None:
+        half_w = fw * 1.4
+        half_h = half_w * (w / h) * 0.75
+        x0, x1 = fx - half_w, fx + half_w
+        y0, y1 = fy - half_h * 1.1, fy + half_h * 0.9
+        if x0 < 0.06:
+            x0 = 0.0
+        if x1 > 0.94:
+            x1 = 1.0
+        if y0 < 0.06:
+            y0 = 0.0
+        if y1 > 0.94:
+            y1 = 1.0
+        rect = (max(0.0, x0), max(0.0, y0), min(1.0, x1), min(1.0, y1))
+    return rect
+
+
+def panel_in_rect(rect, face, src_w, src_h, aspect):
+    """Recuadro (en % del video) con la proporción `aspect` (ancho/alto en pixeles), lo más grande posible DENTRO del recuadro de la
+    cámara y centrado en la cara. Así el panel de arriba muestra solo al streamer, sin pedazos del juego."""
+    x0, y0, x1, y1 = rect
+    rw, rh = (x1 - x0) * src_w, (y1 - y0) * src_h
+    bw = min(rw, rh * aspect)
+    bh = bw / aspect
+    cx = min(max(face["x"] * src_w, x0 * src_w + bw / 2), x1 * src_w - bw / 2)
+    cy = min(max(face["y"] * src_h + bh * 0.05, y0 * src_h + bh / 2), y1 * src_h - bh / 2)
+    return {"x": round((cx - bw / 2) / src_w * 100, 2), "y": round((cy - bh / 2) / src_h * 100, 2),
+            "w": round(bw / src_w * 100, 2), "h": round(bh / src_h * 100, 2)}
+
+
+def facecam_box(source, start, dur, src_w, src_h, aspect):
+    """Recuadro (en % del video) de la cámara del streamer para el panel de arriba del modo dividido, o None si el video no tiene
+    una cámara superpuesta (entonces se usa cam_box, que sigue la cara). Nunca lanza error."""
+    try:
+        import numpy as np
+        frames, per = [], []
+        for gray in _read_frames(source, start, min(dur, FACECAM_SECS), src_w, src_h, FACECAM_W, FACECAM_FPS):
+            frames.append(gray)
+            per.append(_detect(gray, 0.025))
+        if len(frames) < 4:
+            return None
+        face = facecam_pick(per, len(frames))
+        if not face:
+            return None
+        rect = facecam_rect(np.stack(frames), face)
+        return panel_in_rect(rect, face, src_w, src_h, aspect)
+    except ImportError:
+        print("  Encuadre: falta numpy/scikit-image para buscar la cámara del streamer.", flush=True)
+    except Exception as e:  # noqa: BLE001
+        print(f"  Encuadre: no pude buscar la cámara del streamer ({type(e).__name__}: {str(e)[:100]}).", flush=True)
     return None

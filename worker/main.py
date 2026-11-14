@@ -122,7 +122,7 @@ def process(job):
             out = work / f"{cid}.mp4"
             
             render_clip(video, words, m["start"], m["end"], out, work, custom_crop=custom_crop, layout=clip_layout, brand=logo,
-                        hook=m.get("hook") or m["title"])
+                        hook=m.get("hook") or m["title"], profile=prof, opts=opts)
             
             if ocfg["enabled"] and opts.get("original", True):
                 try:   # aporte propio: voz narradora, dramómetro, encuesta A/B y descripción con tu punto de vista

@@ -146,3 +146,26 @@ DEDUPE_HOURS = int(os.environ.get("DEDUPE_HOURS") or 48)     # compara con los c
 VERIFY_IMAGES = (os.environ.get("VERIFY_IMAGES") or "auto").strip().lower()
 VERIFY_TOP = int(os.environ.get("VERIFY_TOP") or 12)         # cuántos candidatos revisa con imágenes (los mejores)
 VERIFY_FRAMES = min(5, max(2, int(os.environ.get("VERIFY_FRAMES") or 3)))
+
+
+# --- Parte 4: audio, efectos, cámara de streamer y GPU ---
+CLIP_BLEEP = _flag("CLIP_BLEEP")              # pitido en groserías (y subtítulo censurado)
+BLEEP_WORDS = os.environ.get("BLEEP_WORDS", "")   # palabras extra a pitar, separadas por coma
+BLEEP_KEEP = os.environ.get("BLEEP_KEEP", "")     # palabras que NO se pitan aunque estén en la lista
+CLIP_LOUDNORM = _flag("CLIP_LOUDNORM")        # volumen parejo (LUFS)
+try:
+    CLIP_LUFS = min(-9.0, max(-23.0, float(os.environ.get("CLIP_LUFS") or -14)))
+except ValueError:
+    CLIP_LUFS = -14.0
+# zoom y cámara lenta: auto = lo decide el tipo de contenido (GTA y Juegos: ambos; GTA RP y Reality: solo zoom); 1 = siempre; 0 = nunca
+CLIP_ZOOM = (os.environ.get("CLIP_ZOOM") or "auto").strip().lower()
+CLIP_SLOWMO = (os.environ.get("CLIP_SLOWMO") or "auto").strip().lower()
+try:
+    CLIP_SLOW_RATE = min(0.9, max(0.5, float(os.environ.get("CLIP_SLOW_RATE") or 0.5)))
+except ValueError:
+    CLIP_SLOW_RATE = 0.5
+CLIP_FACECAM = _flag("CLIP_FACECAM")          # buscar el recuadro de la cámara del streamer en el modo dividido
+# Codificador de video: auto (prueba GPU y si no hay usa CPU) | cpu | nvenc (NVIDIA) | qsv (Intel) | amf (AMD) | videotoolbox (Mac)
+CLIP_ENCODER = (os.environ.get("CLIP_ENCODER") or "auto").strip().lower()
+# Subtítulos con un color por persona: auto = solo si hay pyannote + HF_TOKEN; 1 = intentar siempre; 0 = apagado
+SUBS_PER_SPEAKER = (os.environ.get("SUBS_PER_SPEAKER") or "auto").strip().lower()

@@ -15,6 +15,7 @@ import config
 #   📺 WASTED/BUSTED/MISSION PASSED/estrellas en pantalla (screen), 🗯 discusión (argument)
 # signals = qué detectores extra corre el worker para ese tipo (Parte 3); dedupe = quitar clips repetidos;
 # verify = permitir la verificación con imágenes (ver VERIFY_IMAGES en .env)
+# fx = efectos de la Parte 4: zoom (punch-in) y/o slow = cámara lenta en explosiones (ver CLIP_ZOOM / CLIP_SLOWMO en .env)
 PROFILES = {
     "auto": {
         "label": "General", "ideal": 45, "kind": "un podcast/directo/video",
@@ -58,6 +59,7 @@ PROFILES = {
         "preroll": 3.0, "tail": 1.5, "question": False, "action": False,
         "bonus": {"loud": 8, "motion": 0, "chat": 9, "argument": 10},
         "signals": {"argument": True}, "dedupe": True, "verify": True,
+        "fx": {"zoom": True},
         "keywords": ["pelea", "pelear", "discusión", "discutir", "traición", "traicionó", "traidor", "traidora", "dime a ver",
                      "mentiroso", "mentirosa", "falso", "falsa", "hipócrita", "chisme", "te lo dije", "en mi cara", "respétame",
                      "no me grites", "me tienes harto", "me tienes harta", "habla claro", "cállate", "lárgate",
@@ -75,6 +77,7 @@ PROFILES = {
         "preroll": 6.0, "tail": 2.5, "question": False, "action": True,
         "bonus": {"loud": 7, "motion": 8, "chat": 8, "combat": 6},
         "signals": {"combat": True}, "verify": True,
+        "fx": {"zoom": True, "slow": True},
         "keywords": ["clutch", "ace", "pentakill", "no way", "no puede ser", "qué locura", "increíble", "imposible", "wtf",
                      "insane", "let's go", "lets go", "vamos", "nooo", "mira eso", "last second", "gané", "ganamos", "victoria",
                      "headshot", "1v", "booyah"],
@@ -93,6 +96,7 @@ PROFILES = {
         "preroll": 5.0, "tail": 2.5, "question": False, "action": True,
         "bonus": {"loud": 9, "motion": 4, "chat": 8, "combat": 10, "screen": 9},
         "signals": {"combat": True, "screen": True}, "verify": True,
+        "fx": {"zoom": True, "slow": True},
         "keywords": ["wasted", "busted", "mission passed", "me mataron", "me mató", "me explotó", "explotó", "explosión", "choque",
                      "persecución", "policía", "los pacos", "la policía", "cinco estrellas", "5 estrellas", "tanque", "avión",
                      "helicóptero", "helicoptero", "headshot", "no puede ser", "qué locura", "increíble", "imposible", "wtf",
@@ -111,6 +115,7 @@ PROFILES = {
         "preroll": 2.0, "tail": 1.5, "question": False, "action": False,
         "bonus": {"loud": 7, "motion": 0, "chat": 9, "screen": 5},
         "signals": {"screen": True},
+        "fx": {"zoom": True},
         "keywords": ["manos arriba", "alto ahí", "quieto", "al suelo", "te voy a arrestar", "estás detenido", "tengo derecho",
                      "abogado", "rehén", "rehen", "dame todo", "esto es un atraco", "te voy a matar", "no me dispares",
                      "no dispares", "fail rp", "rompí el rol", "no rolees", "nuevo en la ciudad", "te lo juro oficial",

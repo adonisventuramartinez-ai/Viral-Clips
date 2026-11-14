@@ -295,7 +295,7 @@ def process_live(job):
         out = work / f"{cid}.mp4"
         render_clip(win, rel_words, mstart - base, end - base, out, work,
                     custom_crop=src.get("custom_crop"), layout=src.get("layout"), brand=st.get("brand"),
-                    hook=m.get("hook") or m["title"])
+                    hook=m.get("hook") or m["title"], profile=prof, opts=opts)
         path = f"{sid}/{cid}.mp4"
         db.upload_clip(path, out)
         m["abs_start"], m["abs_end"] = mstart, end

@@ -69,16 +69,26 @@ def _esc(text: str, upper: bool) -> str:
     return text.replace("{", "(").replace("}", ")").replace("\\", "/")
 
 
-def build_ass(words, start, end, group=2, layout="crop", style=None, hook=None, hook_sec=3.5):
+def build_ass(words, start, end, group=2, layout="crop", style=None, hook=None, hook_sec=3.5, tmap=None, n_speakers=0):
     """words: lista global [{w,start,end}]. Genera eventos relativos al inicio del clip.
-    hook = frase gancho que sale arriba los primeros `hook_sec` segundos (None = sin gancho)."""
+    hook = frase gancho que sale arriba los primeros `hook_sec` segundos (None = sin gancho).
+    tmap = función que pasa un segundo del clip al segundo del video final (cámara lenta). n_speakers >= 2 = color por persona (words con 'spk')."""
+    tmap = tmap or (lambda t: t)
     st = _subs(style)
     ws = [w for w in words if w["start"] >= start - 0.05 and w["end"] <= end + 0.3]
     lines = [_header(layout, st)]
 
-    yellow = "{\\c&H" + _hex(st["active"], "00E0FF") + "&}"
     white = "{\\c&H" + _hex(st["text"]) + "&}"
     pop = "{\\fscx120\\fscy120\\t(0,100,\\fscx100\\fscy100)}" if st["pop"] else ""
+    if n_speakers >= 2:
+        import speakers
+        actives = ["{\\c&H" + _hex(c, "00E0FF") + "&}" for c in speakers.colors(n_speakers, st["active"])]
+    else:
+        actives = ["{\\c&H" + _hex(st["active"], "00E0FF") + "&}"]
+
+    def active_for(w):
+        k = w.get("spk")
+        return actives[k] if k is not None and 0 <= k < len(actives) else actives[0]
 
     if hook and str(hook).strip():
         h = _esc(str(hook).strip()[:70], True)
@@ -87,13 +97,13 @@ def build_ass(words, start, end, group=2, layout="crop", style=None, hook=None, 
     for i in range(0, len(ws), group):
         g = ws[i : i + group]
         for j, w in enumerate(g):
-            t0 = w["start"] - start
-            t1 = (g[j + 1]["start"] if j + 1 < len(g) else w["end"]) - start
+            t0 = tmap(w["start"] - start)
+            t1 = tmap((g[j + 1]["start"] if j + 1 < len(g) else w["end"]) - start)
             if t1 <= t0:
                 t1 = t0 + 0.1
             partes = []
             for k, x in enumerate(g):
-                partes.append((f"{yellow}{pop}" if k == j else white) + _esc(x["w"], st["upper"]))
+                partes.append((f"{active_for(x)}{pop}" if k == j else white) + _esc(x["w"], st["upper"]))
             lines.append(f"Dialogue: 0,{_t(t0)},{_t(t1)},Cap,,0,0,0,,{' '.join(partes)}\n")
     return "".join(lines)
 
@@ -172,6 +182,11 @@ def _cam_box(source: Path, start: float, dur: float, sw: int, sh: int, custom_cr
     aspect = 1080 / top_h
     if config.CLIP_FRAMING == "auto":
         import framing
+        if config.CLIP_FACECAM:
+            box = framing.facecam_box(source, start, dur, sw, sh, aspect)
+            if box:
+                print("  Dividido: encontré el recuadro de la cámara del streamer", flush=True)
+                return box
         box = framing.cam_box(source, start, dur, sw, sh, aspect)
         if box:
             print("  Dividido: encontré la cámara por la cara", flush=True)
@@ -196,23 +211,25 @@ def _duo_boxes(source: Path, start: float, dur: float, sw: int, sh: int):
     return ({"x": 0.0, "y": (100 - h) / 2, "w": 50.0, "h": h}, {"x": 50.0, "y": (100 - h) / 2, "w": 50.0, "h": h})
 
 
-def _ass_for(words, start, end, workdir: Path, stem: str, layout: str, brand: dict = None, hook: str = None) -> Path:
+def _ass_for(words, start, end, workdir: Path, stem: str, layout: str, brand: dict = None, hook: str = None,
+             tmap=None, n_speakers: int = 0) -> Path:
     ass = workdir / f"{stem}.ass"
     b = brand or {}
     ass.write_text(build_ass(words, start, end, layout=layout, style=b.get("subs"),
-                             hook=hook if b.get("hook", True) else None, hook_sec=float(b.get("hook_sec", 3.5))),
+                             hook=hook if b.get("hook", True) else None, hook_sec=float(b.get("hook_sec", 3.5)),
+                             tmap=tmap, n_speakers=n_speakers),
                    encoding="utf-8")
     return ass
 
 
-def build_filter(layout: str, source: Path, start: float, dur: float, ass_name: str, custom_crop: dict = None, keys=None) -> str:
-    """Devuelve el grafo de filtros (sin etiqueta final) para el encuadre pedido."""
+def layout_graph(layout: str, source: Path, start: float, dur: float, custom_crop: dict = None, keys=None) -> str:
+    """Grafo de filtros del encuadre pedido, SIN subtítulos y sin etiqueta final (render_clip le pone zoom, cámara lenta y subtítulos)."""
     if layout == "blur":
         return (
             "[0:v]split=2[bg][fg];"
             "[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=30:5,eq=brightness=-0.12[b];"
             "[fg]scale=1080:-2:flags=lanczos[f];"
-            f"[b][f]overlay=(W-w)/2:(H-h)/2,setsar=1,subtitles={ass_name}"
+            "[b][f]overlay=(W-w)/2:(H-h)/2,setsar=1"
         )
     if layout == "duo":
         sw, sh = _probe(source)
@@ -222,7 +239,7 @@ def build_filter(layout: str, source: Path, start: float, dur: float, ass_name: 
             "[0:v]split=2[a][b];"
             f"[a]{a},scale=1080:{DUO_H}:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:{DUO_H},setsar=1[t];"
             f"[b]{b},scale=1080:{DUO_H}:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:{DUO_H},setsar=1[g];"
-            f"[t][g]vstack=inputs=2,subtitles={ass_name}"
+            "[t][g]vstack=inputs=2"
         )
     if layout in SPLIT_TOPS:
         top_h = SPLIT_TOPS[layout]
@@ -238,14 +255,19 @@ def build_filter(layout: str, source: Path, start: float, dur: float, ass_name: 
             "[0:v]split=2[a][b];"
             f"[a]{cam},scale=1080:{top_h}:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:{top_h},setsar=1[t];"
             f"[b]{game},setsar=1[g];"
-            f"[t][g]vstack=inputs=2,subtitles={ass_name}"
+            "[t][g]vstack=inputs=2"
         )
     sharpen = f"unsharp=5:5:{config.CLIP_SHARPEN:.2f}:5:5:0.0," if config.CLIP_SHARPEN > 0 else ""
     return (
         "[0:v]" + _crop_filter(source, start, dur, custom_crop, keys)
         + ",scale=1080:1920:flags=lanczos+accurate_rnd+full_chroma_int,"
-        + sharpen + f"setsar=1,subtitles={ass_name}"
+        + sharpen + "setsar=1"
     )
+
+
+def build_filter(layout: str, source: Path, start: float, dur: float, ass_name: str, custom_crop: dict = None, keys=None) -> str:
+    """Igual que antes: encuadre + subtítulos (sin efectos). Lo conservo para no romper pruebas ni código que lo use."""
+    return layout_graph(layout, source, start, dur, custom_crop, keys) + f",subtitles={ass_name}"
 
 
 _LOGO_POS = {
@@ -271,9 +293,38 @@ def _bar_graph(graph: str, dur: float, src_in: str = "vA", src_out: str = "vB") 
             f"[{src_in}][bar]overlay=x='-w+w*t/{d:.2f}':y=H-h-10:shortest=1[{src_out}]")
 
 
+def _flag(opt, default):
+    """opción de la web (True/False/'auto'/None) > valor por defecto del .env o del perfil."""
+    import postfx
+    v = postfx._mode(opt)
+    return default if v is None else v
+
+
+def _encode(cmd_head, cmd_tail, vb, workdir):
+    """Codifica con la GPU si hay y, si falla, repite con el CPU (un clip nunca se pierde por culpa de la GPU)."""
+    import encoder
+    kind = encoder.pick()
+    r = subprocess.run(cmd_head + encoder.video_args(kind, config.CLIP_CRF, config.CLIP_PRESET, vb) + cmd_tail,
+                       cwd=workdir, capture_output=True, text=True)
+    if r.returncode != 0 and kind != "cpu":
+        print(f"  Codificador {kind} falló ({r.stderr.strip().splitlines()[-1][:100] if r.stderr.strip() else 'sin detalle'}); "
+              "repito con CPU.", flush=True)
+        encoder.mark_bad(kind)
+        r = subprocess.run(cmd_head + encoder.video_args("cpu", config.CLIP_CRF, config.CLIP_PRESET, vb) + cmd_tail,
+                           cwd=workdir, capture_output=True, text=True)
+    if r.returncode != 0:
+        raise RuntimeError("ffmpeg falló: " + r.stderr[-600:])
+    return kind
+
+
 def render_clip(source: Path, words, start: float, end: float, out: Path, workdir: Path,
-                custom_crop: dict = None, layout: str = None, brand: dict = None, hook: str = None):
+                custom_crop: dict = None, layout: str = None, brand: dict = None, hook: str = None,
+                profile: dict = None, opts: dict = None):
+    """profile = perfil del tipo de contenido (decide zoom / cámara lenta); opts = opciones del trabajo
+    (bleep, loudnorm, zoom, slowmo, speakers: True / False / 'auto'). Todo lo nuevo es opcional y falla sin romper el clip."""
+    import postfx
     dur = end - start
+    opts = opts or {}
     layout = (layout or config.CLIP_LAYOUT or "crop").strip().lower()
     if layout not in ("crop", "blur", "duo", *SPLIT_TOPS):
         layout = "crop"
@@ -287,16 +338,72 @@ def render_clip(source: Path, words, start: float, end: float, out: Path, workdi
             if not keys:   # no vi a nadie: mejor video completo con fondo borroso que mostrar paisaje vacío
                 print("  Encuadre: no encontré personas, uso fondo borroso (blur)", flush=True)
                 layout = "blur"
-    ass = _ass_for(words, start, end, workdir, out.stem, layout, brand, hook)
-    graph = build_filter(layout, source, start, dur, ass.name, custom_crop, keys)
 
-    logo = Path(brand["path"]) if brand and brand.get("path") else None
-    use_logo = bool(logo and logo.exists())
-    graph = f"{graph}[vA]"
+    # ---- audio: pitido en groserías y volumen parejo
+    has_aud = postfx.has_audio(source)
+    beeps = []
+    try:
+        if _flag(opts.get("bleep"), config.CLIP_BLEEP):
+            beeps = postfx.find_profanity(words, start, end)
+            if beeps:
+                words = postfx.censor_words(words)
+                print(f"  Pitido: {len(beeps)} grosería(s) tapada(s)", flush=True)
+                if not has_aud:
+                    beeps = []
+    except Exception as e:  # noqa: BLE001
+        print(f"  Pitido: no pude aplicarlo ({type(e).__name__}: {str(e)[:100]})", flush=True)
+        beeps = []
+    measured, norm = None, False
+    if has_aud and dur >= 3 and _flag(opts.get("loudnorm"), config.CLIP_LOUDNORM):
+        norm = True
+        measured = postfx.measure_loudness(source, start, dur)
+        if measured:
+            print(f"  Volumen: {measured['input_i']:.1f} LUFS -> {config.CLIP_LUFS:g} LUFS", flush=True)
+        else:
+            print(f"  Volumen: no pude medirlo, ajusto en una sola pasada a {config.CLIP_LUFS:g} LUFS", flush=True)
+
+    # ---- zoom y cámara lenta
+    fx = None
+    try:
+        fx = postfx.plan_fx(source, start, dur, profile, opts)
+    except Exception as e:  # noqa: BLE001
+        print(f"  Efectos: no pude calcularlos ({type(e).__name__}: {str(e)[:100]})", flush=True)
+    slow = fx["slow"] if fx else None
+    zooms = fx["zoom"] if fx else []
+    if fx:
+        print("  Efectos: " + ", ".join(x for x in (
+            f"zoom en {zooms[0][0]:.1f} s" if zooms else "", f"cámara lenta en {slow[0]:.1f} s" if slow else "") if x), flush=True)
+    dur_out = postfx.out_duration(dur, slow)
+
+    # ---- subtítulos (un color por persona si hay pyannote)
+    n_spk = 0
+    if _flag(opts.get("speakers"), config.SUBS_PER_SPEAKER not in ("0", "false", "no", "off")):
+        try:
+            import speakers
+            words, n_spk = speakers.label_words(source, words, start, end, workdir)
+            if n_spk >= 2:
+                print(f"  Subtítulos: {n_spk} personas, un color para cada una", flush=True)
+        except Exception as e:  # noqa: BLE001
+            print(f"  Subtítulos por persona: no pude ({type(e).__name__}: {str(e)[:100]})", flush=True)
+            n_spk = 0
+    ass = _ass_for(words, start, end, workdir, out.stem, layout, brand, hook, tmap=postfx.make_tmap(slow), n_speakers=n_spk)
+
+    # ---- grafo de video: encuadre -> zoom -> cámara lenta -> subtítulos -> barra -> logo
+    graph = layout_graph(layout, source, start, dur, custom_crop, keys) + "[vL]"
+    cur = "vL"
+    if zooms:
+        graph += f";[{cur}]{postfx.zoom_chain(zooms)[:-1]}[vZ]"
+        cur = "vZ"
+    if slow:
+        graph += ";" + postfx.slow_video(cur, "vS", slow)
+        cur = "vS"
+    graph += f";[{cur}]subtitles={ass.name}[vA]"
     cur = "vA"
     if brand and brand.get("progress_bar"):
-        graph = _bar_graph(graph, dur, "vA", "vB")
+        graph = _bar_graph(graph, dur_out, "vA", "vB")
         cur = "vB"
+    logo = Path(brand["path"]) if brand and brand.get("path") else None
+    use_logo = bool(logo and logo.exists())
     if use_logo:
         graph = _logo_graph(graph, brand, cur)
         inputs = ["-i", str(source.resolve()), "-i", str(logo.resolve())]
@@ -304,18 +411,13 @@ def render_clip(source: Path, words, start: float, end: float, out: Path, workdi
         graph = f"{graph};[{cur}]null[out]"
         inputs = ["-i", str(source.resolve())]
 
-    vb = _bitrate(dur)
-    cmd = [
-        "ffmpeg", "-y", "-ss", f"{start:.2f}", "-t", f"{dur:.2f}",
-    ] + inputs + [
-        "-filter_complex", graph, "-map", "[out]", "-map", "0:a?",
-        "-c:v", "libx264", "-preset", config.CLIP_PRESET, "-crf", str(config.CLIP_CRF),
-        "-profile:v", "high", "-level", "4.2",
-        "-maxrate", str(vb), "-bufsize", str(vb * 2),
-        "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart",
-        str(out.resolve()),
-    ]
-    r = subprocess.run(cmd, cwd=workdir, capture_output=True, text=True)
-    if r.returncode != 0:
-        raise RuntimeError("ffmpeg falló: " + r.stderr[-600:])
+    amap = ["-map", "0:a?"]
+    if has_aud and (beeps or slow or norm):
+        graph += ";" + postfx.audio_graph(dur, beeps, slow, measured, norm)
+        amap = ["-map", "[aout]"]
+
+    vb = _bitrate(dur_out)
+    head = ["ffmpeg", "-y", "-ss", f"{start:.2f}", "-t", f"{dur:.2f}"] + inputs + ["-filter_complex", graph, "-map", "[out]"] + amap
+    tail = ["-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(out.resolve())]
+    _encode(head, tail, vb, workdir)
     return out

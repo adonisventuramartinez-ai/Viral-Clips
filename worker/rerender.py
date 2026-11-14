@@ -6,6 +6,7 @@ import time
 import brand
 import config
 import db
+import profiles
 from download import download
 from render import render_clip
 from transcribe import transcribe
@@ -39,7 +40,8 @@ def process_rerender(job):
 
         out = work / f"{cid}.mp4"
         render_clip(video, words, start - offset, end - offset, out, work, custom_crop=custom, layout=layout,
-                    brand=brand.load(work), hook=clip.get("title"))
+                    brand=brand.load(work), hook=clip.get("title"),
+                    profile=profiles.get((src.get("options") or {}).get("content_type")), opts=src.get("options"))
 
         path = f"{clip['source_id']}/{cid}_{int(time.time())}.mp4"
         db.upload_clip(path, out)
