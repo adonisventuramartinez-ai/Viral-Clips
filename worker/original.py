@@ -1,14 +1,4 @@
-"""Modo Original (sin mostrar la cara ni hablar tú): convierte un corte en un clip con aporte propio.
-
-Cada clip sale con:
-  1. Tarjeta de CONTEXTO con VOZ NARRADORA (IA): explica qué pasó antes de que veas el momento.
-  2. El clip, con un DRAMÓMETRO (barra de drama) los primeros segundos.
-  3. Tarjeta de CIERRE con ENCUESTA A/B (la gente comenta A o B) y voz.
-  + descripción con tu punto de vista y el crédito/permiso.
-Además arma solo un TOP de los mejores momentos (cuenta regresiva #5 … #1) con voz.
-
-Todo se configura desde la web (Ajustes → Modo Original). Si la voz o la IA fallan, el clip sale igual.
-"""
+"""Modo Original (sin mostrar la cara ni hablar tú): convierte un corte en un clip con aporte propio."""
 import json
 import re
 import shutil
@@ -35,24 +25,17 @@ Responde SOLO JSON: {{"context":"...","outro":"...","poll":{{"q":"...","a":"..."
 Fragmento:
 {text}"""
 
-
-# ---------------------------------------------------------------- ajustes (los guarda la web)
-
-def load(workdir=None):
-    """Ajustes de Modo Original: valores por defecto + lo guardado en la web (Storage 'uploads', brand/original.json)."""
+def load(workdir=None, content_type="podcast"):
     cfg = dict(DEFAULTS)
     try:
         import db
         raw = db.sb.storage.from_("uploads").download("brand/original.json")
         saved = json.loads(raw.decode("utf-8")) if raw else {}
         cfg.update({k: saved[k] for k in DEFAULTS if k in saved})
-    except Exception:  # noqa: BLE001  (nada guardado: se usan los valores del .env)
+    except Exception:
         pass
     cfg["top_n"] = int(min(10, max(3, int(cfg.get("top_n") or 5))))
     return cfg
-
-
-# ---------------------------------------------------------------- IA y voz
 
 def _parse(txt):
     m = re.search(r"\{.*\}", txt or "", re.S)
@@ -64,9 +47,7 @@ def _parse(txt):
         return None
     return d if isinstance(d, dict) and d.get("context") else None
 
-
 def extras(text, cfg):
-    """Texto original del clip. Si la IA falla usa frases genéricas (el clip no se cae)."""
     base = {"context": f"Momento clave de {cfg['show']}", "outro": "¿Tú qué piensas? Comenta.",
             "poll": None, "caption": ""}
     try:
@@ -78,14 +59,12 @@ def extras(text, cfg):
         p = d.get("poll")
         if isinstance(p, dict) and all(str(p.get(k, "")).strip() for k in "qab"):
             base["poll"] = {k: str(p[k]).strip() for k in "qab"}
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         print(f"  Original: la IA no respondió ({type(e).__name__}); uso frases genéricas.", flush=True)
     base["context"], base["outro"] = base["context"][:100], base["outro"][:70]
     return base
 
-
 def tts(text, out, voice):
-    """Voz narradora. 1º edge-tts (voces dominicanas gratis, necesita internet), 2º espeak-ng, si no, sin voz (None)."""
     text = re.sub(r"[^\w\s¿?¡!,.:;'\-áéíóúüñÁÉÍÓÚÜÑ]", " ", text).strip()
     if not text:
         return None
@@ -99,7 +78,7 @@ def tts(text, out, voice):
         asyncio.run(go())
         if out.exists() and out.stat().st_size > 500:
             return out
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         print(f"  Voz: edge-tts no disponible ({type(e).__name__}); pruebo espeak-ng.", flush=True)
     if shutil.which("espeak-ng"):
         wav = out.with_suffix(".wav")
@@ -107,7 +86,6 @@ def tts(text, out, voice):
         if r.returncode == 0 and wav.exists():
             return wav
     return None
-
 
 def _dur(path):
     r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(path)],
@@ -117,13 +95,9 @@ def _dur(path):
     except ValueError:
         return 0.0
 
-
-# ---------------------------------------------------------------- tarjetas y piezas
-
 def _esc(t):
-    t = "".join(ch for ch in t if ord(ch) < 0x2190).strip()     # las tarjetas no dibujan emojis
+    t = "".join(ch for ch in t if ord(ch) < 0x2190).strip()
     return t.replace("{", "(").replace("}", ")").replace("\\", "/").replace("\n", "\\N")
-
 
 _HEAD = f"""[Script Info]
 ScriptType: v4.00+
@@ -141,9 +115,7 @@ Style: Meter,Montserrat,38,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,
 Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
 """
 
-
 def make_card(text, small, min_dur, out, workdir, voice=None, color="0x101820"):
-    """Tarjeta vertical 1080x1920. Si hay voz, dura lo que dure la voz (+0.5 s)."""
     workdir = Path(workdir)
     ass = workdir / (Path(out).stem + "_card.ass")
     d = max(min_dur, _dur(voice) + 0.5) if voice else min_dur
@@ -165,9 +137,7 @@ def make_card(text, small, min_dur, out, workdir, voice=None, color="0x101820"):
         raise RuntimeError("tarjeta falló: " + r.stderr[-400:])
     return Path(out)
 
-
 def _meter_ass(pct, path):
-    """Dramómetro: etiqueta + barra que se llena, arriba a la derecha, los primeros 4 s del clip."""
     pct = int(min(99, max(35, pct)))
     x0, x1, y0, y1 = 690, 1020, 132, 156
     xf = x0 + (x1 - x0) * pct // 100
@@ -179,9 +149,7 @@ def _meter_ass(pct, path):
                           + f"Dialogue: 0,{t},{e},Meter,,0,0,0,,{{\\fad(200,300)}}{box('303030', x0, x1)}\n"
                           + f"Dialogue: 2,{t},{e},Meter,,0,0,0,,{{\\fad(200,300)}}{box('1E5AFF', x0, xf)}\n", encoding="utf-8")
 
-
 def concat(parts, out, workdir, vf_extra=None):
-    """Une videos 1080x1920 (con audio) en uno; vf_extra = {índice: filtro de video extra para esa pieza}."""
     vf_extra = vf_extra or {}
     ins, fl = [], []
     for i, p in enumerate(parts):
@@ -199,9 +167,7 @@ def concat(parts, out, workdir, vf_extra=None):
         raise RuntimeError("unir falló: " + r.stderr[-400:])
     return Path(out)
 
-
 def wrap_clip(clip, ex, out, workdir, cfg, score=75):
-    """contexto (con voz) + clip (con dramómetro) + cierre (encuesta A/B, con voz) -> out."""
     workdir, stem = Path(workdir), Path(out).stem
     voice = (lambda txt, tag: tts(txt, workdir / f"{stem}_{tag}.mp3", cfg["voice"])) if cfg["narrate"] else (lambda *a: None)
     temp = []
@@ -229,9 +195,7 @@ def wrap_clip(clip, ex, out, workdir, cfg, score=75):
                 Path(p).unlink(missing_ok=True)
     return Path(out)
 
-
 def compilation(items, head, out, workdir, cfg):
-    """TOP con cuenta regresiva. items = [(título, archivo)] ya en el orden de aparición (#N … #1)."""
     workdir = Path(workdir)
     voice = (lambda txt, tag: tts(txt, workdir / f"comp_{tag}.mp3", cfg["voice"])) if cfg["narrate"] else (lambda *a: None)
     parts, temp = [], []
@@ -250,9 +214,7 @@ def compilation(items, head, out, workdir, cfg):
                 Path(p).unlink(missing_ok=True)
     return Path(out)
 
-
 def description(m, ex, cfg):
-    """Descripción del post: tu punto de vista + (encuesta) + crédito de permiso + hashtags."""
     bits = [ex.get("caption") or m.get("description") or ""]
     if ex.get("poll") and cfg["poll"]:
         bits.append(f"{ex['poll']['q']} A) {ex['poll']['a']}  B) {ex['poll']['b']}  Comenta tu respuesta")
