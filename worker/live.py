@@ -426,7 +426,7 @@ def process_live(job):
     # ------------------------------------------------------------------ bucle principal
     try:
         db.set_source(sid, error=None, progress={})
-        st["brand"] = brand.load(work)
+        st["brand"] = brand.load(work, template=opts.get("brand_template"))
         st["brand"]["progress_bar"] = bool(opts.get("progress_bar"))
         inputs, maps, title = _resolve(src["url"], quality)
         proc = _start_ffmpeg(inputs, maps, seg_dir, logf, st["session"])
@@ -514,8 +514,11 @@ def process_live(job):
     except Exception as e:  # noqa: BLE001
         import traceback
         traceback.print_exc()
-        db.set_source(sid, status="error", error=str(e)[:500])
-        db.finish_job(job["id"], ok=False)
+        import jobq
+        msg, _retry = jobq.explain(e)   # un directo no se reintenta (ya pasó), pero el error sí se explica claro
+        print(f"  ✖ {msg}", flush=True)
+        db.set_source(sid, status="error", error=msg[:500])
+        db.finish_job(job["id"], ok=False, error=f"{type(e).__name__}: {e}")
     finally:
         for cmd_id, info in list(waiting.items()):      # pedidos que quedaron sin atender
             db.finish_command(info["cmd"]["id"], False, "El directo terminó antes de poder cortar")

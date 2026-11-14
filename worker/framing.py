@@ -16,8 +16,10 @@ import subprocess
 SAMPLE_FPS = 3.0
 DET_W = 640        # ancho al que se reduce el cuadro para buscar caras
 WIN = 3            # +-1 s de ventana para decidir quién habla
-MIN_DWELL = 4      # muestras seguidas (~1.3 s) antes de mover la cámara
-MIN_GAP = 2.0      # segundos mínimos entre dos paneos
+MIN_DWELL = 3      # muestras seguidas (~1 s) antes de mover la cámara
+MIN_GAP = 1.5      # segundos mínimos entre dos paneos
+URGENT_EDGE = 0.36  # si la cara cae en el 14% exterior del recuadro (casi cortada), la cámara reacciona rápido
+URGENT_DWELL = 2   # muestras seguidas (~0.7 s) para ese caso
 RAMP = 0.5         # duración del paneo
 MIN_COVERAGE = 0.2  # si hay caras en menos de esta fracción del clip, se usa el centro
 
@@ -26,14 +28,17 @@ _det = None
 
 def _load():
     """Detectores de OpenCV: cara de frente + de perfil (izq y der). Ven gente con gorra, lentes o de lado.
-    Si no hay OpenCV, cae al detector viejo de scikit-image."""
+    Si no hay OpenCV (o sus archivos .xml no vienen en la instalación), cae al detector de scikit-image."""
     global _det
     if _det is None:
         try:
             import cv2
             d = cv2.data.haarcascades
-            _det = ("cv2", cv2.CascadeClassifier(d + "haarcascade_frontalface_alt2.xml"),
-                    cv2.CascadeClassifier(d + "haarcascade_profileface.xml"))
+            a = cv2.CascadeClassifier(d + "haarcascade_frontalface_alt2.xml")
+            b = cv2.CascadeClassifier(d + "haarcascade_profileface.xml")
+            if a.empty() or b.empty():
+                raise RuntimeError("faltan los .xml de OpenCV")
+            _det = ("cv2", a, b)
         except Exception:  # noqa: BLE001
             from skimage.data import lbp_frontal_face_cascade_filename
             from skimage.feature import Cascade
@@ -51,12 +56,18 @@ def _raw_boxes(gray, min_frac=0.05):
                                    max_size=(int(w * 0.4),) * 2)
         return [(r["c"], r["r"], r["width"], r["height"]) for r in raw]
     import cv2
-    g = cv2.equalizeHist(np.ascontiguousarray(gray))
+    g = np.ascontiguousarray(gray)
+    g = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(4, 4)).apply(g)   # escenas oscuras (estudios de podcast): realza sin quemar
     ms = (max(12, int(w * min_frac)),) * 2
-    out = [tuple(r) for r in a.detectMultiScale(g, 1.1, 4, minSize=ms)]
-    out += [tuple(r) for r in b.detectMultiScale(g, 1.1, 4, minSize=ms)]
-    out += [(w - x - bw, y, bw, bh) for x, y, bw, bh in b.detectMultiScale(cv2.flip(g, 1), 1.1, 4, minSize=ms)]
-    return out
+
+    def run(neigh):
+        out = [tuple(r) for r in a.detectMultiScale(g, 1.1, neigh, minSize=ms)]
+        out += [tuple(r) for r in b.detectMultiScale(g, 1.1, neigh, minSize=ms)]
+        out += [(w - x - bw, y, bw, bh) for x, y, bw, bh in b.detectMultiScale(cv2.flip(g, 1), 1.1, neigh, minSize=ms)]
+        return out
+
+    out = run(4)
+    return out if out else run(3)   # si no vio nada, un segundo intento menos exigente (poca luz)
 
 
 # ---------------------------------------------------------------- lectura y detección
@@ -171,22 +182,26 @@ def plan(samples, crop_frac):
         else:
             last = t
 
+    # mediana de 3 muestras: un cuadro suelto con ruido no mueve la cámara
+    tg = [statistics.median(tg[max(0, i - 1): i + 2]) for i in range(len(tg))]
+
     dead = 0.2 * crop_frac
+    edge = URGENT_EDGE * crop_frac
     cur = statistics.median(tg[: max(3, int(SAMPLE_FPS * 2))])
     keys = [(0.0, _left(cur, crop_frac))]
-    pending, since_move = 0, -99.0
+    pending, urgent, since_move = 0, 0, -99.0
     for i, t in enumerate(tg):
         now = samples[i]["t"]
-        if abs(t - cur) > dead:
-            pending += 1
-        else:
-            pending = 0
-        if pending >= MIN_DWELL and now - since_move >= MIN_GAP:
-            new = statistics.median(tg[i - pending + 1: i + 1])
-            t0 = max(samples[i - pending + 1]["t"], keys[-1][0] + 0.1)   # el paneo empieza cuando empezó el cambio
+        pending = pending + 1 if abs(t - cur) > dead else 0
+        urgent = urgent + 1 if abs(t - cur) > edge else 0   # la persona está casi fuera del cuadro
+        go = pending >= MIN_DWELL or urgent >= URGENT_DWELL
+        if go and now - since_move >= MIN_GAP:
+            n = max(pending, urgent)
+            new = statistics.median(tg[i - n + 1: i + 1])
+            t0 = max(samples[i - n + 1]["t"], keys[-1][0] + 0.1)   # el paneo empieza cuando empezó el cambio
             keys.append((t0, keys[-1][1]))
             keys.append((t0 + RAMP, _left(new, crop_frac)))
-            cur, pending, since_move = new, 0, now
+            cur, pending, urgent, since_move = new, 0, 0, now
     if len(keys) == 1:   # nadie cambió: se queda quieto en la posición típica de todo el clip
         return [(0.0, _left(statistics.median(tg), crop_frac))]
     return keys

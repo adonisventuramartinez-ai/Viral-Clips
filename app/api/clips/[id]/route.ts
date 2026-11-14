@@ -19,7 +19,7 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
   return NextResponse.json({ success: true });
 }
 
-/** Cambia si el clip aparece en el feed/Top de la comunidad, o su título. */
+/** Cambia si el clip aparece en el feed/Top de la comunidad, su título, o su hora de publicación programada. */
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   const db = serverClient();
   if (!db) return NextResponse.json({ error: "Supabase no está conectado" }, { status: 503 });
@@ -27,6 +27,20 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   const upd: Record<string, unknown> = {};
   if (typeof b.is_public === "boolean") upd.is_public = b.is_public;
   if (typeof b.title === "string" && b.title.trim()) upd.title = b.title.trim().slice(0, 80);
+  // Programar la publicación en Facebook: scheduled_at = fecha ISO (entre 1 minuto y 60 días) o null para cancelar
+  if ("scheduled_at" in b) {
+    const { data: cur } = await db.from("clips").select("publish_status").eq("id", params.id).maybeSingle();
+    if (cur?.publish_status === "published") return NextResponse.json({ error: "Este clip ya se publicó" }, { status: 409 });
+    if (b.scheduled_at === null) {
+      upd.scheduled_at = null; upd.publish_status = null; upd.publish_error = null;
+    } else {
+      const t = Date.parse(String(b.scheduled_at));
+      const now = Date.now();
+      if (!Number.isFinite(t) || t < now + 60_000 || t > now + 60 * 86_400_000)
+        return NextResponse.json({ error: "Elige una fecha entre dentro de 1 minuto y 60 días" }, { status: 400 });
+      upd.scheduled_at = new Date(t).toISOString(); upd.publish_status = "scheduled"; upd.publish_error = null;
+    }
+  }
   if (!Object.keys(upd).length) return NextResponse.json({ error: "Nada que cambiar" }, { status: 400 });
   const { error } = await db.from("clips").update(upd).eq("id", params.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

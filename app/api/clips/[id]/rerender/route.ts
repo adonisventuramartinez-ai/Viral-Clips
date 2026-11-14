@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { serverClient } from "@/lib/supabase";
+import { insertJob } from "@/lib/jobs";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   if (!Number.isFinite(start) || !Number.isFinite(end)) return NextResponse.json({ error: "Escribe el inicio y el fin como 1:23" }, { status: 400 });
   if (end - start < 5 || end - start > 180) return NextResponse.json({ error: "El clip debe durar entre 5 y 180 segundos" }, { status: 400 });
   const layout = ["crop", "split", "split_eq", "split_game", "blur", "duo"].includes(b.layout) ? b.layout : null;
+  const hook = typeof b.hook === "string" && b.hook.trim() ? b.hook.trim().slice(0, 70) : null;   // gancho alternativo (A/B)
   const quality = ["720p", "1080p", "1440p", "2160p"].includes(b.quality) ? b.quality : "1080p";
 
   const { data: clip } = await db.from("clips").select("id,source_id").eq("id", params.id).maybeSingle();
@@ -29,7 +31,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const { data: busy } = await db.from("jobs").select("id").eq("type", "clip").in("status", ["queued", "running"]).contains("payload", { clip_id: params.id }).limit(1);
   if (busy && busy.length) return NextResponse.json({ error: "Este clip ya se está ajustando" }, { status: 409 });
 
-  const { error } = await db.from("jobs").insert({ source_id: clip.source_id, type: "clip", payload: { clip_id: params.id, start, end, layout, quality } });
+  const { error } = await insertJob(db, { source_id: clip.source_id, payload: { clip_id: params.id, start, end, layout, quality, hook } }, "clip");
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

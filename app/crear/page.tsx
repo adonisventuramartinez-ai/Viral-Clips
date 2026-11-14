@@ -9,12 +9,13 @@ import { ASPECT_VERT, DEFAULT_CAM, DEFAULT_CROP, aspectCam, boxH, isSplit, parse
 type Src = "twitch" | "kick" | "archivo";
 const LAYOUTS: [Layout, string][] = [["crop", "Vertical"], ["split_eq", "Dividido"], ["duo", "Dos personas"], ["blur", "Fondo difuminado"]];
 const PROPS: [Layout, string][] = [["split", "Cara grande"], ["split_eq", "Equilibrado"], ["split_game", "Juego grande"]];
-const FX_DEFAULT: Record<string, string> = { bleep: "auto", loudnorm: "auto", zoom: "auto", slowmo: "auto" };
+const FX_DEFAULT: Record<string, string> = { bleep: "auto", loudnorm: "auto", zoom: "auto", slowmo: "auto", tighten: "auto" };
 const FX_OPTIONS: [string, string, string][] = [
   ["bleep", "Pitido en groserías", "Tapa la palabra con un pitido y censura el subtítulo (p***)."],
   ["loudnorm", "Volumen parejo", "Deja todos los clips al mismo volumen (-14 LUFS)."],
   ["zoom", "Zoom en el momento fuerte", "Acercamiento corto en explosiones, ráfagas de disparos o picos de volumen."],
   ["slowmo", "Cámara lenta", "Un segundo en cámara lenta sobre una explosión."],
+  ["tighten", "Quitar silencios y muletillas", "Acorta pausas largas y quita los \"eh\" / \"mmm\"; mete un zoom suave en cada corte. Automático: solo en charlas."],
 ];
 const TYPES: [string, string][] = [["auto", "General"], ["reality", "Reality (Casa de Alofoke)"], ["podcast", "Podcast"], ["entrevista", "Entrevista"], ["juego", "Juegos"], ["gta", "GTA 5 acción"], ["gta6", "GTA 6 acción"], ["gta_rp", "GTA RP"], ["directo", "Directo (charla)"]];
 const TYPE_HELP: Record<string, string> = {
@@ -47,6 +48,9 @@ export default function Crear() {
   const [ctype, setCtype] = useState("auto");
   const [game, setGame] = useState("");
   const [bar, setBar] = useState(false);
+  const [pv, setPv] = useState<{ state: "idle" | "working" | "ready" | "error"; url?: string; text?: string }>({ state: "idle" });
+  const [tpl, setTpl] = useState(""); // plantilla de marca ("" = la marca general)
+  const [tpls, setTpls] = useState<{ id: string; name: string }[]>([]);
   const [fx, setFx] = useState<Record<string, string>>({ ...FX_DEFAULT }); // audio y efectos: auto = lo decide el tipo de contenido / el .env del worker
   const [multi, setMulti] = useState(false); // varios links a la vez (uno por línea)
   const [presets, setPresets] = useState<Record<string, any>>({});
@@ -55,6 +59,10 @@ export default function Crear() {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const { brand, logoUrl } = useBrand();
   const [stats, setStats] = useState<{ clips: number; creators: number; users: number } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/brand/templates", { cache: "no-store" }).then((r) => r.json()).then((j) => setTpls(j.items ?? [])).catch(() => {});
+  }, []);
 
   useEffect(() => {
     try { setName(localStorage.getItem("cf_clipper") || ""); } catch {}
@@ -86,7 +94,7 @@ export default function Crear() {
   function savePreset() {
     const n = presetName.trim().slice(0, 30);
     if (!n) return setMsg({ ok: false, text: "Ponle un nombre a tu configuración." });
-    savePresets({ ...presets, [n]: { layout, secs, count, quality, manualCrop, cropBox, manualCam, camBox, ctype, game, bar, fx } });
+    savePresets({ ...presets, [n]: { layout, secs, count, quality, manualCrop, cropBox, manualCam, camBox, ctype, game, bar, fx, tpl } });
     setPresetName("");
     setMsg({ ok: true, text: `Guardé “${n}”. La puedes cargar cuando quieras.` });
   }
@@ -94,13 +102,32 @@ export default function Crear() {
     const p = presets[n];
     if (!p) return;
     setLayout(p.layout); setSecs(p.secs); setCount(p.count); setQuality(p.quality);
-    setCtype(p.ctype ?? "auto"); setGame(p.game ?? ""); setBar(!!p.bar); setFx({ ...FX_DEFAULT, ...(p.fx ?? {}) });
+    setCtype(p.ctype ?? "auto"); setGame(p.game ?? ""); setBar(!!p.bar); setFx({ ...FX_DEFAULT, ...(p.fx ?? {}) }); setTpl(p.tpl ?? "");
     setManualCrop(!!p.manualCrop); setCropBox(p.cropBox ?? DEFAULT_CROP); setManualCam(p.manualCam !== false); setCamBox(p.camBox ?? DEFAULT_CAM);
     setMsg({ ok: true, text: `Cargué “${n}”.` });
   }
   function deletePreset(n: string) {
     const { [n]: _x, ...rest } = presets;
     savePresets(rest);
+  }
+
+  /** Pide al worker UN cuadro real (encuadre + gancho + logo + subtítulos) del video, sin crear los clips. */
+  async function preview() {
+    if (!links.length) return setMsg({ ok: false, text: "Pega el link del video primero." });
+    setPv({ state: "working" });
+    const r = await fetch("/api/preview", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: links[0], t: from || "", layout, custom_crop: sentBox ? round2(sentBox) : null, content_type: ctype, game: ctype === "juego" ? game.trim() : "", brand_template: tpl || null }),
+    }).catch(() => null);
+    const j = await r?.json().catch(() => ({}));
+    if (!r?.ok) return setPv({ state: "error", text: j?.error ?? "No se pudo pedir la vista previa" });
+    for (let i = 0; i < 80; i++) {   // hasta ~4 min
+      await new Promise((ok) => setTimeout(ok, 3000));
+      const g = await fetch(`/api/preview?id=${j.id}`, { cache: "no-store" }).then((x) => x.json()).catch(() => null);
+      if (g?.status === "ready") return setPv({ state: "ready", url: g.url });
+      if (g?.status === "error") return setPv({ state: "error", text: g.error });
+    }
+    setPv({ state: "error", text: "Tardó demasiado. Inténtalo otra vez." });
   }
 
   async function paste() {
@@ -123,7 +150,7 @@ export default function Crear() {
             kind: "vod_url", url: link, range_from: links.length === 1 ? from || null : null, range_to: links.length === 1 ? to || null : null,
             clip_seconds: Number(secs), clips: Number(count), quality,
             layout, custom_crop: sentBox ? round2(sentBox) : null, clipper,
-            content_type: ctype, game: ctype === "juego" ? game.trim() : "", progress_bar: bar, ...fx,
+            content_type: ctype, game: ctype === "juego" ? game.trim() : "", progress_bar: bar, brand_template: tpl || null, ...fx,
           }),
         });
         const data = await res.json().catch(() => ({}));
@@ -196,6 +223,15 @@ export default function Crear() {
           <label style={{ display: "flex", gap: 8, alignItems: "center", textTransform: "none", fontSize: 13, color: "var(--text)", margin: "0 0 12px" }}>
             <input type="checkbox" checked={bar} onChange={(e) => setBar(e.target.checked)} style={{ width: "auto" }} /> Barra de progreso abajo del clip (retiene más gente)
           </label>
+          {tpls.length > 0 && (
+            <label style={{ display: "block", textTransform: "none", fontSize: 13, color: "var(--text)", margin: "0 0 12px" }}>
+              Plantilla de marca
+              <select value={tpl} onChange={(e) => setTpl(e.target.value)} style={{ marginTop: 4 }}>
+                <option value="">Marca general (la de Ajustes)</option>
+                {tpls.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </label>
+          )}
           <details style={{ margin: "0 0 12px" }}>
             <summary style={{ cursor: "pointer", fontSize: 13 }}>Audio y efectos (pitido, volumen, zoom, cámara lenta)</summary>
             <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
@@ -249,7 +285,17 @@ export default function Crear() {
             </>
           )}
 
-          <button className="btn" style={{ width: "100%", marginTop: 6 }} disabled={busy}>{busy ? "Importando…" : links.length > 1 ? `Importar ${links.length} links y generar clips` : "Importar link y generar clips"}</button>
+          <button type="button" className="btn ghost" style={{ width: "100%", marginTop: 6 }} onClick={preview} disabled={busy || pv.state === "working" || !links.length}>
+            {pv.state === "working" ? "Preparando la vista previa… (puede tardar un minuto)" : "👁 Vista previa (1 cuadro real, sin crear clips)"}
+          </button>
+          {pv.state === "error" && <div className="banner" style={{ marginTop: 10 }}>{pv.text}</div>}
+          {pv.state === "ready" && pv.url && (
+            <div style={{ marginTop: 10, textAlign: "center" }}>
+              <img src={pv.url} alt="Vista previa del clip" style={{ width: 220, maxWidth: "100%", aspectRatio: "9 / 16", objectFit: "cover", borderRadius: 14, border: "1px solid var(--line)" }} />
+              <small style={{ display: "block", color: "var(--muted)", marginTop: 6 }}>Así saldrá: encuadre, gancho, logo y subtítulos. Si algo no te gusta, cambia el encuadre o la plantilla y pídela otra vez.</small>
+            </div>
+          )}
+          <button className="btn" style={{ width: "100%", marginTop: 10 }} disabled={busy}>{busy ? "Importando…" : links.length > 1 ? `Importar ${links.length} links y generar clips` : "Importar link y generar clips"}</button>
           {msg && <div className={`banner ${msg.ok ? "ok" : ""}`} style={{ marginTop: 14, marginBottom: 0 }}>{msg.text}</div>}
 
           {stats && (

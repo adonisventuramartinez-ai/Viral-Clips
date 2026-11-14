@@ -15,10 +15,15 @@ import selfcheck
 import watcher
 import brand
 import energy
+import jobq
+import logx
 import voices
 import profiles
 import original
 import publisher
+import scheduler
+import packager
+import thumb
 from render import render_clip
 from transcribe import transcribe
 
@@ -77,11 +82,17 @@ def process(job):
 
     work = config.WORK_DIR / sid
     work.mkdir(parents=True, exist_ok=True)
+    st = logx.Stages()
     try:
+        if int(job.get("attempts") or 1) > 1:   # reintento: limpiar lo que dejó el intento anterior
+            n = db.reset_source_outputs(sid)
+            print(f"  Reintento: limpié {n} clip(s) a medias del intento anterior", flush=True)
+        st.begin("descarga")
         db.set_source(sid, status="downloading", error=None)
         video, title, offset = download(src["url"], work, quality, src.get("range_from"), src.get("range_to"))
         alive()
         db.set_source(sid, title=title, status="transcribing")
+        st.begin("transcripción")
 
         segments, words = transcribe(video, work)
         if not segments:
@@ -93,6 +104,7 @@ def process(job):
             print(f"  Voces: {n_voices} persona(s) distintas" if n_voices >= 2 else "  Voces: no distingo más de una (sigo sin etiquetas)", flush=True)
 
         alive()
+        st.begin("análisis")
         db.set_source(sid, status="analyzing")
         ai_segments = segments
         try:
@@ -115,8 +127,9 @@ def process(job):
         if not chosen:
             raise RuntimeError("La IA no encontró momentos para clips")
 
+        st.begin("clips")
         db.set_source(sid, status="clipping")
-        logo = brand.load(work)
+        logo = brand.load(work, template=opts.get("brand_template"))
         logo["progress_bar"] = bool(opts.get("progress_bar"))
         ocfg = original.load(work)
         made, published = [], 0
@@ -127,12 +140,24 @@ def process(job):
             
             render_clip(video, words, m["start"], m["end"], out, work, custom_crop=custom_crop, layout=clip_layout, brand=logo,
                         hook=m.get("hook") or m["title"], profile=prof, opts=opts)
-            
+
+            txt = " ".join(w["w"] for w in words if m["start"] <= w["start"] <= m["end"])
+            if config.THUMBS:   # miniatura del clip YA renderizado (antes de la tarjeta de intro/cierre)
+                jpg = thumb.make(out, m.get("hook") or m["title"], work / f"{cid}.jpg")
+                if jpg:
+                    try:
+                        db.upload_thumb(f"thumbs/{sid}/{cid}.jpg", jpg)
+                        m["thumb_path"] = f"thumbs/{sid}/{cid}.jpg"
+                    except Exception as e:  # noqa: BLE001
+                        print(f"  Miniatura: no pude subirla ({type(e).__name__}: {str(e)[:80]})", flush=True)
+                    jpg.unlink(missing_ok=True)
+            if config.PACK:     # textos por red + 3 ganchos alternativos
+                m["pack"] = packager.build_pack(m, txt, ocfg)
+
             if ocfg["enabled"] and opts.get("original", True):
                 try:   # aporte propio: voz narradora, dramómetro, encuesta A/B y descripción con tu punto de vista
                     raw = work / f"{cid}_raw.mp4"
                     shutil.copy(out, raw)
-                    txt = " ".join(w["w"] for w in words if m["start"] <= w["start"] <= m["end"])
                     ex = original.extras(txt, ocfg)
                     wrapped = work / f"{cid}_orig.mp4"
                     original.wrap_clip(out, ex, wrapped, work, ocfg, score=m.get("score", 75))
@@ -149,7 +174,7 @@ def process(job):
                        for w in words if m["start"] <= w["start"] <= m["end"]]
             db.save_clip(sid, src.get("user_id"), m, path, out.stat().st_size, in_clip)
             if config.FB_AUTOPUBLISH and published < config.FB_MAX_PER_JOB and m.get("score", 0) >= config.FB_MIN_SCORE:
-                if publisher.publish_reel(out, m.get("description") or m["title"]):
+                if publisher.publish_reel(out, packager.caption_for(m, "reels") if m.get("pack") else (m.get("description") or m["title"])):
                     published += 1
             out.unlink(missing_ok=True)
             print(f"  clip listo: {m['title']} ({m['score']}%)", flush=True)
@@ -174,17 +199,38 @@ def process(job):
 
         db.set_source(sid, status="done")
         db.finish_job(job["id"], ok=True)
+        print(f"Resumen: {len(chosen)} clip(s) · {st.summary()}", flush=True)
     except Cancelled:
         print(f"  fuente {sid} quitada desde la web, cancelo.", flush=True)
     except Exception as e:  # noqa: BLE001
         traceback.print_exc()
-        db.set_source(sid, status="error", error=f"{type(e).__name__}: {e}"[:500])
-        db.finish_job(job["id"], ok=False)
+        fail(job, e, source_id=sid)
     finally:
         shutil.rmtree(work, ignore_errors=True)
 
 
+def fail(job, exc, source_id=None):
+    jobq.fail(job, exc, source_id)
+
+
+def handle(job):
+    """Reparte el trabajo al módulo que corresponde, con sus logs etiquetados."""
+    with logx.job(job["id"], job["type"]):
+        print(f"Trabajo {job['id']} → fuente {job['source_id']} · prioridad {job.get('priority', 0)} · intento {job.get('attempts', 1)}", flush=True)
+        if job["type"] == "record":
+            live.process_live(job)
+        elif job["type"] == "clip":
+            if (job.get("payload") or {}).get("preview"):
+                import preview
+                preview.process_preview(job)
+            else:
+                rerender.process_rerender(job)
+        else:
+            process(job)
+
+
 def main():
+    logx.install()
     if not (config.SUPABASE_URL and config.SUPABASE_KEY):
         raise SystemExit("Falta SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY")
     selfcheck.run()
@@ -200,14 +246,21 @@ def main():
             last_clean = time.time()
         job = db.claim_job()
         if job:
-            print(f"Trabajo {job['id']} → fuente {job['source_id']}", flush=True)
-            if job["type"] == "record":
-                live.process_live(job)
-            elif job["type"] == "clip":
-                rerender.process_rerender(job)
-            else:
-                process(job)
+            try:
+                handle(job)
+            except Exception as e:  # noqa: BLE001  (un error raro en un trabajo nunca debe apagar al worker)
+                traceback.print_exc()
+                print(f"  ✖ Error fuera de lo esperado en el trabajo: {type(e).__name__}: {str(e)[:150]}", flush=True)
+                try:
+                    db.finish_job(job["id"], ok=False, error=f"{type(e).__name__}: {e}")
+                except Exception:  # noqa: BLE001
+                    pass
+                time.sleep(config.POLL_SECONDS)
         else:
+            try:
+                scheduler.tick()    # ¿hay clips programados para publicar en Facebook?
+            except Exception as e:  # noqa: BLE001
+                print(f"Programación: error ({type(e).__name__}: {str(e)[:100]})", flush=True)
             try:
                 watcher.tick()      # ¿alguno de tus canales entró en vivo? (solo cuando el worker está libre)
             except Exception as e:  # noqa: BLE001  (vigilar canales es un extra: nunca debe tumbar al worker)

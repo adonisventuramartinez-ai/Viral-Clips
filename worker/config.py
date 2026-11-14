@@ -108,6 +108,9 @@ FB_PAGE_ID = os.environ.get("FB_PAGE_ID", "").strip()
 FB_PAGE_TOKEN = os.environ.get("FB_PAGE_TOKEN", "").strip()
 FB_MIN_SCORE = int(os.environ.get("FB_MIN_SCORE") or 75)       # solo publica clips con este puntaje o más
 FB_MAX_PER_JOB = int(os.environ.get("FB_MAX_PER_JOB") or 3)    # tope por video procesado
+SCHEDULE_CHECK_SECONDS = int(os.environ.get("SCHEDULE_CHECK_SECONDS") or 60)   # cada cuánto revisa si hay clips programados
+PACK = (os.environ.get("PACK") or "1").strip().lower() not in ("0", "false", "no", "off")    # paquete de textos por red + ganchos (una llamada de IA por clip)
+THUMBS = (os.environ.get("THUMBS") or "1").strip().lower() not in ("0", "false", "no", "off")  # miniatura automática
 
 
 # --- Transcripción: ayuda a Whisper con nombres propios y jerga (Groq acepta ~220 tokens) ---
@@ -160,6 +163,8 @@ except ValueError:
 # zoom y cámara lenta: auto = lo decide el tipo de contenido (GTA y Juegos: ambos; GTA RP y Reality: solo zoom); 1 = siempre; 0 = nunca
 CLIP_ZOOM = (os.environ.get("CLIP_ZOOM") or "auto").strip().lower()
 CLIP_SLOWMO = (os.environ.get("CLIP_SLOWMO") or "auto").strip().lower()
+CLIP_TIGHTEN = (os.environ.get("CLIP_TIGHTEN") or "auto").strip().lower()   # quitar silencios y muletillas: auto (según el tipo) | 1 | 0
+INTRO_MODE = (os.environ.get("INTRO_MODE") or "card").strip().lower()       # "card" = tarjeta con voz antes del clip | "cold" = el clip arranca ya, con el texto encima
 try:
     CLIP_SLOW_RATE = min(0.9, max(0.5, float(os.environ.get("CLIP_SLOW_RATE") or 0.5)))
 except ValueError:
@@ -178,3 +183,13 @@ try:
     VOICE_THRESHOLD = min(6.0, max(0.5, float(os.environ.get("VOICE_THRESHOLD") or 1.6)))   # más bajo = separa más (y se equivoca más)
 except ValueError:
     VOICE_THRESHOLD = 1.6
+
+
+# --- Mejora 4: cola, reintentos y logs ---
+JOB_MAX_ATTEMPTS = min(6, max(1, int(os.environ.get("JOB_MAX_ATTEMPTS") or 3)))     # intentos por trabajo antes de dejarlo en error
+try:
+    JOB_RETRY_DELAYS = [max(5, int(x)) for x in (os.environ.get("JOB_RETRY_DELAYS") or "60,300,900").split(",") if x.strip()] or [60, 300, 900]
+except ValueError:
+    JOB_RETRY_DELAYS = [60, 300, 900]                                                # segundos de espera entre intentos
+LOG_DIR = Path(os.environ.get("LOG_DIR", "./logs"))                                 # carpeta de los logs (worker.log, rota solo)
+LOG_MAX_MB = min(200, max(1, int(os.environ.get("LOG_MAX_MB") or 5)))

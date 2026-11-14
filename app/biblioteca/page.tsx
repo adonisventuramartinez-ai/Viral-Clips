@@ -92,6 +92,17 @@ export default function Biblioteca() {
     reload.current();
   }
 
+  /** Pone otra vez en cola una fuente que falló (con las mismas opciones). */
+  async function retry(id: string) {
+    setCleaning(true);
+    const r = await fetch("/api/sources/retry", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) setErr(j.error ?? "No se pudo reintentar");
+    else setNote("Listo: lo puse otra vez en la cola.");
+    setCleaning(false);
+    reload.current();
+  }
+
   const working = sources.filter((s) => ACTIVE.includes(s.status));
   const failed = sources.filter((s) => s.status === "error");
   const stuck = sources.filter((s) => s.status === "queued");
@@ -129,6 +140,7 @@ export default function Biblioteca() {
             <div style={{ minWidth: 0 }}>
               <b>{STATUS_LABEL[s.status] ?? s.status}…{STEPS.includes(s.status) ? ` (paso ${STEPS.indexOf(s.status) + 1} de ${STEPS.length})` : ""}</b>
               <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis" }}>{s.title ?? s.url}</span>
+              {s.error && <span style={{ display: "block", color: "var(--muted)", fontSize: 12 }}>{s.error}</span>}
             </div>
           </div>
           <button className="btn ghost sm" onClick={() => clean(s.id)} disabled={cleaning}>
@@ -140,7 +152,10 @@ export default function Biblioteca() {
         <div key={s.id} className="banner">
           <b>Falló:</b> {s.title ?? s.url}<br />
           <span style={{ color: "var(--muted)", fontSize: 13, wordBreak: "break-word" }}>{s.error}</span>
-          <div style={{ marginTop: 8 }}>
+          <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
+            <button className="btn sm" onClick={() => retry(s.id)} disabled={cleaning}>
+              ↻ Reintentar
+            </button>
             <button className="btn ghost sm" onClick={() => clean(s.id)} disabled={cleaning}>
               Quitar
             </button>

@@ -9,3 +9,4 @@ scikit-image
 chat-downloader
 opencv-python-headless
 edge-tts
+Pillow

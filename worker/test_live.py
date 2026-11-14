@@ -120,7 +120,7 @@ def test_live_flow():
         def upload_clip(self, path, f): pass
         def save_clip(self, sid, uid, m, path, size, words): rec["clips"].append((m["title"], m.get("hook"), m["abs_start"], m["abs_end"]))
         def set_progress(self, sid, **p): rec["progress"].append(p)
-        def finish_job(self, jid, ok=True): rec["finished"] = ok
+        def finish_job(self, jid, ok=True, error=None): rec["finished"] = ok
         def finish_command(self, cid, ok=True, message=None, clip_id=None): rec["finish_cmd"].append((cid, ok, message, bool(clip_id)))
         def pending_commands(self, sid):
             self.polls += 1
@@ -130,7 +130,7 @@ def test_live_flow():
 
     fake_db = FakeDB()
     sys.modules["db"] = fake_db
-    sys.modules["brand"] = types.SimpleNamespace(load=lambda w: {})
+    sys.modules["brand"] = types.SimpleNamespace(load=lambda w, template=None: {})
 
     def fake_render(win, words, start, end, out, work, **kw):
         rec["renders"].append((round(start, 1), round(end, 1), kw.get("hook")))

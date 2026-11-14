@@ -118,8 +118,8 @@ page = (root / "app/crear/page.tsx").read_text(encoding="utf-8")
 for k in ("bleep", "loudnorm", "zoom", "slowmo"):
     check(f"ruta de trabajos acepta {k}", re.search(rf"\b{k}: tri\({k}\)", route) is not None)
     check(f"formulario ofrece {k}", f'["{k}",' in page)
-check("el formulario envía las opciones", "progress_bar: bar, ...fx," in page)
-check("las configuraciones guardadas incluyen las opciones", "bar, fx } }" in page and "setFx({ ...FX_DEFAULT, ...(p.fx ?? {}) })" in page)
+check("el formulario envía las opciones", "...fx," in page and "progress_bar: bar," in page)
+check("las configuraciones guardadas incluyen las opciones", "bar, fx, tpl } }" in page and "setFx({ ...FX_DEFAULT, ...(p.fx ?? {}) })" in page)
 
 # 6) GTA 6
 g6 = profiles.get("gta6")

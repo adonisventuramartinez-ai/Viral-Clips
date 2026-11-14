@@ -74,7 +74,7 @@ def tts(text, out, voice):
         import edge_tts
 
         async def go():
-            await edge_tts.Communicate(text, voice, rate="+6%").save(str(out))
+            await edge_tts.Communicate(text, voice, rate="+10%").save(str(out))
         asyncio.run(go())
         if out.exists() and out.stat().st_size > 500:
             return out
@@ -107,24 +107,49 @@ WrapStyle: 0
 
 [V4+ Styles]
 Format: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding
-Style: Big,Montserrat,72,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,4,0,5,90,90,0,1
-Style: Small,Montserrat,42,&H0000E0FF,&H0000E0FF,&H00000000,&H00000000,-1,0,0,0,100,100,2,0,1,3,0,8,90,90,380,1
-Style: Meter,Montserrat,38,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,1,0,1,4,0,9,0,60,150,1
+Style: Big,Montserrat,92,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,6,2,5,80,80,0,1
+Style: Small,Montserrat,54,&H0000E0FF,&H0000E0FF,&H00000000,&H00000000,-1,0,0,0,100,100,3,0,1,4,0,8,90,90,330,1
+Style: Meter,Montserrat,54,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,2,0,1,5,0,8,0,0,125,1
+Style: Intro,Montserrat,60,&H00FFFFFF,&H00FFFFFF,&H78000000,&H00000000,-1,0,0,0,100,100,0,0,3,20,0,8,90,90,330,1
 
 [Events]
 Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
 """
 
-def make_card(text, small, min_dur, out, workdir, voice=None, color="0x101820"):
+POP = "{\\fad(250,200)\\fscx85\\fscy85\\t(0,320,\\fscx100\\fscy100)}"
+
+
+def grab_frame(clip, at, out):
+    """Un cuadro del clip (at = 'first' o 'last') para usarlo de fondo de las tarjetas. Devuelve la ruta o None."""
+    clip = Path(clip)
+    d = _dur(clip)
+    t = 0.0 if at == "first" else max(0.0, d - 0.3)
+    r = subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-ss", f"{t:.2f}", "-i", str(clip.resolve()),
+                        "-frames:v", "1", str(Path(out).resolve())], capture_output=True)
+    return Path(out) if r.returncode == 0 and Path(out).exists() else None
+
+
+def make_card(text, small, min_dur, out, workdir, voice=None, color="0x101820", bg=None):
+    """Tarjeta de texto. Si pasas bg (imagen), el fondo es ese cuadro borroso, oscurecido y con un movimiento lento,
+    para que no se vea una pantalla muerta; sin bg queda el color plano de siempre."""
     workdir = Path(workdir)
     ass = workdir / (Path(out).stem + "_card.ass")
     d = max(min_dur, _dur(voice) + 0.5) if voice else min_dur
-    ass.write_text(_HEAD + f"Dialogue: 0,0:00:00.00,0:00:{d + 1:05.2f},Big,,0,0,0,,{{\\fad(250,200)}}{_esc(text)}\n"
-                   + (f"Dialogue: 0,0:00:00.00,0:00:{d + 1:05.2f},Small,,0,0,0,,{_esc(small)}\n" if small else ""),
+    ass.write_text(_HEAD + f"Dialogue: 0,0:00:00.00,0:00:{d + 1:05.2f},Big,,0,0,0,,{POP}{_esc(text)}\n"
+                   + (f"Dialogue: 0,0:00:00.00,0:00:{d + 1:05.2f},Small,,0,0,0,,{{\\fad(250,200)}}{_esc(small)}\n" if small else ""),
                    encoding="utf-8")
-    vf = (f"drawbox=x=0:y=0:w=iw:h=16:color=0xFFE000:t=fill,drawbox=x=0:y=ih-16:w=iw:h=16:color=0xFFE000:t=fill,"
-          f"subtitles={ass.name},format=yuv420p")
-    cmd = ["ffmpeg", "-y", "-f", "lavfi", "-i", f"color=c={color}:s={W}x{H}:r={FPS}:d={d:.2f}"]
+    bars = ("drawbox=x=0:y=0:w=iw:h=16:color=0xFFE000:t=fill,drawbox=x=0:y=ih-16:w=iw:h=16:color=0xFFE000:t=fill,"
+            f"subtitles={ass.name},format=yuv420p")
+    use_bg = bool(bg and Path(bg).exists())
+    if use_bg:
+        cmd = ["ffmpeg", "-y", "-loop", "1", "-framerate", str(FPS), "-i", str(Path(bg).resolve())]
+        # imagen más grande que el cuadro + recorte que se desliza despacio = movimiento sin zoompan (que es lento)
+        pre = (f"scale={int(W * 1.12)}:{int(H * 1.12)}:force_original_aspect_ratio=increase,"
+               f"crop={W}:{H}:x='(iw-ow)*min(1,t/{max(d, 1):.2f})':y='(ih-oh)/2',boxblur=22:3,eq=brightness=-0.10:saturation=0.9,")
+    else:
+        cmd = ["ffmpeg", "-y", "-f", "lavfi", "-i", f"color=c={color}:s={W}x{H}:r={FPS}:d={d:.2f}"]
+        pre = ""
+    vf = pre + bars
     if voice:
         cmd += ["-i", str(Path(voice).resolve()), "-filter_complex",
                 f"[0:v]{vf}[v];[1:a]aresample=48000,aformat=channel_layouts=stereo,apad[a]", "-map", "[v]", "-map", "[a]"]
@@ -137,17 +162,26 @@ def make_card(text, small, min_dur, out, workdir, voice=None, color="0x101820"):
         raise RuntimeError("tarjeta falló: " + r.stderr[-400:])
     return Path(out)
 
-def _meter_ass(pct, path):
+def _meter_color(pct):
+    """Color BGR de la barra: amarillo (tranquilo), naranja (tenso), rojo (explosivo)."""
+    return "00E0FF" if pct < 50 else ("1E8CFF" if pct < 75 else "1E1EFF")
+
+def _meter_ass(pct, path, intro=None, show_meter=True):
+    """Dramómetro (si show_meter) y, en apertura directa (INTRO_MODE=cold), el texto de contexto encima de los primeros segundos."""
     pct = int(min(99, max(35, pct)))
-    x0, x1, y0, y1 = 690, 1020, 132, 156
+    x0, x1, y0, y1 = 250, 830, 200, 246          # 580 x 46 px, centrada, debajo de la zona de la barra del teléfono
     xf = x0 + (x1 - x0) * pct // 100
     box = lambda c, xa, xb: (f"{{\\an7\\pos(0,0)\\p1\\c&H{c}&\\bord0\\shad0}}m {xa} {y0} l {xb} {y0} {xb} {y1} {xa} {y1}{{\\p0}}")
     t = "0:00:00.30"
-    e = "0:00:04.20"
-    Path(path).write_text(_HEAD
-                          + f"Dialogue: 1,{t},{e},Meter,,0,0,0,,{{\\fad(200,300)}}DRAMOMETRO {pct}%\n"
-                          + f"Dialogue: 0,{t},{e},Meter,,0,0,0,,{{\\fad(200,300)}}{box('303030', x0, x1)}\n"
-                          + f"Dialogue: 2,{t},{e},Meter,,0,0,0,,{{\\fad(200,300)}}{box('1E5AFF', x0, xf)}\n", encoding="utf-8")
+    e = "0:00:05.00"
+    ev = ""
+    if show_meter:
+        ev += (f"Dialogue: 1,{t},{e},Meter,,0,0,0,,{{\\fad(200,300)}}DRAMÓMETRO {pct}%\n"
+               f"Dialogue: 0,{t},{e},Meter,,0,0,0,,{{\\fad(200,300)}}{box('303030', x0 - 6, x1 + 6)}\n"
+               f"Dialogue: 2,{t},{e},Meter,,0,0,0,,{{\\fad(200,300)}}{box(_meter_color(pct), x0, xf)}\n")
+    if intro:
+        ev += f"Dialogue: 3,0:00:00.20,0:00:03.40,Intro,,0,0,0,,{POP}{_esc(intro)}\n"
+    Path(path).write_text(_HEAD + ev, encoding="utf-8")
 
 def concat(parts, out, workdir, vf_extra=None):
     vf_extra = vf_extra or {}
@@ -168,12 +202,26 @@ def concat(parts, out, workdir, vf_extra=None):
     return Path(out)
 
 def wrap_clip(clip, ex, out, workdir, cfg, score=75):
+    """Envuelve el clip con intro + cierre. INTRO_MODE=card (por defecto): tarjeta narrada antes del clip.
+    INTRO_MODE=cold: el clip arranca de inmediato y el texto de contexto sale encima de los primeros 3 s (mejor retención,
+    pero sin la voz narradora de la intro; el cierre sigue narrado)."""
     workdir, stem = Path(workdir), Path(out).stem
+    cold = config.INTRO_MODE == "cold"
     voice = (lambda txt, tag: tts(txt, workdir / f"{stem}_{tag}.mp3", cfg["voice"])) if cfg["narrate"] else (lambda *a: None)
     temp = []
     try:
-        v1 = voice(ex["context"], "v1")
-        a = make_card(ex["context"], cfg["show"], 2.5, workdir / f"{stem}_in.mp4", workdir, v1)
+        parts, extra = [], {}
+        bg_out = grab_frame(clip, "last", workdir / f"{stem}_bg_out.png")
+        temp.append(bg_out)
+        if cold:
+            parts.append(clip)
+        else:
+            v1 = voice(ex["context"], "v1")
+            bg_in = grab_frame(clip, "first", workdir / f"{stem}_bg_in.png")
+            temp += [bg_in, v1]
+            a = make_card(ex["context"], cfg["show"], 2.2, workdir / f"{stem}_in.mp4", workdir, v1, bg=bg_in)
+            temp.append(a)
+            parts += [a, clip]
         if cfg["poll"] and ex.get("poll"):
             p = ex["poll"]
             end_text, end_small = f"{p['q']}\n\nA) {p['a']}\nB) {p['b']}", "COMENTA A O B"
@@ -181,14 +229,15 @@ def wrap_clip(clip, ex, out, workdir, cfg, score=75):
         else:
             end_text, end_small = ex["outro"], cfg["page"]
             v2 = voice(ex["outro"], "v2")
-        b = make_card(end_text, end_small, 2.8, workdir / f"{stem}_out.mp4", workdir, v2)
-        temp += [a, b, v1, v2]
-        extra = {}
-        if cfg["meter"]:
+        b = make_card(end_text, end_small, 2.8, workdir / f"{stem}_out.mp4", workdir, v2, bg=bg_out)
+        temp += [b, v2]
+        parts.append(b)
+        if cfg["meter"] or cold:
             mass = workdir / f"{stem}_meter.ass"
-            _meter_ass(score, mass)
-            extra[1] = f"subtitles={mass.name}"
-        concat([a, clip, b], out, workdir, extra)
+            _meter_ass(score, mass, intro=ex["context"] if cold else None, show_meter=bool(cfg["meter"]))
+            extra[0 if cold else 1] = f"subtitles={mass.name}"
+            temp.append(mass)
+        concat(parts, out, workdir, extra)
     finally:
         for p in temp:
             if p:

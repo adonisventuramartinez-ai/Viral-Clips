@@ -272,14 +272,20 @@ def build_filter(layout: str, source: Path, start: float, dur: float, ass_name: 
 
 _LOGO_POS = {
     "bc": "(W-w)/2:H-h-{m}", "bl": "40:H-h-{m}", "br": "W-w-40:H-h-{m}",
-    "tc": "(W-w)/2:60", "tl": "40:60", "tr": "W-w-40:60",
+    "tc": "(W-w)/2:{t}", "tl": "40:{t}", "tr": "W-w-40:{t}",
 }
+# Zona segura de TikTok/Reels/Facebook: arriba ~170 px quedan tapados por la barra del teléfono y abajo ~240 px por la
+# descripción y los botones. "auto" = arriba a la izquierda, lejos de la cara, del micrófono y de los subtítulos.
+SAFE_TOP, SAFE_BOTTOM = 170, 240
 
 
 def _logo_graph(graph: str, brand: dict, src: str = "v") -> str:
-    """Pega el logo sobre el video. brand = {path, pos, size (% del ancho), opacity (0-100), margin}.
-    `graph` debe terminar en la etiqueta [src]."""
-    pos = _LOGO_POS.get(brand.get("pos", "bc"), _LOGO_POS["bc"]).format(m=int(brand.get("margin", 110)))
+    """Pega el logo sobre el video. brand = {path, pos ('auto' o bc/bl/br/tc/tl/tr), size (% del ancho), opacity (0-100), margin}.
+    `graph` debe terminar en la etiqueta [src]. Los márgenes nunca bajan de la zona segura."""
+    key = brand.get("pos", "bc")
+    key = "tl" if key == "auto" else key
+    m = max(SAFE_BOTTOM, int(brand.get("margin", 110)))
+    pos = _LOGO_POS.get(key, _LOGO_POS["bc"]).format(m=m, t=SAFE_TOP)
     width = max(40, int(1080 * min(60, max(5, float(brand.get("size", 24)))) / 100)) // 2 * 2
     alpha = min(1.0, max(0.1, float(brand.get("opacity", 100)) / 100))
     return (f"{graph};[1:v]scale={width}:-1,format=rgba,colorchannelmixer=aa={alpha:.2f}[logo];"
@@ -320,6 +326,28 @@ def _encode(cmd_head, cmd_tail, vb, workdir):
 def render_clip(source: Path, words, start: float, end: float, out: Path, workdir: Path,
                 custom_crop: dict = None, layout: str = None, brand: dict = None, hook: str = None,
                 profile: dict = None, opts: dict = None):
+    """Igual que antes, pero antes de renderizar puede quitar silencios y muletillas (tighten.py) y meter zooms suaves en los cortes."""
+    import postfx
+    tight = None
+    try:
+        if postfx.wants_tighten(profile, opts):
+            import tighten
+            tight = tighten.apply(source, words, start, end, workdir, out.stem)
+    except Exception as e:  # noqa: BLE001
+        print(f"  Ritmo: no pude aplicarlo ({type(e).__name__}: {str(e)[:100]})", flush=True)
+    try:
+        if tight:
+            src2, words2, dur2, punch = tight
+            return _render_core(src2, words2, 0.0, dur2, out, workdir, custom_crop, layout, brand, hook, profile, opts, extra_zooms=punch)
+        return _render_core(source, words, start, end, out, workdir, custom_crop, layout, brand, hook, profile, opts)
+    finally:
+        if tight:
+            Path(tight[0]).unlink(missing_ok=True)
+
+
+def _render_core(source: Path, words, start: float, end: float, out: Path, workdir: Path,
+                 custom_crop: dict = None, layout: str = None, brand: dict = None, hook: str = None,
+                 profile: dict = None, opts: dict = None, extra_zooms=None):
     """profile = perfil del tipo de contenido (decide zoom / cámara lenta); opts = opciones del trabajo
     (bleep, loudnorm, zoom, slowmo, speakers: True / False / 'auto'). Todo lo nuevo es opcional y falla sin romper el clip."""
     import postfx
@@ -369,7 +397,7 @@ def render_clip(source: Path, words, start: float, end: float, out: Path, workdi
     except Exception as e:  # noqa: BLE001
         print(f"  Efectos: no pude calcularlos ({type(e).__name__}: {str(e)[:100]})", flush=True)
     slow = fx["slow"] if fx else None
-    zooms = fx["zoom"] if fx else []
+    zooms = (fx["zoom"] if fx else []) + list(extra_zooms or [])
     if fx:
         print("  Efectos: " + ", ".join(x for x in (
             f"zoom en {zooms[0][0]:.1f} s" if zooms else "", f"cámara lenta en {slow[0]:.1f} s" if slow else "") if x), flush=True)

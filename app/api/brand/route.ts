@@ -8,7 +8,7 @@ export const fetchCache = "force-no-store";
 // Logo / marca de agua: se guarda en Storage (bucket "uploads", carpeta "brand/") y el worker lo pega en cada clip.
 const BUCKET = "uploads";
 const SETTINGS = "brand/settings.json";
-const POS = ["bc", "bl", "br", "tc", "tl", "tr"];
+const POS = ["auto", "bc", "bl", "br", "tc", "tl", "tr"];
 const EXT: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" };
 
 type Subs = { text: string; active: string; outline: string; size: number; outline_w: number; upper: boolean; pop: boolean; offset: number };

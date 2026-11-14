@@ -44,7 +44,7 @@ def process_rerender(job):
 
         out = work / f"{cid}.mp4"
         render_clip(video, words, start - offset, end - offset, out, work, custom_crop=custom, layout=layout,
-                    brand=brand.load(work), hook=clip.get("title"),
+                    brand=brand.load(work, template=(src.get("options") or {}).get("brand_template")), hook=(str(p.get("hook") or "").strip()[:70] or clip.get("title")),
                     profile=profiles.get((src.get("options") or {}).get("content_type"), (src.get("options") or {}).get("game")), opts=src.get("options"))
 
         path = f"{clip['source_id']}/{cid}_{int(time.time())}.mp4"
@@ -59,6 +59,7 @@ def process_rerender(job):
         print("  Re-render listo", flush=True)
     except Exception as e:  # noqa: BLE001
         print(f"  Re-render falló: {type(e).__name__}: {e}", flush=True)
-        db.finish_job(job["id"], ok=False)
+        import jobq
+        jobq.fail(job, e)
     finally:
         shutil.rmtree(work, ignore_errors=True)

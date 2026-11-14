@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { serverClient } from "@/lib/supabase";
+import { insertJob } from "@/lib/jobs";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -25,7 +26,8 @@ export async function POST(req: Request) {
     content_type = "auto", // auto | reality | podcast | entrevista | juego | gta | gta6 | gta_rp | directo
     game = null, // nombre del juego (ayuda a la IA a entender las jugadas)
     progress_bar = false, // barra de progreso abajo del clip
-    bleep = "auto", loudnorm = "auto", zoom = "auto", slowmo = "auto", // audio y efectos: "auto" | "1" | "0"
+    brand_template = null, // id de una plantilla de marca (Ajustes > Marca); null = marca general
+    bleep = "auto", loudnorm = "auto", zoom = "auto", slowmo = "auto", tighten = "auto", // audio y efectos: "auto" | "1" | "0"
     max_new = 3 // en vivo: máximo de clips nuevos por revisión
   } = body;
 
@@ -44,7 +46,8 @@ export async function POST(req: Request) {
   const safeType = ["auto", "reality", "podcast", "entrevista", "juego", "gta", "gta6", "gta_rp", "directo"].includes(content_type) ? content_type : "auto";
   const safeGame = typeof game === "string" && game.trim() ? game.trim().slice(0, 60) : null;
   const tri = (v: unknown) => (v === "1" || v === true ? "1" : v === "0" || v === false ? "0" : "auto");
-  const options = { content_type: safeType, game: safeGame, progress_bar: progress_bar === true, bleep: tri(bleep), loudnorm: tri(loudnorm), zoom: tri(zoom), slowmo: tri(slowmo) };
+  const safeTpl = typeof brand_template === "string" && /^[a-z0-9-]{1,40}$/.test(brand_template) ? brand_template : null;
+  const options = { content_type: safeType, game: safeGame, progress_bar: progress_bar === true, brand_template: safeTpl, bleep: tri(bleep), loudnorm: tri(loudnorm), zoom: tri(zoom), slowmo: tri(slowmo), tighten: tri(tighten) };
   Object.assign(safe, options);
   const safeLayout = ["crop", "split", "split_eq", "split_game", "blur", "duo"].includes(layout) ? layout : "crop";
 
@@ -74,11 +77,7 @@ export async function POST(req: Request) {
   const { data: source, error } = ins;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const { error: jobErr } = await db.from("jobs").insert({
-    source_id: source.id,
-    type: kind === "live" ? "record" : "download",
-    payload: safe,
-  });
+  const { error: jobErr } = await insertJob(db, { source_id: source.id, payload: safe }, kind === "live" ? "record" : "download");
   if (jobErr) return NextResponse.json({ error: jobErr.message }, { status: 500 });
 
   return NextResponse.json({ ok: true, source_id: source.id });

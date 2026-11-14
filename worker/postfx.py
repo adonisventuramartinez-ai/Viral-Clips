@@ -154,6 +154,12 @@ def wants(prof, opts=None):
     return (bool(fx.get("zoom")) if zoom is None else zoom), (bool(fx.get("slow")) if slow is None else slow)
 
 
+def wants_tighten(prof, opts=None):
+    """¿Quitar silencios y muletillas en este clip? Opciones de la web > .env > perfil (solo tipos de charla)."""
+    v = _mode((opts or {}).get("tighten"), config.CLIP_TIGHTEN)
+    return bool((prof or {}).get("tighten")) if v is None else v
+
+
 def choose_fx(impacts, dur, peak=None, want_zoom=True, want_slow=True, rate=None):
     """Decide los efectos de UN clip.
     impacts = [(segundo, 'shot'|'boom')] relativos al clip; peak = (segundo, dB sobre lo normal) del momento más fuerte.

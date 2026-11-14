@@ -175,6 +175,11 @@ EXTRA_MARK = {"combat": "💥", "screen": "📺", "argument": "🗯"}
 TYPES = ["auto", "reality", "podcast", "entrevista", "juego", "gta", "gta6", "gta_rp", "directo"]
 
 
+# Tipos de charla: ahí se quitan silencios y muletillas (en juegos y acción el silencio es parte de la jugada)
+for _k in ("auto", "podcast", "entrevista", "reality", "directo"):
+    PROFILES[_k]["tighten"] = True
+
+
 def norm(text):
     """Minúsculas y sin acentos: 'Traición' y 'traicion' cuentan igual (Whisper no siempre pone tildes)."""
     t = unicodedata.normalize("NFD", str(text or "").lower())

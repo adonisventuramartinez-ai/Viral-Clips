@@ -17,6 +17,20 @@ export type Clip = {
   isPublic?: boolean;
   description?: string;
   hashtags?: string[];
+  pack?: Pack;
+  thumbUrl?: string;
+  scheduledAt?: string;
+  publishStatus?: "scheduled" | "published" | "error";
+  publishError?: string;
+};
+
+export type Pack = {
+  tiktok?: { caption?: string; hashtags?: string[] };
+  reels?: { caption?: string; hashtags?: string[] };
+  shorts?: { title?: string; description?: string; hashtags?: string[] };
+  hooks?: string[];
+  first_comment?: string;
+  source?: string;
 };
 
 export type SourceRow = {

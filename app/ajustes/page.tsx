@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { SUB_PRESETS, logoStyle, toHash, useBrand, type Brand, type Subs } from "@/lib/useBrand";
 
-const POSITIONS: [string, string][] = [["bc", "Abajo al centro"], ["bl", "Abajo a la izquierda"], ["br", "Abajo a la derecha"], ["tc", "Arriba al centro"], ["tl", "Arriba a la izquierda"], ["tr", "Arriba a la derecha"]];
+const POSITIONS: [string, string][] = [["auto", "Automática (zona segura)"], ["bc", "Abajo al centro"], ["bl", "Abajo a la izquierda"], ["br", "Abajo a la derecha"], ["tc", "Arriba al centro"], ["tl", "Arriba a la izquierda"], ["tr", "Arriba a la derecha"]];
 
 function LogoSection() {
   const { brand, logoUrl, reload } = useBrand();
@@ -193,6 +193,62 @@ function OriginalSection() {
   );
 }
 
+type Tpl = { id: string; name: string; hasLogo: boolean; pos: string; hook: boolean; color: string };
+
+/** Plantillas de marca: guarda la marca de arriba (logo + subtítulos + gancho) con un nombre y úsala en cualquier video. */
+function TemplatesSection() {
+  const { reload } = useBrand();
+  const [items, setItems] = useState<Tpl[]>([]);
+  const [name, setName] = useState("");
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = () => fetch("/api/brand/templates", { cache: "no-store" }).then((r) => r.json()).then((j) => setItems(j.items ?? [])).catch(() => {});
+  useEffect(() => { load(); }, []);
+
+  async function call(method: string, body: object, ok: string) {
+    setBusy(true); setMsg(null);
+    const r = await fetch("/api/brand/templates", { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => null);
+    const j = await r?.json().catch(() => ({}));
+    setMsg(r?.ok ? { ok: true, text: ok } : { ok: false, text: j?.error ?? "No se pudo" });
+    setBusy(false);
+    if (r?.ok) { load(); reload(); }
+    return !!r?.ok;
+  }
+  async function save() {
+    if (await call("POST", { name }, `Plantilla “${name.trim()}” guardada con la marca actual.`)) setName("");
+  }
+
+  return (
+    <div className="card neon" style={{ maxWidth: 720, marginBottom: 18 }}>
+      <h3 style={{ marginBottom: 6 }}>🎨 Plantillas de marca</h3>
+      <p className="sub" style={{ marginBottom: 14, fontSize: 13 }}>
+        Arma tu logo y tus subtítulos arriba, guárdalos con un nombre (por ejemplo “WorldCast” o “Alofoke”) y elige la plantilla al crear los clips.
+        Guarda primero los cambios de arriba y después la plantilla.
+      </p>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <input value={name} onChange={(e) => setName(e.target.value)} maxLength={40} placeholder="Nombre de la plantilla" style={{ flex: "1 1 220px" }} />
+        <button className="btn sm" onClick={save} disabled={busy || !name.trim()}>Guardar marca actual como plantilla</button>
+      </div>
+      {items.length === 0 && <p className="sub" style={{ marginTop: 12, marginBottom: 0, fontSize: 13 }}>Todavía no tienes plantillas. Sin plantilla se usa la marca general.</p>}
+      {items.map((t) => (
+        <div key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "10px 0", borderTop: "1px solid var(--line)", marginTop: 10 }}>
+          <div style={{ minWidth: 0 }}>
+            <i style={{ display: "inline-block", width: 12, height: 12, borderRadius: 6, background: `#${t.color}`, marginRight: 8 }} />
+            <b>{t.name}</b>
+            <span style={{ color: "var(--muted)", fontSize: 12, marginLeft: 8 }}>{t.hasLogo ? "con logo" : "sin logo"} · gancho {t.hook ? "sí" : "no"}</span>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="btn ghost sm" disabled={busy} onClick={() => confirm(`¿Poner “${t.name}” como tu marca general? Reemplaza el logo y los subtítulos de arriba.`) && call("POST", { apply: t.id }, `“${t.name}” ahora es tu marca general.`)}>Usar como general</button>
+            <button className="btn ghost sm" disabled={busy} onClick={() => confirm(`¿Borrar la plantilla “${t.name}”?`) && call("DELETE", { id: t.id }, "Plantilla borrada.")}>Borrar</button>
+          </div>
+        </div>
+      ))}
+      {msg && <div className={`banner ${msg.ok ? "ok" : ""}`} style={{ marginTop: 12, marginBottom: 0 }}>{msg.text}</div>}
+    </div>
+  );
+}
+
 export default function Ajustes() {
   const rows: [string, string, string][] = [
     ["Quién elige los clips", "LLM_PROVIDER", "groq (gratis) o anthropic"],
@@ -212,6 +268,7 @@ export default function Ajustes() {
       <OriginalSection />
       <LogoSection />
       <SubsSection />
+      <TemplatesSection />
       <p className="sub">Por ahora estos ajustes se cambian en el archivo <code>worker/.env</code> y se aplican al reiniciar el worker.</p>
       <div className="card neon" style={{ maxWidth: 720 }}>
         {rows.map(([label, key, hint]) => (
