@@ -603,3 +603,34 @@ def apply_connections(force=False, every=120):
         return {}
     import connections
     return connections.apply(rows)
+
+
+# ----------------------------------------------------------------------------- Parte 11: siempre activo
+def recover_on_start():
+    """Al arrancar el contenedor: los trabajos de video/clip que quedaron 'running' por un reinicio vuelven a la cola YA (no esperan 3 h).
+    Los directos (record) no se tocan: un directo que se cortó no se puede retomar. Devuelve cuántos devolvió."""
+    rows = sb.table("jobs").select("id,attempts,source_id,type").eq("status", "running").in_("type", ["download", "clip"]).execute().data or []
+    n = 0
+    for r in rows:
+        if int(r.get("attempts") or 0) >= config.JOB_MAX_ATTEMPTS:
+            finish_job(r["id"], ok=False, error="El worker se detuvo varias veces con este trabajo")
+            try:
+                set_source(r["source_id"], status="error", error="El trabajo se interrumpió varias veces. Vuelve a intentarlo.")
+            except Exception:  # noqa: BLE001
+                pass
+        else:
+            sb.table("jobs").update({"status": "queued", "locked_at": None}).eq("id", r["id"]).execute()
+            n += 1
+    return n
+
+
+def restart_is_safe(minutes=10):
+    """True si no hay nada publicándose ni programado para los próximos `minutes`, ni un directo grabando. Si no se puede saber, False."""
+    soon = (datetime.now(timezone.utc) + timedelta(minutes=minutes)).isoformat()
+    if sb.table("posts").select("id", count="exact").eq("status", "publishing").execute().count:
+        return False
+    if sb.table("posts").select("id", count="exact").eq("status", "queued").lte("scheduled_at", soon).execute().count:
+        return False
+    if sb.table("clips").select("id", count="exact").eq("publish_status", "scheduled").lte("scheduled_at", soon).execute().count:
+        return False
+    return not live_active()

@@ -247,3 +247,8 @@ LEARN_MIN_PER_HOUR = int(os.environ.get("LEARN_MIN_PER_HOUR") or 2)  # publicaci
 LEARN_SLOT_COUNT = int(os.environ.get("LEARN_SLOT_COUNT") or 3)      # cuántas horas por día
 LEARN_GAP_HOURS = int(os.environ.get("LEARN_GAP_HOURS") or 2)        # separación mínima entre las horas elegidas
 LEARN_EXPLORE = (os.environ.get("LEARN_EXPLORE") or "1").strip().lower() in ("1", "true", "yes", "on")  # 1 hora de prueba en un horario poco probado
+
+
+# --- Parte 11: worker siempre activo (Docker) ---
+RESTART_HOUR = int(os.environ.get("RESTART_HOUR") or 4)              # hora local (0-23) del reinicio diario que baja el yt-dlp nuevo; -1 = nunca
+RECOVER_ON_START = (os.environ.get("RECOVER_ON_START") or "1").strip().lower() in ("1", "true", "yes", "on")   # al arrancar, retoma los trabajos que quedaron a medias

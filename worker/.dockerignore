@@ -3,3 +3,4 @@ work/
 __pycache__/
 cookies.txt
 *.zip
+logs/

@@ -17,6 +17,7 @@ import watcher
 import brand
 import energy
 import jobq
+import lifecycle
 import logx
 import voices
 import profiles
@@ -253,6 +254,8 @@ def handle(job):
 
 def main():
     logx.install()
+    lifecycle.install_signals()   # docker stop = salida ordenada
+    lifecycle.start_watchdog()    # latido para el HEALTHCHECK de Docker
     if not (config.SUPABASE_URL and config.SUPABASE_KEY):
         raise SystemExit("Falta SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY")
     selfcheck.run()
@@ -260,6 +263,13 @@ def main():
     import llm
     print(f"IA en orden de uso: {' → '.join(llm.configured())}", flush=True)
     print("Worker listo (encuadres: vertical, dividido, dos personas, difuminado; directos con reconexión y chat), esperando trabajos…", flush=True)
+    if config.RECOVER_ON_START:
+        try:
+            n = db.recover_on_start()
+            if n:
+                print(f"Recuperación: {n} trabajo(s) que quedaron a medias vuelven a la cola.", flush=True)
+        except Exception as e:  # noqa: BLE001
+            print(f"Recuperación al arrancar: no pude ({type(e).__name__}: {str(e)[:100]})", flush=True)
     poster.start_thread()   # publica a su hora aunque el worker esté grabando un directo
     last_clean = 0.0
     while True:
@@ -286,6 +296,8 @@ def main():
                     pass
                 time.sleep(config.POLL_SECONDS)
         else:
+            if lifecycle.daily_restart_due(db):
+                lifecycle.main_exit(f"diario, {config.RESTART_HOUR}:00")    # Docker lo vuelve a levantar con el yt-dlp más nuevo
             try:
                 viral.tick()        # analiza clips que llegaron sin pasar por el área viral (en vivo, rehechos)
             except Exception as e:  # noqa: BLE001

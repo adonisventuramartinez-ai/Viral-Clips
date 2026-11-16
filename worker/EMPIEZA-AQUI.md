@@ -19,6 +19,10 @@ Luego **Deployments → ⋯ → Redeploy**.
    La llave de Groq es gratis: console.groq.com → API Keys.
 4. Deja la ventana abierta. Debe decir `Worker listo, esperando trabajos…`
 
+### Para dejarlo siempre activo (recomendado)
+Después de la primera vez, usa **INICIAR-SIEMPRE.bat** en vez de INICIAR-WORKER.bat: queda en segundo plano y se levanta solo.
+Marca también "Start Docker Desktop when you sign in" en Docker Desktop. Más detalles en `CAMBIOS-PARTE-11.md`.
+
 ## Probar
 Entra a tu página de Vercel → contraseña → **Crear clips** → pega un link de YouTube con un tramo corto
 (Desde 0:00, Hasta 10:00) → **Analizar video** → mira el progreso en **Biblioteca**.
