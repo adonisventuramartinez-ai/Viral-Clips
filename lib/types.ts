@@ -25,6 +25,7 @@ export type Clip = {
   viral?: Viral;
   viralStatus?: "pending" | "ready" | "review" | "rejected" | "approved";
   thumbBUrl?: string;
+  thumbChoice?: "a" | "b";
 };
 
 export type Viral = {
@@ -36,9 +37,14 @@ export type Viral = {
   hook_score?: number;
   thumb_text?: string;
   hashtags?: string[];
+  thumb_texts?: string[];
+  /** Lo que elegiste en Hacerlo viral para cada miniatura: texto, estilo y segundo del cuadro. */
+  thumb?: { a?: ThumbInfo; b?: ThumbInfo };
   risks?: string[];
   source?: string;
 };
+
+export type ThumbInfo = { text?: string; style?: string; time?: number | null };
 
 export type Pack = {
   tiktok?: { caption?: string; hashtags?: string[] };

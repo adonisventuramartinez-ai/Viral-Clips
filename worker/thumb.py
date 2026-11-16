@@ -9,6 +9,19 @@ from pathlib import Path
 
 N_FRAMES = 10
 W, H = 1080, 1920
+# Estilos del texto de la miniatura. key = color de la palabra más larga (None = todo blanco), pos = dónde empieza el texto (fracción del alto),
+# fade = desde dónde empieza el degradado negro que ayuda a leer; top = el degradado y el texto van arriba.
+STYLES = {
+    "amarillo": {"key": (255, 224, 0), "pos": 0.55, "fade": 0.40, "top": False},
+    "rojo": {"key": (255, 45, 79), "pos": 0.55, "fade": 0.40, "top": False},
+    "blanco": {"key": None, "pos": 0.55, "fade": 0.40, "top": False},
+    "centro": {"key": (255, 224, 0), "pos": 0.38, "fade": 0.25, "top": False},
+}
+DEFAULT_STYLE = "amarillo"
+
+
+def style_of(name):
+    return STYLES.get(str(name or "").lower(), STYLES[DEFAULT_STYLE])
 FONTS = ["/usr/share/fonts/truetype/**/Montserrat*Bold*.ttf", "/usr/share/fonts/**/Montserrat-ExtraBold*.ttf",
          "/usr/share/fonts/truetype/**/Poppins-Bold.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
          "C:/Windows/Fonts/arialbd.ttf"]
@@ -106,14 +119,15 @@ def _wrap(draw, text, font, width):
     return lines
 
 
-def compose(frame, title, out):
-    """Pone degradado y título (en mayúsculas, con la palabra más larga en amarillo) sobre el cuadro."""
+def compose(frame, title, out, style=None):
+    """Pone degradado y título (en mayúsculas, con la palabra más larga resaltada) sobre el cuadro. style = nombre de STYLES."""
     from PIL import Image, ImageDraw
+    st = style_of(style)
     im = Image.open(frame).convert("RGB").resize((W, H))
     grad = Image.new("L", (1, H))
     for y in range(H):
         # la parte de abajo queda casi negra: así tapa los subtítulos que ya trae el cuadro y el título se lee siempre
-        a = 0 if y < H * 0.40 else int(252 * min(1.0, (y - H * 0.40) / (H * 0.14)))
+        a = 0 if y < H * st["fade"] else int(252 * min(1.0, (y - H * st["fade"]) / (H * 0.14)))
         grad.putpixel((0, y), a)
     im.paste(Image.new("RGB", (W, H), (0, 0, 0)), (0, 0), grad.resize((W, H)))
     d = ImageDraw.Draw(im)
@@ -127,11 +141,11 @@ def compose(frame, title, out):
         lines = _wrap(d, text, font, W - 160)
     key = max(text.split(), key=len) if text else ""
     lh = int(size * 1.15)
-    y = int(H * 0.55)             # zona segura: arriba de la descripción y los botones de la red
+    y = int(H * st["pos"])             # zona segura: arriba de la descripción y los botones de la red
     for ln in lines[:4]:
         x = (W - d.textlength(ln, font=font)) / 2
         for w in ln.split(" "):
-            col = (255, 224, 0) if w == key else (255, 255, 255)
+            col = st["key"] if (st["key"] and w == key) else (255, 255, 255)
             d.text((x, y), w, font=font, fill=col, stroke_width=6, stroke_fill=(0, 0, 0))
             x += d.textlength(w + " ", font=font)
         y += lh
@@ -139,19 +153,29 @@ def compose(frame, title, out):
     return Path(out)
 
 
-def make(video, title, out, rank=0):
+def make_t(video, title, out, rank=0, at=None, style=None):
+    """Como make, pero devuelve (ruta, segundo usado) para poder guardarlo. (None, None) si algo falla."""
     try:
         out = Path(out)
-        t = pick_time(video, rank)
+        if at is None:
+            t = pick_time(video, rank)
+        else:
+            dur = _duration(video)
+            t = max(0.0, min(float(at), max(0.0, dur - 0.1))) if dur else max(0.0, float(at))
         raw = out.with_suffix(".raw.jpg")
         r = subprocess.run(["ffmpeg", "-y", "-v", "error", "-ss", f"{t:.2f}", "-i", str(video), "-frames:v", "1", "-q:v", "2", str(raw)],
                            capture_output=True, timeout=60)
         if r.returncode != 0 or not raw.exists():
-            return None
+            return None, None
         try:
-            return compose(raw, title, out)
+            return compose(raw, title, out, style), round(float(t), 2)
         finally:
             raw.unlink(missing_ok=True)
     except Exception as e:  # noqa: BLE001
         print(f"  Miniatura: no pude ({type(e).__name__}: {str(e)[:100]})", flush=True)
-        return None
+        return None, None
+
+
+def make(video, title, out, rank=0, at=None, style=None):
+    """Miniatura del clip. at = segundo exacto del cuadro (si no, elige el mejor solo). Devuelve la ruta o None."""
+    return make_t(video, title, out, rank, at, style)[0]

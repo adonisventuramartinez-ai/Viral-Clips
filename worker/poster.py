@@ -25,6 +25,23 @@ def caption(clip, network):
     return clip.get("title") or "", packager.caption_for(clip, "reels")
 
 
+def _cover_url(clip, db):
+    """URL firmada de la miniatura elegida en Hacerlo viral (o None). Nunca falla."""
+    try:
+        p = db.cover_path(clip)
+        return db.signed_url(p) if p else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _cover_bytes(clip, db):
+    try:
+        p = db.cover_path(clip)
+        return db.download_clip(p) if p else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def publish_post(post, clip, db, workdir=None, fb=None, ig=None, yt=None):
     """Publica un post. Devuelve el id externo o lanza RuntimeError con el motivo."""
     net = post["network"]
@@ -34,7 +51,8 @@ def publish_post(post, clip, db, workdir=None, fb=None, ig=None, yt=None):
     if net == "instagram":
         if ig is None:
             import publisher_ig as ig
-        return ig.publish(db.signed_url(clip["storage_path"]), text)
+        cover = _cover_url(clip, db)
+        return ig.publish(db.signed_url(clip["storage_path"]), text, cover_url=cover) if cover else ig.publish(db.signed_url(clip["storage_path"]), text)
     workdir = Path(workdir or config.WORK_DIR / "posts")
     workdir.mkdir(parents=True, exist_ok=True)
     f = workdir / f"post_{post['id']}.mp4"
@@ -51,7 +69,8 @@ def publish_post(post, clip, db, workdir=None, fb=None, ig=None, yt=None):
             if yt is None:
                 import publisher_yt as yt
             tags = (((clip.get("pack") or {}).get("shorts") or {}).get("hashtags") if isinstance(clip.get("pack"), dict) else None) or clip.get("hashtags")
-            return yt.publish(f.read_bytes(), title, text, tags)
+            jpg = _cover_bytes(clip, db)
+            return yt.publish(f.read_bytes(), title, text, tags, thumb=jpg) if jpg else yt.publish(f.read_bytes(), title, text, tags)
         raise RuntimeError(f"red desconocida: {net}")
     finally:
         f.unlink(missing_ok=True)

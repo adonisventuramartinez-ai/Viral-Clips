@@ -9,6 +9,7 @@ const I = (d: string) => (
 // [ruta, etiqueta, icono]
 const items: [string, string, React.ReactNode][] = [
   ["/crear", "Proyecto", I("M4 5h16v14H4zM4 9h16M9 5v14")],
+  ["/viral", "Hacerlo viral", I("M12 3c1 3 5 5 5 10a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-5 1-9z")],
   ["/top", "Top global", I("M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3")],
   ["/clipeadores", "Clipeadores", I("M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.3 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z")],
   ["/donadores", "Donadores", I("M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.6-7 10-7 10z")],

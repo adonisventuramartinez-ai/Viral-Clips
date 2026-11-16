@@ -28,6 +28,7 @@ import poster
 import scheduler
 import packager
 import thumb
+import studio
 import viral
 from render import render_clip
 from transcribe import transcribe
@@ -195,7 +196,7 @@ def process(job):
             in_clip = [{"w": w["w"], "start": w["start"] - m["start"], "end": w["end"] - m["start"]}
                        for w in words if m["start"] <= w["start"] <= m["end"]]
             db.save_clip(sid, src.get("user_id"), m, path, out.stat().st_size, in_clip)
-            gate_ok = (not config.VIRAL) or (m.get("viral") or {}).get("verdict") == "ready"   # solo lo que pasó el área viral
+            gate_ok = ((not config.VIRAL) or (m.get("viral") or {}).get("verdict") == "ready") and not db.require_approval()   # solo lo que pasó el área viral (y con tu aprobación si la pediste)
             if config.FB_AUTOPUBLISH and gate_ok and published < config.FB_MAX_PER_JOB and m.get("score", 0) >= config.FB_MIN_SCORE:
                 if publisher.publish_reel(out, packager.caption_for(m, "reels") if m.get("pack") else (m.get("description") or m["title"])):
                     published += 1
@@ -271,6 +272,7 @@ def main():
         except Exception as e:  # noqa: BLE001
             print(f"Recuperación al arrancar: no pude ({type(e).__name__}: {str(e)[:100]})", flush=True)
     poster.start_thread()   # publica a su hora aunque el worker esté grabando un directo
+    studio.start_thread()   # atiende Hacerlo viral (miniaturas, re-análisis) sin esperar a que termine un render
     last_clean = 0.0
     while True:
         try:

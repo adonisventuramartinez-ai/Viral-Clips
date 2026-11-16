@@ -370,11 +370,11 @@ def signed_url(path, seconds=3600):
 
 
 def clips_ready_for_queue(networks, limit=10):
-    """Clips 'listos' o aprobados, recientes, con archivo, sin publicar/programar a mano y sin post en alguna de las redes pedidas."""
+    """Clips 'listos' o aprobados (solo aprobados si pediste aprobar tú cada uno en Hacerlo viral), recientes, con archivo, sin publicar/programar a mano y sin post en alguna de las redes pedidas."""
     try:
         since = (datetime.now(timezone.utc) - timedelta(days=config.QUEUE_CLIP_DAYS)).isoformat()
         rows = (sb.table("clips").select("id,title,viral,viral_score,viral_status,publish_status,storage_path")
-                .in_("viral_status", ["ready", "approved"]).gte("created_at", since).not_.is_("storage_path", "null")
+                .in_("viral_status", ["approved"] if require_approval() else ["ready", "approved"]).gte("created_at", since).not_.is_("storage_path", "null")
                 .order("created_at", desc=True).limit(60).execute().data or [])
         rows = [r for r in rows if r.get("publish_status") not in ("scheduled", "published")]
         if not rows:
@@ -634,3 +634,52 @@ def restart_is_safe(minutes=10):
     if sb.table("clips").select("id", count="exact").eq("publish_status", "scheduled").lte("scheduled_at", soon).execute().count:
         return False
     return not live_active()
+
+
+# ----------------------------------------------------------------------------- Parte 12: página Hacerlo viral (migración 0014)
+_vconf = {"at": 0.0, "val": None}
+
+
+def require_approval():
+    """¿Hay que aprobar a mano cada clip en Hacerlo viral antes de que entre a la cola? Lee el ajuste de la web (tabla viral_config),
+    con VIRAL_REQUIRE_APPROVAL como respaldo si la tabla no existe. Se recuerda 20 s."""
+    import time as _t
+    if _t.time() - _vconf["at"] < 20 and _vconf["val"] is not None:
+        return _vconf["val"]
+    val = bool(config.VIRAL_REQUIRE_APPROVAL)
+    try:
+        rows = sb.table("viral_config").select("require_approval").eq("id", 1).limit(1).execute().data or []
+        if rows:
+            val = bool(rows[0].get("require_approval"))
+    except Exception:  # noqa: BLE001  (sin la migración 0014 se usa el respaldo)
+        pass
+    _vconf["at"], _vconf["val"] = _t.time(), val
+    return val
+
+
+def clips_with_requests(limit=3):
+    """Clips con un pedido de la web esperando (viral_req con acción y sin error). Vacío si falta la migración 0014."""
+    try:
+        rows = (sb.table("clips").select("*").not_.is_("viral_req", "null").order("created_at").limit(20).execute().data or [])
+        return [r for r in rows if isinstance(r.get("viral_req"), dict) and r["viral_req"].get("action") and not r["viral_req"].get("error")][:limit]
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def clips_missing_thumbs(limit=2):
+    """Clips ya analizados, con archivo y sin miniatura (llegaron en vivo o rehechos), que aún no se intentaron."""
+    try:
+        since = (datetime.now(timezone.utc) - timedelta(days=config.VIRAL_BACKFILL_DAYS)).isoformat()
+        rows = (sb.table("clips").select("*").is_("thumb_path", "null").not_.is_("storage_path", "null").not_.is_("viral", "null")
+                .gte("created_at", since).order("created_at", desc=True).limit(20).execute().data or [])
+        return [r for r in rows if not (r.get("viral") or {}).get("thumb_tried") and r.get("viral_req") is None][:limit]
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def cover_path(clip):
+    """Ruta de la miniatura elegida para publicar (la B solo si la elegiste y existe)."""
+    if (clip or {}).get("thumb_choice") == "b" and clip.get("thumb_b_path"):
+        return clip["thumb_b_path"]
+    return (clip or {}).get("thumb_path") or None
+

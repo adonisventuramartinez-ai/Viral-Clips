@@ -55,6 +55,11 @@ def process_rerender(job):
         db.update_clip(cid, start_sec=start, end_sec=end, storage_path=path, size_bytes=out.stat().st_size, captions=in_clip)
         if old and old != path:
             db.remove_file(old)
+        try:    # el video cambió: la miniatura vieja ya no es de este momento; Hacerlo viral la rehace sola
+            if clip.get("thumb_path") or clip.get("viral"):
+                db.update_clip(cid, viral_req={"action": "thumbs", "a": {}, "auto": True})
+        except Exception:  # noqa: BLE001  (sin la migración 0014 no pasa nada)
+            pass
         db.finish_job(job["id"], ok=True)
         print("  Re-render listo", flush=True)
     except Exception as e:  # noqa: BLE001

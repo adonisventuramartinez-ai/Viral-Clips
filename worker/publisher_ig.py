@@ -14,11 +14,19 @@ def configured():
     return bool(config.IG_USER_ID and config.IG_TOKEN)
 
 
-def publish(video_url, caption, wait=300, poll=8):
-    """Devuelve el id del medio publicado. Lanza RuntimeError con el motivo si algo falla."""
+def publish(video_url, caption, wait=300, poll=8, cover_url=None):
+    """Devuelve el id del medio publicado. Lanza RuntimeError con el motivo si algo falla.
+    cover_url = miniatura elegida en Hacerlo viral (URL pública). Si Instagram no la acepta, se publica igual sin portada propia."""
     tok, uid = config.IG_TOKEN, config.IG_USER_ID
-    r = requests.post(f"{API}/{uid}/media", data={"media_type": "REELS", "video_url": video_url, "caption": (caption or "")[:2200],
-                                                   "share_to_feed": "true", "access_token": tok}, timeout=60)
+    data = {"media_type": "REELS", "video_url": video_url, "caption": (caption or "")[:2200], "share_to_feed": "true", "access_token": tok}
+    r = None
+    if cover_url:
+        r = requests.post(f"{API}/{uid}/media", data={**data, "cover_url": cover_url}, timeout=60)
+        if not r.ok:
+            print(f"  Instagram no aceptó la portada ({r.text[:120]}); lo publico sin ella.", flush=True)
+            r = None
+    if r is None:
+        r = requests.post(f"{API}/{uid}/media", data=data, timeout=60)
     if not r.ok:
         raise RuntimeError(f"Instagram rechazó el video: {r.text[:200]}")
     cid = r.json()["id"]

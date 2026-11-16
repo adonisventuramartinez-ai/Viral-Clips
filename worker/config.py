@@ -252,3 +252,10 @@ LEARN_EXPLORE = (os.environ.get("LEARN_EXPLORE") or "1").strip().lower() in ("1"
 # --- Parte 11: worker siempre activo (Docker) ---
 RESTART_HOUR = int(os.environ.get("RESTART_HOUR") or 4)              # hora local (0-23) del reinicio diario que baja el yt-dlp nuevo; -1 = nunca
 RECOVER_ON_START = (os.environ.get("RECOVER_ON_START") or "1").strip().lower() in ("1", "true", "yes", "on")   # al arrancar, retoma los trabajos que quedaron a medias
+
+# ---- Parte 12: página Hacerlo viral (estudio de miniaturas y revisión)
+STUDIO_SECONDS = int(os.environ.get("STUDIO_SECONDS") or 6)                  # cada cuánto atiende lo que pides desde la web (miniaturas, re-análisis)
+VIRAL_REQUIRE_APPROVAL = (os.environ.get("VIRAL_REQUIRE_APPROVAL") or "0").strip().lower() in ("1", "true", "yes", "on")  # respaldo si no hay ajuste en la web
+THUMB_BACKFILL_PER_TICK = int(os.environ.get("THUMB_BACKFILL_PER_TICK") or 2)  # miniaturas que hace por vuelta a clips que llegaron sin ella
+THUMB_MAX_BYTES = 2_000_000                                                   # YouTube no acepta miniaturas de más de 2 MB
+

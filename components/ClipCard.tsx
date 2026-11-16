@@ -178,6 +178,7 @@ export default function ClipCard({ clip, onDeleted, onAdjusted }: { clip: Clip; 
                 ))}
                 {clip.viral.hashtags?.length ? <small>{clip.viral.hashtags.join(" ")} <a href="#" onClick={(e) => { e.preventDefault(); navigator.clipboard?.writeText((clip.viral?.hashtags ?? []).join(" ")); }}>copiar</a></small> : null}
                 {clip.thumbBUrl && <small>🖼 <a href={clip.thumbBUrl} target="_blank" rel="noreferrer">Miniatura B</a> (prueba A/B contra la principal)</small>}
+                <small><a href="/viral">🚀 Abrir en Hacerlo viral</a> para cambiar la miniatura, el título y los hashtags</small>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   <button className="btn sm" disabled={busy || sched.status === "published"} onClick={() => viralAct({ auto_slot: true }, "Programado en la mejor hora libre. Míralo abajo al recargar.", () => { setVStatus("approved"); setSched({ status: "scheduled" }); })}>🕐 Programar a la mejor hora</button>
                   <button className="btn sm ghost" disabled={busy} onClick={() => viralAct({ viral_status: "approved" }, "Aprobado.", () => setVStatus("approved"))}>✅ Aprobar</button>
