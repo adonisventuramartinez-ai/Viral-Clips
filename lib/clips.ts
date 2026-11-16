@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fmtTime } from "./format";
-import type { Clip, Pack } from "./types";
+import type { Clip, Pack, Viral } from "./types";
 
 type Row = {
   id: string;
@@ -19,6 +19,9 @@ type Row = {
   scheduled_at?: string | null;
   publish_status?: "scheduled" | "published" | "error" | null;
   publish_error?: string | null;
+  viral?: Viral | null;
+  viral_status?: Clip["viralStatus"] | null;
+  thumb_b_path?: string | null;
 };
 
 const COLS = "id,title,start_sec,end_sec,viral_score,reason,storage_path,size_bytes";
@@ -32,7 +35,7 @@ export async function loadClips(db: SupabaseClient, sourceId?: string): Promise<
   // Prueba con todas las columnas nuevas y va quitando las que aún no existan (migraciones 0004 / 0005 / 0007 sin correr)
   let data: unknown[] | null = null;
   let error: { message: string } | null = null;
-  for (const extra of [",is_public,description,hashtags,pack,thumb_path,scheduled_at,publish_status,publish_error", ",is_public,description,hashtags", ",is_public", ""]) {
+  for (const extra of [",is_public,description,hashtags,pack,thumb_path,scheduled_at,publish_status,publish_error,viral,viral_status,thumb_b_path", ",is_public,description,hashtags,pack,thumb_path,scheduled_at,publish_status,publish_error", ",is_public,description,hashtags", ",is_public", ""]) {
     const r = await q(COLS + extra);
     data = r.data as unknown[] | null;
     error = r.error;
@@ -41,7 +44,7 @@ export async function loadClips(db: SupabaseClient, sourceId?: string): Promise<
   if (error) throw new Error(error.message);
 
   const rows = (data ?? []) as unknown as Row[];
-  const paths = rows.flatMap((r) => [r.storage_path, r.thumb_path]).filter((p): p is string => !!p);
+  const paths = rows.flatMap((r) => [r.storage_path, r.thumb_path, r.thumb_b_path]).filter((p): p is string => !!p);
   const play = new Map<string, string>();
   const dl = new Map<string, string>();
   if (paths.length) {
@@ -76,6 +79,9 @@ export async function loadClips(db: SupabaseClient, sourceId?: string): Promise<
     scheduledAt: r.scheduled_at ?? undefined,
     publishStatus: r.publish_status ?? undefined,
     publishError: r.publish_error ?? undefined,
+    viral: r.viral ?? undefined,
+    viralStatus: r.viral_status ?? undefined,
+    thumbBUrl: r.thumb_b_path ? play.get(r.thumb_b_path) : undefined,
     videoUrl: r.storage_path ? play.get(r.storage_path) : undefined,
     downloadUrl: r.storage_path ? dl.get(r.storage_path) : undefined,
   }));

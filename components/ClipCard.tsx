@@ -16,6 +16,9 @@ export default function ClipCard({ clip, onDeleted, onAdjusted }: { clip: Clip; 
   const [hooks, setHooks] = useState(false);
   const [when, setWhen] = useState("");
   const [sched, setSched] = useState<{ at?: string; status?: string; error?: string }>({ at: clip.scheduledAt, status: clip.publishStatus, error: clip.publishError });
+  const [vOpen, setVOpen] = useState(false);
+  const [vStatus, setVStatus] = useState(clip.viralStatus);
+  const [title, setTitle] = useState(clip.title);
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
 
   async function adjust() {
@@ -54,6 +57,15 @@ export default function ClipCard({ clip, onDeleted, onAdjusted }: { clip: Clip; 
       setSched(cancel ? {} : { at: new Date(when).toISOString(), status: "scheduled" });
       setNote({ ok: true, text: cancel ? "Programación cancelada." : "Programado. El worker lo publica en tu página de Facebook a esa hora (necesita FB_PAGE_ID y FB_PAGE_TOKEN)." });
     } else setNote({ ok: false, text: j?.error ?? "No se pudo programar" });
+  }
+
+  // Área viral: usar otro título, aprobar/descartar o programar en la mejor hora libre
+  async function viralAct(body: Record<string, unknown>, okText: string, after?: () => void) {
+    setBusy(true); setNote(null);
+    const r = await fetch(`/api/clips/${clip.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => null);
+    const j = await r?.json().catch(() => ({}));
+    setBusy(false);
+    if (r?.ok) { setNote({ ok: true, text: okText }); after?.(); } else setNote({ ok: false, text: j?.error ?? "No se pudo (¿corriste 0009_viral.sql?)" });
   }
 
   async function remove() {
@@ -114,7 +126,7 @@ export default function ClipCard({ clip, onDeleted, onAdjusted }: { clip: Clip; 
         )}
       </div>
       <div className="meta">
-        <p>{clip.title}</p>
+        <p>{title}</p>
         <small><span className="viral">{clip.score}% viral</span> · {clip.seconds ? `${clip.seconds} s · ` : ""}{clip.sizeMb} MB · {clip.start}–{clip.end}</small>
         {clip.reason && <small style={{ display: "block", marginTop: 6, fontFamily: "inherit" }}>{clip.reason}</small>}
 
@@ -147,6 +159,32 @@ export default function ClipCard({ clip, onDeleted, onAdjusted }: { clip: Clip; 
               </div>
             ))}
             {clip.pack.first_comment && <small style={{ color: "var(--muted)" }}>💬 Comentario para fijar: {clip.pack.first_comment}</small>}
+          </div>
+        )}
+        {clip.viral && (
+          <div style={{ marginTop: 10 }}>
+            <button className="btn sm ghost" onClick={() => setVOpen(!vOpen)} style={{ width: "100%", textAlign: "left" }}>
+              🔥 Viral {clip.viral.score}/100 · {vStatus === "approved" ? "✅ aprobado" : clip.viral.verdict === "ready" ? "✅ listo para publicar" : clip.viral.verdict === "review" ? "👀 revísalo" : "⛔ flojo"} {vOpen ? "▴" : "▾"}
+            </button>
+            {vOpen && (
+              <div style={{ display: "grid", gap: 8, marginTop: 8, fontSize: 13 }}>
+                {clip.viral.risks?.length ? <div className="banner" style={{ margin: 0, fontSize: 12 }}>⚠️ Riesgo para Facebook: {clip.viral.risks.join(", ")}. Revísalo antes de publicar.</div> : null}
+                <small style={{ color: "var(--muted)" }}>Títulos (mejor primero). Actual: <b>{title}</b></small>
+                {(clip.viral.titles ?? []).map((t) => (
+                  <div key={t.t} style={{ display: "flex", gap: 8, justifyContent: "space-between", alignItems: "center" }}>
+                    <span>{t.t} <small style={{ color: "var(--muted)" }}>({t.score}{t.angle ? ` · ${t.angle}` : ""})</small></span>
+                    <button className="btn sm ghost" disabled={busy || t.t === title} onClick={() => viralAct({ title: t.t }, "Título cambiado.", () => setTitle(t.t))}>Usar</button>
+                  </div>
+                ))}
+                {clip.viral.hashtags?.length ? <small>{clip.viral.hashtags.join(" ")} <a href="#" onClick={(e) => { e.preventDefault(); navigator.clipboard?.writeText((clip.viral?.hashtags ?? []).join(" ")); }}>copiar</a></small> : null}
+                {clip.thumbBUrl && <small>🖼 <a href={clip.thumbBUrl} target="_blank" rel="noreferrer">Miniatura B</a> (prueba A/B contra la principal)</small>}
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button className="btn sm" disabled={busy || sched.status === "published"} onClick={() => viralAct({ auto_slot: true }, "Programado en la mejor hora libre. Míralo abajo al recargar.", () => { setVStatus("approved"); setSched({ status: "scheduled" }); })}>🕐 Programar a la mejor hora</button>
+                  <button className="btn sm ghost" disabled={busy} onClick={() => viralAct({ viral_status: "approved" }, "Aprobado.", () => setVStatus("approved"))}>✅ Aprobar</button>
+                  <button className="btn sm ghost" disabled={busy} onClick={() => viralAct({ viral_status: "rejected" }, "Descartado.", () => setVStatus("rejected"))}>🗑 Descartar</button>
+                </div>
+              </div>
+            )}
           </div>
         )}
         <div style={{ marginTop: 10, display: "grid", gap: 6 }}>

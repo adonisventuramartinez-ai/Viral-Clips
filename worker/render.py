@@ -6,24 +6,16 @@ from pathlib import Path
 import config
 
 # ---------------------------------------------------------------- subtítulos (ASS)
-# Estilo por defecto = "Clásico". La web (Ajustes > Subtítulos) manda sus valores en brand["subs"].
 DEFAULT_SUBS = {"text": "FFFFFF", "active": "FFE000", "outline": "000000", "size": 78, "outline_w": 6,
                 "upper": True, "pop": True, "offset": 0}
 
-# Medidas de los encuadres (suman 1920)
-# Dividido: alto (px) del panel de ARRIBA (tu cara). Abajo va el gameplay con el resto.
-#   split      cara grande: gameplay completo en 16:9 (1080x608), sin recortar
-#   split_eq   equilibrado: ~50/50, el gameplay se recorta un poco de los lados
-#   split_game juego grande: el gameplay ocupa ~60% (recorta más de los lados)
 SPLIT_TOPS = {"split": 1312, "split_eq": 1000, "split_game": 780}
-DUO_H = 960   # dos personas: dos paneles iguales de 1080x960
+DUO_H = 960
 
-# Altura (MargenV) de los subtítulos según el encuadre: en dividido y dos personas quedan a caballo sobre la unión
 SUB_MARGIN = {"crop": 600, "blur": 600, "duo": 890}
 
 
 def _hex(c: str, default: str = "FFFFFF") -> str:
-    """'#RRGGBB' -> 'BBGGRR' (ASS usa BGR)."""
     c = str(c or "").lstrip("#")
     if not re.fullmatch(r"[0-9a-fA-F]{6}", c):
         c = default
@@ -70,9 +62,6 @@ def _esc(text: str, upper: bool) -> str:
 
 
 def build_ass(words, start, end, group=2, layout="crop", style=None, hook=None, hook_sec=3.5, tmap=None, n_speakers=0):
-    """words: lista global [{w,start,end}]. Genera eventos relativos al inicio del clip.
-    hook = frase gancho que sale arriba los primeros `hook_sec` segundos (None = sin gancho).
-    tmap = función que pasa un segundo del clip al segundo del video final (cámara lenta). n_speakers >= 2 = color por persona (words con 'spk')."""
     tmap = tmap or (lambda t: t)
     st = _subs(style)
     ws = [w for w in words if w["start"] >= start - 0.05 and w["end"] <= end + 0.3]
@@ -109,7 +98,6 @@ def build_ass(words, start, end, group=2, layout="crop", style=None, hook=None, 
 
 
 def _probe(path: Path):
-    """(ancho, alto) del video. Si falla, asume 1920x1080."""
     r = subprocess.run(
         ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height",
          "-of", "csv=p=0:s=x", str(path)], capture_output=True, text=True)
@@ -121,9 +109,13 @@ def _probe(path: Path):
         return 1920, 1080
 
 
+# --- ARREGLO DEFINITIVO: Bitrate calculado para no pasar de 35 MB en Supabase ---
 def _bitrate(dur: float) -> int:
-    total = 60_000_000 * 8 / max(dur, 1.0)
-    return int(min(14_000_000, max(6_000_000, total - 192_000)))
+    # Apuntamos a un máximo de 35 MB (dejando 15 MB de margen para las tarjetas del Modo Original)
+    total = 35_000_000 * 8 / max(dur, 1.0)
+    # Limitamos entre 1.2 Mbps (mínimo calidad) y 5 Mbps (para no pasarse en clips muy cortos)
+    return int(min(5_000_000, max(1_200_000, total - 128_000)))
+# --------------------------------------------------------------------------------
 
 
 def _even(v: float) -> int:
@@ -131,7 +123,6 @@ def _even(v: float) -> int:
 
 
 def _box_filter(sw: int, sh: int, box: dict) -> str:
-    """Recuadro en % del video -> filtro crop de ffmpeg (siempre dentro del cuadro y con medidas pares)."""
     cw = min(sw, _even(sw * float(box["w"]) / 100))
     ch = min(sh, _even(sh * float(box["h"]) / 100))
     x = min(sw - cw, max(0, int(sw * float(box["x"]) / 100) // 2 * 2))
@@ -140,7 +131,6 @@ def _box_filter(sw: int, sh: int, box: dict) -> str:
 
 
 def _fit_filter(sw: int, sh: int, aspect: float, fx: float = 0.5) -> str:
-    """Recorte de la proporción `aspect` (ancho/alto) lo más grande posible; fx = 0 izquierda, 1 derecha."""
     if sw / sh > aspect:
         cw, ch = min(sw, _even(sh * aspect)), sh
     else:
@@ -149,12 +139,9 @@ def _fit_filter(sw: int, sh: int, aspect: float, fx: float = 0.5) -> str:
 
 
 def _crop_filter(source: Path, start: float, dur: float, custom_crop: dict = None, keys=None):
-    """Modo vertical: recorte 9:16 manual, siguiendo caras, o centrado."""
     sw, sh = _probe(source)
-
     if custom_crop:
         return _box_filter(sw, sh, custom_crop)
-
     if sw / sh > 9 / 16:
         cw, ch = int(sh * 9 / 16) // 2 * 2, sh
         crop_frac = cw / sw
@@ -175,8 +162,6 @@ def _crop_filter(source: Path, start: float, dur: float, custom_crop: dict = Non
 
 
 def _cam_box(source: Path, start: float, dur: float, sw: int, sh: int, custom_crop: dict = None, top_h: int = 1312) -> dict:
-    """Recuadro (en %) de la cámara para el panel de arriba del modo dividido.
-    Prioridad: el que marcó el usuario > detección de cara > esquina inferior derecha (donde suele estar la cámara)."""
     if custom_crop:
         return custom_crop
     aspect = 1080 / top_h
@@ -191,14 +176,13 @@ def _cam_box(source: Path, start: float, dur: float, sw: int, sh: int, custom_cr
         if box:
             print("  Dividido: encontré la cámara por la cara", flush=True)
             return box
-    print("  Dividido: no encontré la cámara, uso la esquina inferior derecha (márcala a mano en la web)", flush=True)
+    print("  Dividido: no encontré la cámara, uso la esquina inferior derecha", flush=True)
     w = 26.0
     h = min(100.0, w * sw / (sh * aspect))
     return {"x": 100 - w - 1, "y": 100 - h - 1, "w": w, "h": h}
 
 
 def _duo_boxes(source: Path, start: float, dur: float, sw: int, sh: int):
-    """(arriba, abajo): cada persona en su panel. Si no ve a dos personas, usa la mitad izquierda arriba y la derecha abajo."""
     aspect = 1080 / DUO_H
     if config.CLIP_FRAMING == "auto":
         import framing
@@ -206,7 +190,7 @@ def _duo_boxes(source: Path, start: float, dur: float, sw: int, sh: int):
         if two:
             print("  Dos personas: encontré a las dos (izquierda/arriba va arriba)", flush=True)
             return two
-    print("  Dos personas: no vi a dos personas claras, uso mitad izquierda arriba y mitad derecha abajo", flush=True)
+    print("  Dos personas: no vi a dos personas claras, uso mitad izquierda y derecha", flush=True)
     h = min(100.0, 50.0 * sw / (sh * aspect))
     return ({"x": 0.0, "y": (100 - h) / 2, "w": 50.0, "h": h}, {"x": 50.0, "y": (100 - h) / 2, "w": 50.0, "h": h})
 
@@ -223,7 +207,6 @@ def _ass_for(words, start, end, workdir: Path, stem: str, layout: str, brand: di
 
 
 def layout_graph(layout: str, source: Path, start: float, dur: float, custom_crop: dict = None, keys=None) -> str:
-    """Grafo de filtros del encuadre pedido, SIN subtítulos y sin etiqueta final (render_clip le pone zoom, cámara lenta y subtítulos)."""
     if layout == "blur":
         return (
             "[0:v]split=2[bg][fg];"
@@ -246,9 +229,9 @@ def layout_graph(layout: str, source: Path, start: float, dur: float, custom_cro
         bot_h = 1920 - top_h
         sw, sh = _probe(source)
         cam = _box_filter(sw, sh, _cam_box(source, start, dur, sw, sh, custom_crop, top_h))
-        if bot_h <= 640:   # cabe el gameplay completo en 16:9: sin recortar
+        if bot_h <= 640:
             game = f"scale=1080:{bot_h}:force_original_aspect_ratio=decrease:flags=lanczos,pad=1080:{bot_h}:(ow-iw)/2:(oh-ih)/2:black"
-        else:              # panel más alto: el gameplay llena el panel (recorta un poco de los lados)
+        else:
             game = (f"{_fit_filter(sw, sh, 1080 / bot_h, config.CLIP_FOCUS_X)},"
                     f"scale=1080:{bot_h}:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:{bot_h}")
         return (
@@ -266,7 +249,6 @@ def layout_graph(layout: str, source: Path, start: float, dur: float, custom_cro
 
 
 def build_filter(layout: str, source: Path, start: float, dur: float, ass_name: str, custom_crop: dict = None, keys=None) -> str:
-    """Igual que antes: encuadre + subtítulos (sin efectos). Lo conservo para no romper pruebas ni código que lo use."""
     return layout_graph(layout, source, start, dur, custom_crop, keys) + f",subtitles={ass_name}"
 
 
@@ -274,14 +256,10 @@ _LOGO_POS = {
     "bc": "(W-w)/2:H-h-{m}", "bl": "40:H-h-{m}", "br": "W-w-40:H-h-{m}",
     "tc": "(W-w)/2:{t}", "tl": "40:{t}", "tr": "W-w-40:{t}",
 }
-# Zona segura de TikTok/Reels/Facebook: arriba ~170 px quedan tapados por la barra del teléfono y abajo ~240 px por la
-# descripción y los botones. "auto" = arriba a la izquierda, lejos de la cara, del micrófono y de los subtítulos.
 SAFE_TOP, SAFE_BOTTOM = 170, 240
 
 
 def _logo_graph(graph: str, brand: dict, src: str = "v") -> str:
-    """Pega el logo sobre el video. brand = {path, pos ('auto' o bc/bl/br/tc/tl/tr), size (% del ancho), opacity (0-100), margin}.
-    `graph` debe terminar en la etiqueta [src]. Los márgenes nunca bajan de la zona segura."""
     key = brand.get("pos", "bc")
     key = "tl" if key == "auto" else key
     m = max(SAFE_BOTTOM, int(brand.get("margin", 110)))
@@ -293,28 +271,24 @@ def _logo_graph(graph: str, brand: dict, src: str = "v") -> str:
 
 
 def _bar_graph(graph: str, dur: float, src_in: str = "vA", src_out: str = "vB") -> str:
-    """Barra de progreso blanca abajo que se llena durante el clip (retiene a quien mira). `graph` termina en [src_in]."""
     d = max(0.5, dur)
     return (f"{graph};color=c=white:s=1080x14:r=30:d={d:.2f}[bar];"
             f"[{src_in}][bar]overlay=x='-w+w*t/{d:.2f}':y=H-h-10:shortest=1[{src_out}]")
 
 
 def _flag(opt, default):
-    """opción de la web (True/False/'auto'/None) > valor por defecto del .env o del perfil."""
     import postfx
     v = postfx._mode(opt)
     return default if v is None else v
 
 
 def _encode(cmd_head, cmd_tail, vb, workdir):
-    """Codifica con la GPU si hay y, si falla, repite con el CPU (un clip nunca se pierde por culpa de la GPU)."""
     import encoder
     kind = encoder.pick()
     r = subprocess.run(cmd_head + encoder.video_args(kind, config.CLIP_CRF, config.CLIP_PRESET, vb) + cmd_tail,
                        cwd=workdir, capture_output=True, text=True)
     if r.returncode != 0 and kind != "cpu":
-        print(f"  Codificador {kind} falló ({r.stderr.strip().splitlines()[-1][:100] if r.stderr.strip() else 'sin detalle'}); "
-              "repito con CPU.", flush=True)
+        print(f"  Codificador {kind} falló; repito con CPU.", flush=True)
         encoder.mark_bad(kind)
         r = subprocess.run(cmd_head + encoder.video_args("cpu", config.CLIP_CRF, config.CLIP_PRESET, vb) + cmd_tail,
                            cwd=workdir, capture_output=True, text=True)
@@ -326,14 +300,13 @@ def _encode(cmd_head, cmd_tail, vb, workdir):
 def render_clip(source: Path, words, start: float, end: float, out: Path, workdir: Path,
                 custom_crop: dict = None, layout: str = None, brand: dict = None, hook: str = None,
                 profile: dict = None, opts: dict = None):
-    """Igual que antes, pero antes de renderizar puede quitar silencios y muletillas (tighten.py) y meter zooms suaves en los cortes."""
     import postfx
     tight = None
     try:
         if postfx.wants_tighten(profile, opts):
             import tighten
             tight = tighten.apply(source, words, start, end, workdir, out.stem)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         print(f"  Ritmo: no pude aplicarlo ({type(e).__name__}: {str(e)[:100]})", flush=True)
     try:
         if tight:
@@ -348,8 +321,6 @@ def render_clip(source: Path, words, start: float, end: float, out: Path, workdi
 def _render_core(source: Path, words, start: float, end: float, out: Path, workdir: Path,
                  custom_crop: dict = None, layout: str = None, brand: dict = None, hook: str = None,
                  profile: dict = None, opts: dict = None, extra_zooms=None):
-    """profile = perfil del tipo de contenido (decide zoom / cámara lenta); opts = opciones del trabajo
-    (bleep, loudnorm, zoom, slowmo, speakers: True / False / 'auto'). Todo lo nuevo es opcional y falla sin romper el clip."""
     import postfx
     dur = end - start
     opts = opts or {}
@@ -363,11 +334,10 @@ def _render_core(source: Path, words, start: float, end: float, out: Path, workd
         if sw / sh > 9 / 16:
             import framing
             keys = framing.camera_keys(source, start, dur, sw, sh, int(sh * 9 / 16) // 2 * 2 / sw)
-            if not keys:   # no vi a nadie: mejor video completo con fondo borroso que mostrar paisaje vacío
+            if not keys:
                 print("  Encuadre: no encontré personas, uso fondo borroso (blur)", flush=True)
                 layout = "blur"
 
-    # ---- audio: pitido en groserías y volumen parejo
     has_aud = postfx.has_audio(source)
     beeps = []
     try:
@@ -378,7 +348,7 @@ def _render_core(source: Path, words, start: float, end: float, out: Path, workd
                 print(f"  Pitido: {len(beeps)} grosería(s) tapada(s)", flush=True)
                 if not has_aud:
                     beeps = []
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         print(f"  Pitido: no pude aplicarlo ({type(e).__name__}: {str(e)[:100]})", flush=True)
         beeps = []
     measured, norm = None, False
@@ -390,11 +360,10 @@ def _render_core(source: Path, words, start: float, end: float, out: Path, workd
         else:
             print(f"  Volumen: no pude medirlo, ajusto en una sola pasada a {config.CLIP_LUFS:g} LUFS", flush=True)
 
-    # ---- zoom y cámara lenta
     fx = None
     try:
         fx = postfx.plan_fx(source, start, dur, profile, opts)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         print(f"  Efectos: no pude calcularlos ({type(e).__name__}: {str(e)[:100]})", flush=True)
     slow = fx["slow"] if fx else None
     zooms = (fx["zoom"] if fx else []) + list(extra_zooms or [])
@@ -403,7 +372,6 @@ def _render_core(source: Path, words, start: float, end: float, out: Path, workd
             f"zoom en {zooms[0][0]:.1f} s" if zooms else "", f"cámara lenta en {slow[0]:.1f} s" if slow else "") if x), flush=True)
     dur_out = postfx.out_duration(dur, slow)
 
-    # ---- subtítulos (un color por persona si hay pyannote)
     n_spk = 0
     if _flag(opts.get("speakers"), config.SUBS_PER_SPEAKER not in ("0", "false", "no", "off")):
         try:
@@ -411,12 +379,11 @@ def _render_core(source: Path, words, start: float, end: float, out: Path, workd
             words, n_spk = speakers.label_words(source, words, start, end, workdir)
             if n_spk >= 2:
                 print(f"  Subtítulos: {n_spk} personas, un color para cada una", flush=True)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             print(f"  Subtítulos por persona: no pude ({type(e).__name__}: {str(e)[:100]})", flush=True)
             n_spk = 0
     ass = _ass_for(words, start, end, workdir, out.stem, layout, brand, hook, tmap=postfx.make_tmap(slow), n_speakers=n_spk)
 
-    # ---- grafo de video: encuadre -> zoom -> cámara lenta -> subtítulos -> barra -> logo
     graph = layout_graph(layout, source, start, dur, custom_crop, keys) + "[vL]"
     cur = "vL"
     if zooms:

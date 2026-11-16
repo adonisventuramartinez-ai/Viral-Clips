@@ -232,3 +232,73 @@ alter table public.clips add column if not exists publish_error text;
 alter table public.clips add column if not exists fb_video_id text;
 alter table public.clips add column if not exists published_at timestamptz;
 create index if not exists clips_scheduled on public.clips (scheduled_at) where publish_status = 'scheduled';
+
+-- ===== 0009 viral =====
+-- ClipForge · Parte 7 (área "Hacerlo viral"). Ejecútalo en Supabase > SQL Editor. Se puede correr varias veces.
+
+-- Análisis viral de cada clip: puntaje, veredicto, mejor título y alternativas, hashtags, texto de miniatura, riesgos
+alter table public.clips add column if not exists viral jsonb;
+-- pending = falta analizar | ready = listo para publicar | review = míralo tú | rejected = descartado | approved = lo aprobaste tú
+alter table public.clips add column if not exists viral_status text check (viral_status in ('pending','ready','review','rejected','approved'));
+-- Segunda miniatura para probar A/B
+alter table public.clips add column if not exists thumb_b_path text;
+-- Los clips NUEVOS nacen "pending" (los viejos quedan sin estado y no se tocan)
+alter table public.clips alter column viral_status set default 'pending';
+create index if not exists clips_viral_status on public.clips (viral_status) where viral_status in ('pending','ready');
+
+-- ===== 0010 cola de publicación =====
+-- ClipForge · Parte 8 (cola de publicación en Facebook, Instagram y YouTube). Ejecútalo en Supabase > SQL Editor. Se puede correr varias veces.
+create table if not exists public.posts (
+  id           uuid primary key default gen_random_uuid(),
+  clip_id      uuid not null references public.clips(id) on delete cascade,
+  network      text not null check (network in ('facebook','instagram','youtube')),
+  status       text not null default 'queued' check (status in ('queued','publishing','published','error','cancelled')),
+  scheduled_at timestamptz not null,
+  external_id  text,
+  error        text,
+  attempts     int not null default 0,
+  published_at timestamptz,
+  created_at   timestamptz not null default now(),
+  unique (clip_id, network)
+);
+create index if not exists posts_due on public.posts (scheduled_at) where status = 'queued';
+alter table public.posts enable row level security;
+
+-- ===== 0011 clips automáticos =====
+-- ClipForge · Parte 9 (clips automáticos de lo mejor del momento). Ejecútalo en Supabase > SQL Editor. Se puede correr varias veces.
+create table if not exists public.discover_feeds (
+  id           uuid primary key default gen_random_uuid(),
+  name         text,
+  kind         text not null default 'channel' check (kind in ('channel','search')),
+  target       text not null,                    -- link del canal, o texto de búsqueda
+  active       boolean not null default true,
+  content_type text not null default 'auto',
+  game         text,
+  layout       text not null default 'crop',
+  clips        int  not null default 4 check (clips between 1 and 15),
+  quality      text not null default '720p',
+  min_minutes  int  not null default 3,
+  max_minutes  int  not null default 120,
+  max_age_hours int not null default 48,
+  min_views    int  not null default 0,
+  clipper      text,
+  last_checked timestamptz,
+  last_status  text,
+  created_at   timestamptz not null default now()
+);
+create table if not exists public.discovered_videos (
+  id         uuid primary key default gen_random_uuid(),
+  feed_id    uuid not null references public.discover_feeds(id) on delete cascade,
+  video_id   text not null,
+  title      text,
+  url        text,
+  views      int,
+  status     text not null check (status in ('queued','skipped')),
+  reason     text,
+  source_id  uuid,
+  created_at timestamptz not null default now(),
+  unique (feed_id, video_id)
+);
+create index if not exists discovered_recent on public.discovered_videos (created_at desc);
+alter table public.discover_feeds enable row level security;
+alter table public.discovered_videos enable row level security;

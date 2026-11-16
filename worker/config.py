@@ -193,3 +193,43 @@ except ValueError:
     JOB_RETRY_DELAYS = [60, 300, 900]                                                # segundos de espera entre intentos
 LOG_DIR = Path(os.environ.get("LOG_DIR", "./logs"))                                 # carpeta de los logs (worker.log, rota solo)
 LOG_MAX_MB = min(200, max(1, int(os.environ.get("LOG_MAX_MB") or 5)))
+
+
+# --- Parte 7: área "Hacerlo viral" (todo opcional) ---
+VIRAL = _flag("VIRAL")                                  # pasar cada clip por el área viral (título, hashtags, miniatura, puntaje)
+VIRAL_AUTO_TITLE = _flag("VIRAL_AUTO_TITLE")            # poner el mejor título solo (el original se guarda en viral.title_original)
+VIRAL_THUMB_AB = _flag("VIRAL_THUMB_AB")                # segunda miniatura (otro cuadro, otro texto) para probar A/B
+VIRAL_MIN_SCORE = int(os.environ.get("VIRAL_MIN_SCORE") or 70)      # desde aquí el clip queda "listo" para publicar
+VIRAL_REVIEW_SCORE = int(os.environ.get("VIRAL_REVIEW_SCORE") or 55)  # entre este y el mínimo: lo revisas tú; debajo: descartado
+VIRAL_BACKFILL_DAYS = int(os.environ.get("VIRAL_BACKFILL_DAYS") or 7)  # clips sin análisis (en vivo, rehechos) de los últimos N días
+VIRAL_TICK_SECONDS = int(os.environ.get("VIRAL_TICK_SECONDS") or 60)
+# Mejores horas para publicar (hora de tu país) y huso. Valores por defecto razonables para RD; en la Parte 4 se aprenden de tus datos.
+POST_SLOTS = [s.strip() for s in (os.environ.get("POST_SLOTS") or "12:30,19:00,21:30").split(",") if s.strip()]
+POST_TZ_OFFSET = float(os.environ.get("POST_TZ_OFFSET") or -4)       # República Dominicana = UTC-4 todo el año
+POST_MIN_GAP_MIN = int(os.environ.get("POST_MIN_GAP_MIN") or 90)     # separación mínima entre dos publicaciones
+POST_MAX_PER_DAY = int(os.environ.get("POST_MAX_PER_DAY") or 6)
+
+
+# --- Parte 8: cola de publicación automática (todo opcional; APAGADA por defecto) ---
+AUTO_QUEUE = (os.environ.get("AUTO_QUEUE") or "0").strip().lower() in ("1", "true", "yes", "on")   # programar solo los clips "listos" de la Parte 7
+AUTO_NETWORKS = [n.strip().lower() for n in (os.environ.get("AUTO_NETWORKS") or "").split(",") if n.strip()]   # vacío = todas las que tengan credenciales
+QUEUE_MAX_AHEAD_DAYS = int(os.environ.get("QUEUE_MAX_AHEAD_DAYS") or 3)    # no programa más lejos que esto
+QUEUE_MAX_PENDING = int(os.environ.get("QUEUE_MAX_PENDING") or 12)         # máximo de publicaciones en espera por red
+QUEUE_CLIP_DAYS = int(os.environ.get("QUEUE_CLIP_DAYS") or 3)              # solo clips creados en los últimos N días
+POSTER_SECONDS = int(os.environ.get("POSTER_SECONDS") or 30)               # cada cuánto revisa si hay algo que publicar
+# Instagram Reels (Graph API): cuenta Business/Creator enlazada a tu página. El token de la página sirve.
+IG_USER_ID = os.environ.get("IG_USER_ID", "").strip()
+IG_TOKEN = (os.environ.get("IG_TOKEN") or os.environ.get("FB_PAGE_TOKEN") or "").strip()
+# YouTube Shorts (Data API v3, OAuth): client id/secret de Google Cloud + refresh token de tu canal
+YT_CLIENT_ID = os.environ.get("YT_CLIENT_ID", "").strip()
+YT_CLIENT_SECRET = os.environ.get("YT_CLIENT_SECRET", "").strip()
+YT_REFRESH_TOKEN = os.environ.get("YT_REFRESH_TOKEN", "").strip()
+YT_PRIVACY = (os.environ.get("YT_PRIVACY") or "public").strip().lower()   # public | unlisted | private
+
+
+# --- Parte 9: clips automáticos de lo mejor del momento (APAGADO por defecto) ---
+DISCOVER = (os.environ.get("DISCOVER") or "0").strip().lower() in ("1", "true", "yes", "on")
+DISCOVER_MINUTES = int(os.environ.get("DISCOVER_MINUTES") or 30)          # cada cuánto revisa cada fuente
+DISCOVER_MAX_PER_DAY = int(os.environ.get("DISCOVER_MAX_PER_DAY") or 4)   # videos nuevos que puede procesar en 24 h (cuida tu cupo de IA)
+DISCOVER_MAX_QUEUED = int(os.environ.get("DISCOVER_MAX_QUEUED") or 2)     # no encola más si ya hay tantos videos esperando
+DISCOVER_INSPECT = int(os.environ.get("DISCOVER_INSPECT") or 6)           # máximo de videos que mira a fondo por revisión

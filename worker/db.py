@@ -148,38 +148,60 @@ _pack_cols_ok = True   # pasa a False si la tabla clips aún no tiene pack/thumb
 
 
 def save_clip(source, user_id, m, storage_path, size_bytes, words_in_clip):
-    global _extra_cols_ok, _pack_cols_ok
+    """Guarda el clip y devuelve su id. Va quitando columnas nuevas que la base aún no tenga (migraciones 0005, 0007, 0009)."""
+    global _extra_cols_ok, _pack_cols_ok, _viral_cols_ok
     row = {
         "source_id": source, "user_id": user_id, "title": m["title"], "clipper": _clipper_of(source),
         "start_sec": m["abs_start"], "end_sec": m["abs_end"], "viral_score": m["score"],
         "reason": m["reason"], "captions": words_in_clip,
         "storage_path": storage_path, "size_bytes": size_bytes,
     }
-    extra = {}
-    if m.get("description"):
-        extra["description"] = m["description"]
-    if m.get("hashtags"):
-        extra["hashtags"] = m["hashtags"]
-    pack = {}
-    if m.get("pack"):
-        pack["pack"] = m["pack"]
-    if m.get("thumb_path"):
-        pack["thumb_path"] = m["thumb_path"]
+    extra = {k: m[k] for k in ("description", "hashtags") if m.get(k)}
+    pack = {k: m[k] for k in ("pack", "thumb_path") if m.get(k)}
+    viral = {}
+    if m.get("viral"):
+        viral = {"viral": m["viral"], "viral_status": m.get("viral_status") or "pending"}
+    if m.get("thumb_b_path"):
+        viral["thumb_b_path"] = m["thumb_b_path"]
+    tries = []
+    if viral and _viral_cols_ok:
+        tries.append(("viral", {**row, **extra, **pack, **viral}))
     if pack and _pack_cols_ok:
-        try:
-            sb.table("clips").insert({**row, **extra, **pack}).execute()
-            return
-        except Exception as e:  # noqa: BLE001
-            _pack_cols_ok = False
-            print(f"  Aviso: no pude guardar paquete/miniatura ({str(e)[:80]}). Ejecuta 0007_publicacion.sql en Supabase.", flush=True)
+        tries.append(("pack", {**row, **extra, **pack}))
     if extra and _extra_cols_ok:
+        tries.append(("extra", {**row, **extra}))
+    tries.append(("base", row))
+    for kind, data in tries:
         try:
-            sb.table("clips").insert({**row, **extra}).execute()
-            return
+            res = sb.table("clips").insert(data).execute()
+            return (res.data or [{}])[0].get("id")
         except Exception as e:  # noqa: BLE001
-            _extra_cols_ok = False
-            print(f"  Aviso: no pude guardar descripción/hashtags ({str(e)[:80]}). Ejecuta 0005_calidad.sql en Supabase.", flush=True)
-    sb.table("clips").insert(row).execute()
+            if kind == "base":
+                raise
+            if kind == "viral":
+                _viral_cols_ok = False
+                print(f"  Aviso: no pude guardar el análisis viral ({str(e)[:80]}). Ejecuta 0009_viral.sql en Supabase.", flush=True)
+            elif kind == "pack":
+                _pack_cols_ok = False
+                print(f"  Aviso: no pude guardar paquete/miniatura ({str(e)[:80]}). Ejecuta 0007_publicacion.sql en Supabase.", flush=True)
+            else:
+                _extra_cols_ok = False
+                print(f"  Aviso: no pude guardar descripción/hashtags ({str(e)[:80]}). Ejecuta 0005_calidad.sql en Supabase.", flush=True)
+
+
+_viral_cols_ok = True   # pasa a False si clips aún no tiene viral/viral_status (migración 0009)
+
+
+def clips_needing_viral(limit=3):
+    """Clips recientes que aún no pasaron por el área viral (en vivo, rehechos). Vacío si falta la migración 0009."""
+    global _viral_cols_ok
+    try:
+        since = (datetime.now(timezone.utc) - timedelta(days=config.VIRAL_BACKFILL_DAYS)).isoformat()
+        res = (sb.table("clips").select("id,title,viral_score,hashtags,captions,start_sec,end_sec")
+               .eq("viral_status", "pending").gte("created_at", since).order("created_at").limit(limit).execute())
+        return res.data or []
+    except Exception:  # noqa: BLE001
+        return []
 
 
 def upload_thumb(path, local_file):
@@ -242,11 +264,14 @@ def remove_file(path):
 _hb_warned = False
 
 
+BASE_INFO = {}   # datos fijos que siempre van en el latido (redes configuradas, cola automática)
+
+
 def heartbeat(info=None):
     """Avisa a la web que el worker está vivo (tabla worker_status). Nunca tumba al worker."""
     global _hb_warned
     try:
-        sb.table("worker_status").upsert({"id": 1, "seen_at": now(), "info": info or {}}).execute()
+        sb.table("worker_status").upsert({"id": 1, "seen_at": now(), "info": {**BASE_INFO, **(info or {})}}).execute()
     except Exception as e:  # noqa: BLE001
         if not _hb_warned:
             print(f"Aviso: no pude escribir worker_status ({e}). ¿Corriste 0003_live.sql?", flush=True)
@@ -323,7 +348,8 @@ def create_live_source(ch, found):
         src = sb.table("sources").insert({**row, "options": options}).execute().data[0]
     except Exception:  # noqa: BLE001  (aún no existe la columna options)
         src = sb.table("sources").insert(row).execute().data[0]
-    payload = {"clip_seconds": int(ch.get("clip_seconds") or 0),   # 0 = automática (largo ideal del tipo) "quality": ch.get("quality") or "720p",
+    payload = {"clip_seconds": int(ch.get("clip_seconds") or 0),   # 0 = automática (largo ideal del tipo)
+               "quality": ch.get("quality") or "720p",
                "review_minutes": int(ch.get("review_minutes") or 2), **options}
     if ch.get("max_new"):
         payload["max_new"] = int(ch["max_new"])
@@ -331,4 +357,151 @@ def create_live_source(ch, found):
         sb.table("jobs").insert({"source_id": src["id"], "type": "record", "payload": payload, "priority": 10}).execute()
     except Exception:  # noqa: BLE001  (aún no existe la columna priority: migración 0008)
         sb.table("jobs").insert({"source_id": src["id"], "type": "record", "payload": payload}).execute()
+    return src["id"]
+
+
+# ----------------------------------------------------------------------------- Parte 8: cola de publicación (tabla posts, migración 0010)
+def signed_url(path, seconds=3600):
+    r = sb.storage.from_("clips").create_signed_url(path, seconds)
+    u = r.get("signedURL") or r.get("signed_url") or r.get("signedUrl")
+    if u and not u.startswith("http"):
+        u = f"{config.SUPABASE_URL.rstrip('/')}/storage/v1{u if u.startswith('/') else '/' + u}"
+    return u
+
+
+def clips_ready_for_queue(networks, limit=10):
+    """Clips 'listos' o aprobados, recientes, con archivo, sin publicar/programar a mano y sin post en alguna de las redes pedidas."""
+    try:
+        since = (datetime.now(timezone.utc) - timedelta(days=config.QUEUE_CLIP_DAYS)).isoformat()
+        rows = (sb.table("clips").select("id,title,viral,viral_score,viral_status,publish_status,storage_path")
+                .in_("viral_status", ["ready", "approved"]).gte("created_at", since).not_.is_("storage_path", "null")
+                .order("created_at", desc=True).limit(60).execute().data or [])
+        rows = [r for r in rows if r.get("publish_status") not in ("scheduled", "published")]
+        if not rows:
+            return []
+        have = {}
+        for p in sb.table("posts").select("clip_id,network").in_("clip_id", [r["id"] for r in rows]).execute().data or []:
+            have.setdefault(p["clip_id"], set()).add(p["network"])
+        return [r for r in rows if set(networks) - have.get(r["id"], set()) == set(networks)][:limit]
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def posts_taken(networks):
+    """{red: [fechas ya ocupadas]} (incluye lo programado a mano en Facebook desde la tarjeta del clip)."""
+    out = {n: [] for n in networks}
+    try:
+        for p in sb.table("posts").select("network,scheduled_at").in_("status", ["queued", "publishing"]).execute().data or []:
+            out.setdefault(p["network"], []).append(p["scheduled_at"])
+        if "facebook" in out:
+            for c in sb.table("clips").select("scheduled_at").eq("publish_status", "scheduled").execute().data or []:
+                out["facebook"].append(c["scheduled_at"])
+    except Exception:  # noqa: BLE001
+        pass
+    return out
+
+
+def posts_pending(networks):
+    out = {n: 0 for n in networks}
+    try:
+        for p in sb.table("posts").select("network").eq("status", "queued").execute().data or []:
+            out[p["network"]] = out.get(p["network"], 0) + 1
+    except Exception:  # noqa: BLE001
+        pass
+    return out
+
+
+def create_posts(rows):
+    sb.table("posts").upsert([{**r, "status": "queued"} for r in rows], on_conflict="clip_id,network", ignore_duplicates=True).execute()
+
+
+def due_posts(limit=5):
+    try:
+        res = (sb.table("posts").select("*").eq("status", "queued").lte("scheduled_at", now())
+               .order("scheduled_at").limit(limit).execute())
+        return res.data or []
+    except Exception:  # noqa: BLE001  (migración 0010 sin correr)
+        return []
+
+
+def claim_post(post_id):
+    """Reserva el post (queued -> publishing). False si otro ya lo tomó o ya no está en cola."""
+    res = (sb.table("posts").update({"status": "publishing", "attempts": 1}).eq("id", post_id).eq("status", "queued").execute())
+    return bool(res.data)
+
+
+def update_post(post_id, **fields):
+    sb.table("posts").update(fields).eq("id", post_id).execute()
+
+
+def recover_posts():
+    """Al arrancar: todo post en 'publishing' quedó a medias (el worker se cayó). Se marca en error y NO se repite solo, para no publicar doble."""
+    sb.table("posts").update({"status": "error", "error": "Interrumpido mientras publicaba. Revisa tu página antes de reintentar."}) \
+        .eq("status", "publishing").execute()
+
+
+# ----------------------------------------------------------------------------- Parte 9: clips automáticos (migración 0011)
+def due_feeds(minutes):
+    """Fuentes activas que ya toca revisar (nunca revisadas, o hace más de `minutes`)."""
+    limit = (datetime.now(timezone.utc) - timedelta(minutes=minutes)).isoformat()
+    return (sb.table("discover_feeds").select("*").eq("active", True)
+            .or_(f"last_checked.is.null,last_checked.lte.{limit}").order("last_checked", nullsfirst=True).limit(10).execute().data or [])
+
+
+def update_feed(feed_id, **fields):
+    try:
+        sb.table("discover_feeds").update(fields).eq("id", feed_id).execute()
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def known_video_ids(feed_id, ids):
+    if not ids:
+        return set()
+    rows = sb.table("discovered_videos").select("video_id").eq("feed_id", feed_id).in_("video_id", list(ids)).execute().data or []
+    return {r["video_id"] for r in rows}
+
+
+def discovered_today():
+    since = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+    res = sb.table("discovered_videos").select("id", count="exact").eq("status", "queued").gte("created_at", since).execute()
+    return int(res.count or 0)
+
+
+def videos_waiting():
+    """Videos (no directos) todavía en proceso: así no se apila trabajo."""
+    res = (sb.table("sources").select("id", count="exact").eq("kind", "vod_url")
+           .in_("status", ["queued", "downloading", "transcribing", "analyzing", "clipping"]).execute())
+    return int(res.count or 0)
+
+
+def url_already_used(url):
+    if not url:
+        return False
+    return bool(sb.table("sources").select("id").eq("url", url).limit(1).execute().data)
+
+
+def remember_video(feed_id, info, status, reason=None, source_id=None):
+    row = {"feed_id": feed_id, "video_id": str(info.get("id")), "title": (info.get("title") or "")[:200],
+           "url": info.get("webpage_url"), "views": int(info.get("view_count") or 0), "status": status,
+           "reason": reason, "source_id": source_id}
+    try:
+        sb.table("discovered_videos").upsert(row, on_conflict="feed_id,video_id").execute()
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def create_vod_source(feed, info):
+    """Igual que pegar el link en Crear clips: fuente + trabajo de descarga. Devuelve el id de la fuente."""
+    url = info.get("webpage_url") or f"https://www.youtube.com/watch?v={info['id']}"
+    options = {"content_type": feed.get("content_type") or "auto", "game": feed.get("game"), "progress_bar": False}
+    row = {"kind": "vod_url", "url": url, "title": info.get("title"), "status": "queued",
+           "layout": feed.get("layout") or "crop", "clipper": feed.get("clipper")}
+    try:
+        src = sb.table("sources").insert({**row, "options": options}).execute().data[0]
+    except Exception:  # noqa: BLE001  (aún no existe la columna options)
+        src = sb.table("sources").insert(row).execute().data[0]
+    payload = {"clip_seconds": 0, "clips": int(feed.get("clips") or 4), "quality": feed.get("quality") or "720p", "review_minutes": 2, **options}
+    sb.table("jobs").insert({"source_id": src["id"], "type": "download", "payload": payload}).execute()
+    remember_video(feed["id"], info, "queued", None, src["id"])
     return src["id"]

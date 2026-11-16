@@ -7,6 +7,7 @@ import uuid
 import config
 import db
 import detect
+import discover
 from analyze import find_moments
 from download import download
 import live
@@ -21,9 +22,12 @@ import voices
 import profiles
 import original
 import publisher
+import autoqueue
+import poster
 import scheduler
 import packager
 import thumb
+import viral
 from render import render_clip
 from transcribe import transcribe
 
@@ -142,17 +146,34 @@ def process(job):
                         hook=m.get("hook") or m["title"], profile=prof, opts=opts)
 
             txt = " ".join(w["w"] for w in words if m["start"] <= w["start"] <= m["end"])
-            if config.THUMBS:   # miniatura del clip YA renderizado (antes de la tarjeta de intro/cierre)
-                jpg = thumb.make(out, m.get("hook") or m["title"], work / f"{cid}.jpg")
-                if jpg:
-                    try:
-                        db.upload_thumb(f"thumbs/{sid}/{cid}.jpg", jpg)
-                        m["thumb_path"] = f"thumbs/{sid}/{cid}.jpg"
-                    except Exception as e:  # noqa: BLE001
-                        print(f"  Miniatura: no pude subirla ({type(e).__name__}: {str(e)[:80]})", flush=True)
-                    jpg.unlink(missing_ok=True)
             if config.PACK:     # textos por red + 3 ganchos alternativos
                 m["pack"] = packager.build_pack(m, txt, ocfg)
+            thumb_text = m.get("hook") or m["title"]
+            if config.VIRAL:    # Área viral: mejor título, hashtags, puntaje y veredicto ANTES de publicar
+                v = viral.run(m, txt, ocfg, m["end"] - m["start"])
+                m["viral"], m["viral_status"] = v, viral.status_for(v)
+                m["hashtags"] = v["hashtags"]
+                if config.VIRAL_AUTO_TITLE:
+                    m["title"] = v["title"]
+                if m.get("pack"):
+                    viral.apply_to_pack(m["pack"], v)
+                thumb_text = v["thumb_text"]
+                print(f"  Viral: {v['score']} pts → {v['verdict']}" + (f" · riesgos: {', '.join(v['risks'])}" if v["risks"] else ""), flush=True)
+            if config.THUMBS:   # miniatura del clip YA renderizado (antes de la tarjeta de intro/cierre)
+                variants = [(0, "thumb_path", thumb_text)]
+                if config.VIRAL and config.VIRAL_THUMB_AB:
+                    tt = (m.get("viral") or {}).get("thumb_texts") or []
+                    variants.append((1, "thumb_b_path", tt[1] if len(tt) > 1 else thumb_text))
+                for rank, key, ttext in variants:
+                    suffix = "" if rank == 0 else "_b"
+                    jpg = thumb.make(out, ttext, work / f"{cid}{suffix}.jpg", rank=rank)
+                    if jpg:
+                        try:
+                            db.upload_thumb(f"thumbs/{sid}/{cid}{suffix}.jpg", jpg)
+                            m[key] = f"thumbs/{sid}/{cid}{suffix}.jpg"
+                        except Exception as e:  # noqa: BLE001
+                            print(f"  Miniatura: no pude subirla ({type(e).__name__}: {str(e)[:80]})", flush=True)
+                        jpg.unlink(missing_ok=True)
 
             if ocfg["enabled"] and opts.get("original", True):
                 try:   # aporte propio: voz narradora, dramómetro, encuesta A/B y descripción con tu punto de vista
@@ -173,7 +194,8 @@ def process(job):
             in_clip = [{"w": w["w"], "start": w["start"] - m["start"], "end": w["end"] - m["start"]}
                        for w in words if m["start"] <= w["start"] <= m["end"]]
             db.save_clip(sid, src.get("user_id"), m, path, out.stat().st_size, in_clip)
-            if config.FB_AUTOPUBLISH and published < config.FB_MAX_PER_JOB and m.get("score", 0) >= config.FB_MIN_SCORE:
+            gate_ok = (not config.VIRAL) or (m.get("viral") or {}).get("verdict") == "ready"   # solo lo que pasó el área viral
+            if config.FB_AUTOPUBLISH and gate_ok and published < config.FB_MAX_PER_JOB and m.get("score", 0) >= config.FB_MIN_SCORE:
                 if publisher.publish_reel(out, packager.caption_for(m, "reels") if m.get("pack") else (m.get("description") or m["title"])):
                     published += 1
             out.unlink(missing_ok=True)
@@ -238,8 +260,10 @@ def main():
     import llm
     print(f"IA en orden de uso: {' → '.join(llm.configured())}", flush=True)
     print("Worker listo (encuadres: vertical, dividido, dos personas, difuminado; directos con reconexión y chat), esperando trabajos…", flush=True)
+    poster.start_thread()   # publica a su hora aunque el worker esté grabando un directo
     last_clean = 0.0
     while True:
+        db.BASE_INFO = {"auto_queue": config.AUTO_QUEUE, "discover": config.DISCOVER, "networks": autoqueue.networks_available()}
         db.heartbeat()
         if time.time() - last_clean > 600:
             db.requeue_stale()
@@ -258,9 +282,13 @@ def main():
                 time.sleep(config.POLL_SECONDS)
         else:
             try:
-                scheduler.tick()    # ¿hay clips programados para publicar en Facebook?
+                viral.tick()        # analiza clips que llegaron sin pasar por el área viral (en vivo, rehechos)
             except Exception as e:  # noqa: BLE001
-                print(f"Programación: error ({type(e).__name__}: {str(e)[:100]})", flush=True)
+                print(f"Viral: error ({type(e).__name__}: {str(e)[:100]})", flush=True)
+            try:
+                discover.tick()     # ¿hay videos nuevos y fuertes en tus fuentes? (solo con DISCOVER=1)
+            except Exception as e:  # noqa: BLE001
+                print(f"Clips automáticos: error ({type(e).__name__}: {str(e)[:100]})", flush=True)
             try:
                 watcher.tick()      # ¿alguno de tus canales entró en vivo? (solo cuando el worker está libre)
             except Exception as e:  # noqa: BLE001  (vigilar canales es un extra: nunca debe tumbar al worker)

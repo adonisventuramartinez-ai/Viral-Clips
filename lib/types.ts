@@ -22,6 +22,22 @@ export type Clip = {
   scheduledAt?: string;
   publishStatus?: "scheduled" | "published" | "error";
   publishError?: string;
+  viral?: Viral;
+  viralStatus?: "pending" | "ready" | "review" | "rejected" | "approved";
+  thumbBUrl?: string;
+};
+
+export type Viral = {
+  score: number;
+  verdict: "ready" | "review" | "rejected";
+  title: string;
+  title_original?: string;
+  titles?: { t: string; angle?: string; score: number }[];
+  hook_score?: number;
+  thumb_text?: string;
+  hashtags?: string[];
+  risks?: string[];
+  source?: string;
 };
 
 export type Pack = {

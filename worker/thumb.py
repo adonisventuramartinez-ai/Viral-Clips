@@ -57,7 +57,8 @@ def _duration(video):
         return 0.0
 
 
-def pick_time(video):
+def pick_time(video, rank=0):
+    """Segundo del mejor cuadro. rank=1 da el mejor cuadro DISTINTO (a más de 20% del clip del primero), para la miniatura B."""
     dur = _duration(video)
     if dur < 3:
         return min(0.5, dur / 2)
@@ -72,8 +73,12 @@ def pick_time(video):
             return (f["w"], f["x"]) if f else (None, None)
     except Exception:  # noqa: BLE001
         face_of = lambda g: (None, None)  # noqa: E731
-    best = max(frames, key=lambda tg: score_frame(_sharp(tg[1]), *face_of(tg[1]), float(tg[1].mean())))
-    return best[0]
+    ranked = sorted(frames, key=lambda tg: -score_frame(_sharp(tg[1]), *face_of(tg[1]), float(tg[1].mean())))
+    best = ranked[0][0]
+    if rank <= 0:
+        return best
+    far = [tg for tg in ranked if abs(tg[0] - best) > dur * 0.2]
+    return (far[0] if far else ranked[min(1, len(ranked) - 1)])[0]
 
 
 def _font(size):
@@ -134,10 +139,10 @@ def compose(frame, title, out):
     return Path(out)
 
 
-def make(video, title, out):
+def make(video, title, out, rank=0):
     try:
         out = Path(out)
-        t = pick_time(video)
+        t = pick_time(video, rank)
         raw = out.with_suffix(".raw.jpg")
         r = subprocess.run(["ffmpeg", "-y", "-v", "error", "-ss", f"{t:.2f}", "-i", str(video), "-frames:v", "1", "-q:v", "2", str(raw)],
                            capture_output=True, timeout=60)

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { serverClient } from "@/lib/supabase";
+import { nextSlot } from "@/lib/slots";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,18 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         return NextResponse.json({ error: "Elige una fecha entre dentro de 1 minuto y 60 días" }, { status: 400 });
       upd.scheduled_at = new Date(t).toISOString(); upd.publish_status = "scheduled"; upd.publish_error = null;
     }
+  }
+  // Área viral: aprobar o descartar a mano
+  if (b.viral_status === "approved" || b.viral_status === "rejected") upd.viral_status = b.viral_status;
+  // "Mejor hora": elige la próxima hora buena libre (ver lib/slots.ts) y programa el clip
+  if (b.auto_slot === true) {
+    const { data: cur } = await db.from("clips").select("publish_status").eq("id", params.id).maybeSingle();
+    if (cur?.publish_status === "published") return NextResponse.json({ error: "Este clip ya se publicó" }, { status: 409 });
+    const { data: rows } = await db.from("clips").select("scheduled_at").eq("publish_status", "scheduled");
+    const at = nextSlot((rows ?? []).map((r) => String(r.scheduled_at)));
+    if (!at) return NextResponse.json({ error: "No hay horas libres configuradas (POST_SLOTS)" }, { status: 409 });
+    upd.scheduled_at = at.toISOString(); upd.publish_status = "scheduled"; upd.publish_error = null;
+    if (!upd.viral_status) upd.viral_status = "approved";
   }
   if (!Object.keys(upd).length) return NextResponse.json({ error: "Nada que cambiar" }, { status: 400 });
   const { error } = await db.from("clips").update(upd).eq("id", params.id);
