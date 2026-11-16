@@ -233,3 +233,17 @@ DISCOVER_MINUTES = int(os.environ.get("DISCOVER_MINUTES") or 30)          # cada
 DISCOVER_MAX_PER_DAY = int(os.environ.get("DISCOVER_MAX_PER_DAY") or 4)   # videos nuevos que puede procesar en 24 h (cuida tu cupo de IA)
 DISCOVER_MAX_QUEUED = int(os.environ.get("DISCOVER_MAX_QUEUED") or 2)     # no encola más si ya hay tantos videos esperando
 DISCOVER_INSPECT = int(os.environ.get("DISCOVER_INSPECT") or 6)           # máximo de videos que mira a fondo por revisión
+
+
+# --- Parte 10: Mi página (estadísticas y mejores horas aprendidas) y Facebook como fuente ---
+STATS = _flag("STATS")                                            # leer los números de lo que publicas (solo en las redes con credenciales)
+STATS_MINUTES = int(os.environ.get("STATS_MINUTES") or 60)           # cada cuánto lee los números de tus publicaciones
+STATS_DAYS = int(os.environ.get("STATS_DAYS") or 30)                 # publicaciones de los últimos N días
+STATS_BATCH = int(os.environ.get("STATS_BATCH") or 25)               # máximo de publicaciones que lee por vuelta
+YT_API_KEY = os.environ.get("YT_API_KEY", "").strip()                # opcional: leer vistas de YouTube sin OAuth de lectura
+LEARN_SLOTS = (os.environ.get("LEARN_SLOTS") or "1").strip().lower() in ("1", "true", "yes", "on")   # aprender tus mejores horas
+LEARN_MIN_POSTS = int(os.environ.get("LEARN_MIN_POSTS") or 12)       # publicaciones con 24 h o más antes de fiarse de los datos
+LEARN_MIN_PER_HOUR = int(os.environ.get("LEARN_MIN_PER_HOUR") or 2)  # publicaciones mínimas en una hora para que cuente
+LEARN_SLOT_COUNT = int(os.environ.get("LEARN_SLOT_COUNT") or 3)      # cuántas horas por día
+LEARN_GAP_HOURS = int(os.environ.get("LEARN_GAP_HOURS") or 2)        # separación mínima entre las horas elegidas
+LEARN_EXPLORE = (os.environ.get("LEARN_EXPLORE") or "1").strip().lower() in ("1", "true", "yes", "on")  # 1 hora de prueba en un horario poco probado

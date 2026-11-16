@@ -1,6 +1,6 @@
 """Clips automáticos de lo mejor del momento.
 
-Vigila FUENTES que tú eliges (canales de YouTube o una búsqueda, ej. "La Casa de Alofoke 3"), encuentra videos nuevos que van fuerte
+Vigila FUENTES que tú eliges (canales de YouTube, una búsqueda, ej. "La Casa de Alofoke 3", o una página de Facebook), encuentra videos nuevos que van fuerte
 (más vistas por hora desde que se subieron) y crea solo el trabajo de clips. Cada clip pasa por el área viral (Parte 7) y, con
 AUTO_QUEUE=1, entra a la cola de publicación (Parte 8).
 
@@ -8,10 +8,17 @@ AUTO_QUEUE=1, entra a la cola de publicación (Parte 8).
   pick(items, k)            -> los k más fuertes
   tick(db, lister)          -> una revisión
 
+Facebook (Parte 10) se lista con la Graph API y FB_PAGE_TOKEN: funciona con TUS páginas, y con páginas ajenas solo si tu app de Meta
+tiene el permiso "Page Public Content Access". Los videos se descargan después con yt-dlp, como los de YouTube.
+
 "Lo mejor del momento" aquí significa: lo más visto por hora entre lo que ya sigues. No lee tendencias de TikTok ni de otras redes.
 """
+import re
 import time
 from datetime import datetime, timezone
+from urllib.parse import parse_qs, urlparse
+
+import requests
 
 import config
 
@@ -56,8 +63,100 @@ def _opts():
     return o
 
 
+# ----------------------------------------------------------------------------- Facebook (Graph API)
+FB_API = "https://graph.facebook.com/v21.0"
+_FB_FIELDS = "id,title,description,permalink_url,length,created_time,views,live_status,reactions.summary(true).limit(0)"
+_FB_BASIC = "id,title,description,permalink_url,length,created_time"
+
+
+def fb_page_ref(target):
+    """Link, nombre o id de una página -> lo que entiende la Graph API (id numérico o nombre de usuario). None si no se entiende."""
+    t = (target or "").strip()
+    if not t:
+        return None
+    if re.fullmatch(r"\d{5,}", t):
+        return t
+    if not re.match(r"https?://", t, re.I):
+        t = "https://" + t if re.match(r"(www\.|m\.)?(facebook|fb)\.com", t, re.I) else "https://www.facebook.com/" + t.lstrip("@/")
+    u = urlparse(t)
+    if "facebook.com" not in (u.netloc or "").lower() and "fb.com" not in (u.netloc or "").lower():
+        return None
+    q = parse_qs(u.query)
+    if q.get("id") and re.fullmatch(r"\d+", q["id"][0]):
+        return q["id"][0]
+    parts = [p for p in u.path.split("/") if p]
+    nums = [p for p in parts if re.fullmatch(r"\d{5,}", p)]
+    if parts and parts[0].lower() in ("pages", "people") and nums:
+        return nums[-1]
+    if parts and parts[0].lower() not in ("watch", "reel", "reels", "videos", "groups", "share", "profile.php", "pg"):
+        return parts[0]
+    if len(parts) > 1 and parts[0].lower() == "pg":
+        return parts[1]
+    return None
+
+
+def _fb_error(r):
+    try:
+        e = (r.json() or {}).get("error") or {}
+    except ValueError:
+        e = {}
+    code, msg = e.get("code"), (e.get("message") or r.text or "")[:140]
+    if code == 190:
+        return f"el token de Facebook venció o no sirve (FB_PAGE_TOKEN): {msg}"
+    if code in (10, 200, 283) or "permission" in msg.lower():
+        return f"Facebook no deja leer esa página con tu token (solo páginas tuyas, o con 'Page Public Content Access'): {msg}"
+    return f"Facebook respondió con error: {msg}"
+
+
+def fb_info(v, now=None):
+    """Un video de la Graph API -> el mismo formato que usa evaluate() (lo que da yt-dlp)."""
+    ts = None
+    ct = v.get("created_time")
+    if ct:
+        try:
+            ts = datetime.fromisoformat(str(ct).replace("Z", "+00:00").replace("+0000", "+00:00")).timestamp()
+        except ValueError:
+            ts = None
+    link = v.get("permalink_url") or ""
+    if link.startswith("/"):
+        link = "https://www.facebook.com" + link
+    views = v.get("views")
+    if views is None:     # sin "views": las reacciones sirven de medida aproximada para comparar
+        views = (((v.get("reactions") or {}).get("summary")) or {}).get("total_count") or 0
+    title = (v.get("title") or "").strip() or " ".join(str(v.get("description") or "").split())[:100] or f"Video de Facebook {v.get('id')}"
+    live = str(v.get("live_status") or "").upper()
+    return {"id": str(v.get("id")), "title": title, "duration": float(v.get("length") or 0), "timestamp": ts,
+            "view_count": int(views or 0), "webpage_url": link or f"https://www.facebook.com/watch/?v={v.get('id')}",
+            "live_status": "is_live" if live in ("LIVE", "LIVE_STOPPED_UNPROCESSED") else ("is_upcoming" if live in ("SCHEDULED_UNPUBLISHED", "SCHEDULED_LIVE") else None)}
+
+
+def fb_list(feed, limit=8, get=None):
+    """Lo más reciente de una página de Facebook. Devuelve candidatos con su info ya completa (no hace falta mirar video por video)."""
+    get = get or requests.get
+    if not config.FB_PAGE_TOKEN:
+        raise RuntimeError("falta FB_PAGE_TOKEN en worker/.env para leer Facebook")
+    ref = fb_page_ref(feed.get("target"))
+    if not ref:
+        raise RuntimeError("no entendí el link de la página de Facebook")
+    r = get(f"{FB_API}/{ref}/videos", params={"fields": _FB_FIELDS, "limit": limit, "access_token": config.FB_PAGE_TOKEN}, timeout=30)
+    if not r.ok:    # algún campo (views, live_status) puede no estar permitido: se reintenta con lo básico
+        r2 = get(f"{FB_API}/{ref}/videos", params={"fields": _FB_BASIC, "limit": limit, "access_token": config.FB_PAGE_TOKEN}, timeout=30)
+        if not r2.ok:
+            raise RuntimeError(_fb_error(r2))
+        r = r2
+    out = []
+    for v in (r.json() or {}).get("data") or []:
+        if not v.get("id"):
+            continue
+        info = fb_info(v)
+        out.append({"id": info["id"], "url": info["webpage_url"], "title": info["title"], "info": info})
+    return out
+
+
 def list_candidates(feed, limit=8):
     """Ids y datos básicos de lo más reciente de la fuente (yt-dlp, sin descargar). Devuelve [{id, url, title, view_count, duration}]."""
+    if feed.get("kind") == "facebook":
+        return fb_list(feed, limit)
     import yt_dlp
     target = (feed.get("target") or "").strip()
     if feed.get("kind") == "search":
@@ -82,6 +181,8 @@ def list_candidates(feed, limit=8):
 
 def inspect(c):
     """Datos completos de un video (fecha, vistas, duración, si es directo). None si no se pudo."""
+    if c.get("info"):       # Facebook: la Graph API ya dio todo
+        return c["info"]
     import yt_dlp
     try:
         with yt_dlp.YoutubeDL(_opts()) as y:

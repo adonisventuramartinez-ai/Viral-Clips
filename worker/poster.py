@@ -97,7 +97,19 @@ def _loop():
         time.sleep(config.POSTER_SECONDS)
 
 
+def _stats_loop():
+    """Mi página (Parte 10) en su propio hilo: si una red tarda en contestar, las publicaciones no se retrasan."""
+    import insights
+    while True:
+        try:
+            insights.tick()
+        except Exception as e:  # noqa: BLE001  (las estadísticas son un extra: nunca deben tumbar nada)
+            print(f"Mi página: error ({type(e).__name__}: {str(e)[:100]})", flush=True)
+        time.sleep(config.POSTER_SECONDS)
+
+
 def start_thread():
+    threading.Thread(target=_stats_loop, name="insights", daemon=True).start()
     t = threading.Thread(target=_loop, name="poster", daemon=True)
     t.start()
     return t

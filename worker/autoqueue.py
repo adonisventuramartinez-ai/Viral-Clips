@@ -28,8 +28,9 @@ def networks_available():
     return [n for n in have if not config.AUTO_NETWORKS or n in config.AUTO_NETWORKS]
 
 
-def plan(clips, taken, networks, now=None, pending=None, max_ahead_days=None, max_pending=None):
-    """clips = [{id, viral:{score}}], taken = {red: [fechas ocupadas]}, pending = {red: cuántas en espera}.
+def plan(clips, taken, networks, now=None, pending=None, max_ahead_days=None, max_pending=None, slots=None):
+    """clips = [{id, viral:{score}}], taken = {red: [fechas ocupadas]}, pending = {red: cuántas en espera},
+    slots = {red: ['12:30', ...]} horas aprendidas en Mi página (si falta una red, usa POST_SLOTS).
     Reparte horas buenas: el clip de más puntaje toma la hora más cercana. Devuelve lista de posts a crear."""
     now = now or datetime.now(timezone.utc)
     ahead = now + timedelta(days=config.QUEUE_MAX_AHEAD_DAYS if max_ahead_days is None else max_ahead_days)
@@ -41,7 +42,7 @@ def plan(clips, taken, networks, now=None, pending=None, max_ahead_days=None, ma
         for n in networks:
             if count[n] >= cap:
                 continue
-            slot = viral.next_slots(now, busy[n], 1)
+            slot = viral.next_slots(now, busy[n], 1, slots=(slots or {}).get(n) or None)
             if not slot or slot[0] > ahead:
                 continue
             busy[n].append(slot[0])
@@ -63,7 +64,11 @@ def tick(db=None):
     clips = db.clips_ready_for_queue(nets, 10)
     if not clips:
         return 0
-    rows = plan(clips, db.posts_taken(nets), nets, pending=db.posts_pending(nets))
+    try:
+        learned = db.learned_slots(nets) if config.LEARN_SLOTS else None    # horas aprendidas en Mi página
+    except Exception:  # noqa: BLE001  (sin migración 0012: se usan POST_SLOTS)
+        learned = None
+    rows = plan(clips, db.posts_taken(nets), nets, pending=db.posts_pending(nets), slots=learned)
     if rows:
         db.create_posts(rows)
         print(f"  Cola: {len(rows)} publicación(es) programada(s) en {', '.join(sorted({r['network'] for r in rows}))}", flush=True)

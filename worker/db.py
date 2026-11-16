@@ -505,3 +505,101 @@ def create_vod_source(feed, info):
     sb.table("jobs").insert({"source_id": src["id"], "type": "download", "payload": payload}).execute()
     remember_video(feed["id"], info, "queued", None, src["id"])
     return src["id"]
+
+
+# ----------------------------------------------------------------------------- Parte 10: Mi página (migración 0012)
+def published_items(days=30):
+    """Lo que ya se publicó: la cola (posts) y lo programado a mano en Facebook (clips.fb_video_id), sin repetir."""
+    since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    out, seen = [], set()
+    try:
+        for p in (sb.table("posts").select("id,clip_id,network,external_id,published_at").eq("status", "published")
+                  .gte("published_at", since).not_.is_("external_id", "null").limit(1000).execute().data or []):
+            key = (p["network"], str(p["external_id"]))
+            if key not in seen:
+                seen.add(key)
+                out.append({"network": p["network"], "external_id": str(p["external_id"]), "post_id": p["id"],
+                            "clip_id": p["clip_id"], "published_at": p["published_at"]})
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        for c in (sb.table("clips").select("id,fb_video_id,published_at").eq("publish_status", "published")
+                  .gte("published_at", since).not_.is_("fb_video_id", "null").limit(1000).execute().data or []):
+            key = ("facebook", str(c["fb_video_id"]))
+            if key not in seen:
+                seen.add(key)
+                out.append({"network": "facebook", "external_id": str(c["fb_video_id"]), "post_id": None,
+                            "clip_id": c["id"], "published_at": c["published_at"]})
+    except Exception:  # noqa: BLE001
+        pass
+    return out
+
+
+def stats_map():
+    try:
+        rows = sb.table("post_stats").select("*").limit(5000).execute().data or []
+    except Exception:  # noqa: BLE001  (migración 0012 sin correr)
+        return {}
+    return {(r["network"], str(r["external_id"])): r for r in rows}
+
+
+def save_stats(rows):
+    sb.table("post_stats").upsert(rows, on_conflict="network,external_id").execute()
+
+
+def stats_for_learning(days=60):
+    since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    try:
+        return sb.table("post_stats").select("network,published_at,views,likes,comments,shares").gte("published_at", since).limit(5000).execute().data or []
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def save_best_hours(network, rows):
+    """Reemplaza las horas aprendidas de esa red."""
+    try:
+        sb.table("best_hours").delete().eq("network", network).execute()
+        if rows:
+            stamp = now()
+            sb.table("best_hours").insert([{**r, "network": network, "updated_at": stamp} for r in rows]).execute()
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def learned_slots(networks):
+    """{red: ['12:30', ...]} con las horas aprendidas; si una red no tiene las suyas usa las de 'all'. Vacío = usar POST_SLOTS."""
+    try:
+        rows = sb.table("best_hours").select("network,slot").eq("chosen", True).execute().data or []
+    except Exception:  # noqa: BLE001
+        return {}
+    by = {}
+    for r in rows:
+        by.setdefault(r["network"], []).append(r["slot"])
+    return {n: sorted(by.get(n) or by.get("all") or []) for n in networks if by.get(n) or by.get("all")}
+
+
+def save_followers(network, followers):
+    day = datetime.now(timezone(timedelta(hours=config.POST_TZ_OFFSET))).date().isoformat()
+    try:
+        sb.table("page_followers").upsert({"network": network, "day": day, "followers": int(followers)}, on_conflict="network,day").execute()
+    except Exception:  # noqa: BLE001
+        pass
+
+
+# ----------------------------------------------------------------------------- Conectar cuentas (migración 0013)
+_conn_at = 0.0
+
+
+def apply_connections(force=False, every=120):
+    """Lee las llaves guardadas desde la web y las pone en config. Sin la tabla o sin llaves, no hace nada."""
+    global _conn_at
+    import time
+    if not force and time.time() - _conn_at < every:
+        return {}
+    _conn_at = time.time()
+    try:
+        rows = sb.table("connections").select("network,data").execute().data or []
+    except Exception:  # noqa: BLE001  (migración 0013 sin correr)
+        return {}
+    import connections
+    return connections.apply(rows)

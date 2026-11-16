@@ -263,7 +263,12 @@ def main():
     poster.start_thread()   # publica a su hora aunque el worker esté grabando un directo
     last_clean = 0.0
     while True:
-        db.BASE_INFO = {"auto_queue": config.AUTO_QUEUE, "discover": config.DISCOVER, "networks": autoqueue.networks_available()}
+        try:
+            db.apply_connections()    # llaves guardadas en la web (Conectar cuentas)
+        except Exception:  # noqa: BLE001
+            pass
+        db.BASE_INFO = {"auto_queue": config.AUTO_QUEUE, "discover": config.DISCOVER, "networks": autoqueue.networks_available(),
+                        "stats": config.STATS, "learn_slots": config.LEARN_SLOTS, "learn_min_posts": config.LEARN_MIN_POSTS}
         db.heartbeat()
         if time.time() - last_clean > 600:
             db.requeue_stale()

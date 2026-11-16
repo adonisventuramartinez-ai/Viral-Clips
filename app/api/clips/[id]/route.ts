@@ -49,7 +49,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     const { data: cur } = await db.from("clips").select("publish_status").eq("id", params.id).maybeSingle();
     if (cur?.publish_status === "published") return NextResponse.json({ error: "Este clip ya se publicó" }, { status: 409 });
     const { data: rows } = await db.from("clips").select("scheduled_at").eq("publish_status", "scheduled");
-    const at = nextSlot((rows ?? []).map((r) => String(r.scheduled_at)));
+    // horas aprendidas de Facebook (o de todas las redes) en Mi página; sin datos suficientes se usan POST_SLOTS
+    const { data: bh } = await db.from("best_hours").select("network,slot").eq("chosen", true).in("network", ["facebook", "all"]);
+    const mine = (bh ?? []).filter((h) => h.network === "facebook");
+    const learned = (mine.length ? mine : bh ?? []).map((h) => String(h.slot));
+    const at = nextSlot((rows ?? []).map((r) => String(r.scheduled_at)), new Date(), learned);
     if (!at) return NextResponse.json({ error: "No hay horas libres configuradas (POST_SLOTS)" }, { status: 409 });
     upd.scheduled_at = at.toISOString(); upd.publish_status = "scheduled"; upd.publish_error = null;
     if (!upd.viral_status) upd.viral_status = "approved";

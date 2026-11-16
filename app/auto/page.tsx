@@ -47,7 +47,7 @@ export default function Auto() {
   return (
     <>
       <h1>⚡ Clips automáticos</h1>
-      <p className="sub">Vigila canales o búsquedas y saca clips solo de los videos nuevos que van más fuertes (más vistas por hora). Cada clip pasa por el área viral antes de publicarse.</p>
+      <p className="sub">Vigila canales de YouTube, búsquedas o páginas de Facebook y saca clips solo de los videos nuevos que van más fuertes (más vistas por hora). Cada clip pasa por el área viral antes de publicarse.</p>
       {err && <div className="banner">{err}</div>}
       {!err && on !== null && (
         <div className={`banner ${on ? "ok" : ""}`}>{on ? "Clips automáticos ENCENDIDOS" : "Apagados: pon DISCOVER=1 en worker/.env y reinicia el worker."}</div>
@@ -58,16 +58,18 @@ export default function Auto() {
           <select value={kind} onChange={(e) => setKind(e.target.value)}>
             <option value="channel">Canal de YouTube</option>
             <option value="search">Búsqueda (lo más nuevo)</option>
+            <option value="facebook">Página de Facebook</option>
           </select>
           <input name="name" placeholder="Nombre (opcional)" maxLength={60} />
         </div>
-        <input name="target" required placeholder={kind === "channel" ? "https://www.youtube.com/@canal" : "La Casa de Alofoke 3"} />
+        <input name="target" required placeholder={kind === "channel" ? "https://www.youtube.com/@canal" : kind === "facebook" ? "https://www.facebook.com/NombreDePagina" : "La Casa de Alofoke 3"} />
         <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", gap: 8 }}>
           <select name="content_type">{TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
           <input name="clips" type="number" min={1} max={15} defaultValue={4} title="Clips por video" />
           <input name="max_age_hours" type="number" min={1} defaultValue={48} title="Solo videos de las últimas N horas" />
           <input name="min_views" type="number" min={0} defaultValue={0} title="Vistas mínimas" />
         </div>
+        {kind === "facebook" && <small style={{ color: "var(--muted)" }}>Facebook se lee con la Graph API y el FB_PAGE_TOKEN del worker: funciona con tus páginas, y con páginas de otros solo si tu app de Meta tiene el permiso «Page Public Content Access».</small>}
         <small style={{ color: "var(--muted)" }}>Clips por video · horas de antigüedad máxima · vistas mínimas. Respeta los derechos del contenido: usa solo canales de los que tengas permiso.</small>
         <button className="btn" disabled={busy}>{busy ? "Agregando…" : "Agregar"}</button>
       </form>
@@ -76,7 +78,7 @@ export default function Auto() {
         {items.map((f) => (
           <div key={f.id} className="card" style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
             <div style={{ minWidth: 220 }}>
-              <b>{f.name || f.target}</b> <small style={{ color: "var(--muted)" }}>{f.kind === "search" ? "búsqueda" : "canal"} · {f.clips} clips/video · últimas {f.max_age_hours} h</small>
+              <b>{f.name || f.target}</b> <small style={{ color: "var(--muted)" }}>{f.kind === "search" ? "búsqueda" : f.kind === "facebook" ? "Facebook" : "canal"} · {f.clips} clips/video · últimas {f.max_age_hours} h</small>
               <div><small style={{ color: "var(--muted)" }}>Revisada {ago(f.last_checked)} · {f.last_status ?? "—"}</small></div>
             </div>
             <div style={{ display: "flex", gap: 6 }}>
