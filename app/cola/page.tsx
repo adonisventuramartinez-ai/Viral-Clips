@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import SwitchCard from "@/components/SwitchCard";
 
 type Post = { id: string; network: string; status: string; scheduled_at: string; error: string | null; published_at: string | null; clips: { title: string; viral_score: number } | null };
 type Info = { auto_queue?: boolean; networks?: string[] };
@@ -54,10 +55,15 @@ export default function Cola() {
       <h1>🗓 Cola de publicación</h1>
       <p className="sub">Lo que el worker publica solo a su hora. Los clips entran aquí cuando el área viral los marca como listos.</p>
       {err && <div className="banner">{err}</div>}
+      <SwitchCard
+        name="auto_queue"
+        title="Cola automática"
+        desc="Programa solos, a la mejor hora, los clips que salen «listos» en tus redes conectadas. Si tienes «Aprobar yo cada clip» en Hacerlo viral, solo entran los que aprobaste."
+        confirmOn="Al encender, los clips «listos» se programan solos en tus redes conectadas y se publican a su hora. ¿Encender la cola automática?"
+      />
       {!err && (
-        <div className={`banner ${info.auto_queue ? "ok" : ""}`}>
-          {info.auto_queue ? "Cola automática ENCENDIDA" : "Cola automática apagada (pon AUTO_QUEUE=1 en worker/.env para que programe sola)"} ·{" "}
-          Redes conectadas: {nets.length ? nets.map((n) => NET[n] ?? n).join(", ") : "ninguna (faltan credenciales en worker/.env)"}
+        <div className="banner" style={{ background: "transparent" }}>
+          Redes conectadas: {nets.length ? nets.map((n) => NET[n] ?? n).join(", ") : "ninguna (conéctalas en Conectar cuentas)"}
         </div>
       )}
       {note && <div className="banner">{note}</div>}

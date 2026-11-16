@@ -377,3 +377,32 @@ insert into public.viral_config (id) values (1) on conflict (id) do nothing;
 alter table public.viral_config enable row level security;
 
 create index if not exists clips_viral_req on public.clips (created_at) where viral_req is not null;
+
+-- ===== 0015 botones (clips automáticos y cola) =====
+
+-- Una sola fila (id = 1). Cada interruptor vale:
+--   true  = encendido desde la web
+--   false = apagado desde la web
+--   null  = nunca lo tocaste: manda lo que diga worker/.env (DISCOVER / AUTO_QUEUE), como hasta ahora
+create table if not exists public.app_switches (
+  id         int primary key check (id = 1),
+  discover   boolean,
+  auto_queue boolean,
+  updated_at timestamptz not null default now()
+);
+insert into public.app_switches (id) values (1) on conflict (id) do nothing;
+alter table public.app_switches enable row level security;
+
+-- ===== 0016 cuentas =====
+
+-- Solo el servidor (service role) puede leer esta tabla: la web nunca devuelve contraseñas ni la lista de cuentas.
+create table if not exists public.accounts (
+  id            uuid primary key default gen_random_uuid(),
+  username      text not null unique check (username ~ '^[a-z0-9_.]{3,24}$'),
+  display_name  text not null check (char_length(display_name) between 2 and 40),
+  password_hash text not null,                     -- scrypt$sal$hash (nunca la contraseña)
+  avatar        text,                              -- foto de perfil ya achicada (data:image/jpeg;base64,...)
+  created_at    timestamptz not null default now(),
+  last_login    timestamptz
+);
+alter table public.accounts enable row level security;

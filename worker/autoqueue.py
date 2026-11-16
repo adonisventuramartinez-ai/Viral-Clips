@@ -3,7 +3,7 @@
   plan(clips, taken, networks, now, ...) -> [{clip_id, network, scheduled_at}]   (lógica pura, con pruebas)
   tick(db)                                -> crea las publicaciones en la tabla `posts`
 
-Solo corre con AUTO_QUEUE=1. Nunca programa clips en revisión, flojos o ya publicados.
+Solo corre con el botón «Cola automática» de la web o con AUTO_QUEUE=1. Nunca programa clips en revisión, flojos o ya publicados.
 """
 import time
 from datetime import datetime, timedelta, timezone
@@ -51,9 +51,19 @@ def plan(clips, taken, networks, now=None, pending=None, max_ahead_days=None, ma
     return out
 
 
+def _enabled(db=None):
+    """¿Está encendida la cola automática? Manda el botón de la web (Parte 13); si no se puede leer, el AUTO_QUEUE del .env."""
+    try:
+        if db is None:
+            import db as db
+        return bool(db.auto_queue_on()) if hasattr(db, "auto_queue_on") else bool(config.AUTO_QUEUE)
+    except Exception:  # noqa: BLE001
+        return bool(config.AUTO_QUEUE)
+
+
 def tick(db=None):
     global _last
-    if not config.AUTO_QUEUE or time.time() - _last < 120:
+    if time.time() - _last < 120 or not _enabled(db):
         return 0
     _last = time.time()
     if db is None:

@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import SwitchCard from "@/components/SwitchCard";
 
 type Feed = { id: string; name: string | null; kind: string; target: string; active: boolean; content_type: string; clips: number; max_age_hours: number; min_views: number; last_checked: string | null; last_status: string | null };
 type Found = { id: string; title: string; url: string; views: number; status: string; reason: string | null; created_at: string };
@@ -15,7 +16,6 @@ function ago(iso: string | null) {
 export default function Auto() {
   const [items, setItems] = useState<Feed[]>([]);
   const [found, setFound] = useState<Found[]>([]);
-  const [on, setOn] = useState<boolean | null>(null);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [kind, setKind] = useState("channel");
@@ -24,7 +24,7 @@ export default function Auto() {
     const r = await fetch("/api/feeds", { cache: "no-store" }).catch(() => null);
     const j = await r?.json().catch(() => ({}));
     if (!r?.ok) return setErr(j?.error ?? "No se pudo conectar");
-    setErr(""); setItems(j.items ?? []); setFound(j.found ?? []); setOn(j.discover ?? null);
+    setErr(""); setItems(j.items ?? []); setFound(j.found ?? []);
   }, []);
   useEffect(() => { load(); const t = setInterval(load, 20000); return () => clearInterval(t); }, [load]);
 
@@ -49,9 +49,11 @@ export default function Auto() {
       <h1>⚡ Clips automáticos</h1>
       <p className="sub">Vigila canales de YouTube, búsquedas o páginas de Facebook y saca clips solo de los videos nuevos que van más fuertes (más vistas por hora). Cada clip pasa por el área viral antes de publicarse.</p>
       {err && <div className="banner">{err}</div>}
-      {!err && on !== null && (
-        <div className={`banner ${on ? "ok" : ""}`}>{on ? "Clips automáticos ENCENDIDOS" : "Apagados: pon DISCOVER=1 en worker/.env y reinicia el worker."}</div>
-      )}
+      <SwitchCard
+        name="discover"
+        title="Clips automáticos"
+        desc="Revisa tus fuentes cada 30 min y saca clips solo de los videos nuevos que van fuertes. Máximo 4 videos al día y 2 esperando a la vez. Los clips pasan por Hacerlo viral antes de publicarse."
+      />
       <form onSubmit={add} className="card" style={{ display: "grid", gap: 8 }}>
         <b>Agregar fuente</b>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>

@@ -192,10 +192,20 @@ def inspect(c):
         return None
 
 
+def _enabled(db=None):
+    """¿Están encendidos los Clips automáticos? Manda el botón de la web (Parte 13); si no se puede leer, el DISCOVER del .env."""
+    try:
+        if db is None:
+            import db as db
+        return bool(db.discover_on()) if hasattr(db, "discover_on") else bool(config.DISCOVER)
+    except Exception:  # noqa: BLE001
+        return bool(config.DISCOVER)
+
+
 def tick(db=None, lister=None, inspector=None, now=None):
     """Una revisión: mira las fuentes que ya toca revisar y encola los videos más fuertes. Devuelve cuántos encoló."""
     global _last
-    if not config.DISCOVER or (time.time() - _last < 60 and now is None):
+    if not _enabled(db) or (time.time() - _last < 60 and now is None):
         return 0
     _last = time.time()
     if db is None:

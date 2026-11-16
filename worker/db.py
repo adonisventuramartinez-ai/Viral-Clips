@@ -683,3 +683,40 @@ def cover_path(clip):
         return clip["thumb_b_path"]
     return (clip or {}).get("thumb_path") or None
 
+
+
+# ----------------------------------------------------------------------------- Parte 13: interruptores desde la web (migración 0015)
+_sw = {"at": 0.0, "row": {}}
+
+
+def web_switches(every=15):
+    """Interruptores que dejaste en la web (tabla app_switches). Cada uno es True, False o None (None = lo que diga worker/.env).
+    Se recuerdan 15 s. Sin la migración 0015 devuelve {} y todo sigue mandando el .env."""
+    import time as _t
+    if _t.time() - _sw["at"] < every:
+        return _sw["row"]
+    row = {}
+    try:
+        rows = sb.table("app_switches").select("discover,auto_queue").eq("id", 1).limit(1).execute().data or []
+        if rows:
+            row = rows[0]
+    except Exception:  # noqa: BLE001  (sin la migración 0015: manda el .env)
+        row = {}
+    _sw["at"], _sw["row"] = _t.time(), row
+    return row
+
+
+def switch_on(name, default):
+    """Valor efectivo de un interruptor: lo de la web si lo tocaste; si no, el valor del .env (`default`)."""
+    v = (web_switches() or {}).get(name)
+    return bool(default) if v is None else bool(v)
+
+
+def discover_on():
+    """¿Están encendidos los Clips automáticos? Botón de la web, o DISCOVER del .env si nunca lo tocaste."""
+    return switch_on("discover", config.DISCOVER)
+
+
+def auto_queue_on():
+    """¿Está encendida la Cola automática? Botón de la web, o AUTO_QUEUE del .env si nunca lo tocaste."""
+    return switch_on("auto_queue", config.AUTO_QUEUE)

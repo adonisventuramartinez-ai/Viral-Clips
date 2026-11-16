@@ -1,67 +1,55 @@
 import { NextResponse } from "next/server";
-import { createHash, timingSafeEqual } from "node:crypto";
-import { authToken } from "@/lib/auth";
+import { authToken, sessionSecret, signSession } from "@/lib/auth";
+import { checkPassword, sameSecret } from "@/lib/password";
+import { addFail, blockedFor, clearFails, clientIp, tooMany } from "@/lib/ratelimit";
+import { cleanUsername } from "@/lib/profile";
+import { cookieOpts } from "@/lib/session";
+import { serverClient } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 
-// Límite de intentos por IP: 5 fallos cada 15 minutos. Se guarda en memoria del servidor, así que en
-// Vercel (varias instancias) frena la fuerza bruta casual pero no es un muro perfecto; para algo más
-// fuerte, pon Vercel Firewall / Upstash. Un login correcto borra los fallos de esa IP.
-const MAX_FAILS = Number(process.env.LOGIN_MAX_FAILS || 5);
-const WINDOW_MS = Number(process.env.LOGIN_WINDOW_MIN || 15) * 60 * 1000;
-const fails = new Map<string, { n: number; first: number }>();
-
-function clientIp(req: Request) {
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0].trim();
-  return req.headers.get("x-real-ip") || "desconocida";
-}
-
-function sameSecret(a: string, b: string) {
-  // se comparan los hashes (misma longitud siempre) en tiempo constante
-  const ha = createHash("sha256").update(a).digest();
-  const hb = createHash("sha256").update(b).digest();
-  return timingSafeEqual(ha, hb);
-}
-
-function prune(now: number) {
-  if (fails.size < 500) return;
-  for (const [ip, f] of fails) if (now - f.first > WINDOW_MS) fails.delete(ip);
-}
-
+// Dos formas de entrar:
+//  1) { username, password }  → tu cuenta (cookie cf_session, 30 días)
+//  2) { password }            → solo la clave de acceso de la app (APP_PASSWORD), como antes; sirve de respaldo si no hay cuentas.
+// Límite de intentos por IP: 5 fallos cada 15 minutos (ver lib/ratelimit.ts). Un acceso correcto borra los fallos de esa IP.
 export async function POST(req: Request) {
-  const now = Date.now();
-  const ip = clientIp(req);
-  prune(now);
+  const key = `login:${clientIp(req)}`;
+  const wait = blockedFor(key);
+  if (wait) return NextResponse.json({ error: tooMany(wait) }, { status: 429, headers: { "Retry-After": String(wait) } });
 
-  const rec = fails.get(ip);
-  if (rec && now - rec.first > WINDOW_MS) fails.delete(ip);
-  const cur = fails.get(ip);
-  if (cur && cur.n >= MAX_FAILS) {
-    const retry = Math.max(1, Math.ceil((cur.first + WINDOW_MS - now) / 1000));
-    return NextResponse.json(
-      { error: `Demasiados intentos. Prueba otra vez en ${Math.ceil(retry / 60)} min.` },
-      { status: 429, headers: { "Retry-After": String(retry) } },
-    );
+  const b = await req.json().catch(() => ({}));
+  const password = typeof b.password === "string" ? b.password : "";
+
+  if (typeof b.username === "string" && b.username.trim()) {
+    const db = serverClient();
+    if (!db) return NextResponse.json({ error: "Supabase no está conectado" }, { status: 503 });
+    const username = cleanUsername(b.username);
+    let row: { username: string; display_name: string; password_hash: string } | null = null;
+    if (username) {
+      const { data, error } = await db.from("accounts").select("username,display_name,password_hash").eq("username", username).maybeSingle();
+      if (error) return NextResponse.json({ error: /accounts/i.test(error.message) ? "Falta correr 0016_cuentas.sql en Supabase" : error.message }, { status: 500 });
+      row = data;
+    }
+    // Se verifica siempre (aunque el usuario no exista) para que no se note por el tiempo.
+    const good = await checkPassword(password, row?.password_hash);
+    if (!row || !good) {
+      addFail(key);
+      return NextResponse.json({ error: "Usuario o contraseña incorrectos" }, { status: 401 });
+    }
+    clearFails(key);
+    await db.from("accounts").update({ last_login: new Date().toISOString() }).eq("username", row.username);
+    const res = NextResponse.json({ ok: true, user: { username: row.username, display_name: row.display_name } });
+    res.cookies.set("cf_session", await signSession(row.username, sessionSecret()), cookieOpts(30));
+    return res;
   }
 
-  const { password } = await req.json().catch(() => ({ password: "" }));
   const pw = process.env.APP_PASSWORD;
-  if (!pw || typeof password !== "string" || !sameSecret(password, pw)) {
-    const f = fails.get(ip) || { n: 0, first: now };
-    f.n += 1;
-    fails.set(ip, f);
+  if (!pw || !sameSecret(password, pw)) {
+    addFail(key);
     return NextResponse.json({ error: "Contraseña incorrecta" }, { status: 401 });
   }
-
-  fails.delete(ip);
+  clearFails(key);
   const res = NextResponse.json({ ok: true });
-  res.cookies.set("cf_auth", await authToken(pw), {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 30,
-  });
+  res.cookies.set("cf_auth", await authToken(pw), cookieOpts(30));
   return res;
 }

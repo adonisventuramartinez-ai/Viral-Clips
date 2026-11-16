@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { authToken } from "@/lib/auth";
+import { authToken, sessionSecret, verifySession } from "@/lib/auth";
 
 // Protege toda la app con una contraseña (variable APP_PASSWORD).
 // Importante: las rutas /api usan la service role key, así que NO deben quedar abiertas al público.
@@ -14,7 +14,10 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next(); // en tu PC (desarrollo) pasa sin contraseña
   }
 
-  if (pathname === "/login" || pathname === "/api/login") return NextResponse.next();
+  if (pathname === "/login" || pathname === "/api/login" || pathname === "/api/registro" || pathname === "/api/logout") return NextResponse.next();
+
+  // Sesión de cuenta (usuario + contraseña) o, como antes, solo la clave de acceso.
+  if (await verifySession(req.cookies.get("cf_session")?.value, sessionSecret())) return NextResponse.next();
 
   const cookie = req.cookies.get("cf_auth")?.value;
   if (cookie && cookie === (await authToken(pw))) return NextResponse.next();

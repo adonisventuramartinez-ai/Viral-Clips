@@ -279,7 +279,7 @@ def main():
             db.apply_connections()    # llaves guardadas en la web (Conectar cuentas)
         except Exception:  # noqa: BLE001
             pass
-        db.BASE_INFO = {"auto_queue": config.AUTO_QUEUE, "discover": config.DISCOVER, "networks": autoqueue.networks_available(),
+        db.BASE_INFO = {"auto_queue": db.auto_queue_on(), "discover": db.discover_on(), "switches": True, "networks": autoqueue.networks_available(),
                         "stats": config.STATS, "learn_slots": config.LEARN_SLOTS, "learn_min_posts": config.LEARN_MIN_POSTS}
         db.heartbeat()
         if time.time() - last_clean > 600:
