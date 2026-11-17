@@ -54,13 +54,14 @@ def _providers():
         name = "groq" if i == 0 else f"groq_cuenta{i+1}"
         table[name] = dict(
             kind="openai", url="https://api.groq.com/openai/v1", key=key,
-            model=_env("GROQ_MODEL", "llama-3.3-70b-versatile"), json=True, max_tokens=3000,
-            vision=True, vision_model=_env("GROQ_VISION_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct")
+            model=_env("GROQ_MODEL", "openai/gpt-oss-120b"), json=True, max_tokens=3000,
+            vision=True, max_images=3,   # qwen3.6-27b acepta máximo 3 imágenes por petición
+            vision_model=_env("GROQ_VISION_MODEL", "qwen/qwen3.6-27b")
         )
         # Añadimos el modelo de 8B para cada cuenta
         table[f"{name}_8b"] = dict(
             kind="openai", url="https://api.groq.com/openai/v1", key=key,
-            model=_env("GROQ_FALLBACK_MODEL", "llama-3.1-8b-instant"), json=True, max_tokens=3000
+            model=_env("GROQ_FALLBACK_MODEL", "openai/gpt-oss-20b"), json=True, max_tokens=3000
         )
 
     # Todas las cuentas de Groq van en bloque: primero el modelo grande de CADA cuenta y después el chico de cada una.
@@ -121,7 +122,10 @@ def _from_http(status, text, headers):
             wait = ra if (ra and ra > 600) else 3600
             return _Fail("quota", "se acabó el cupo del día", min(wait, 6 * 3600))
         return _Fail("quota", "límite por minuto", min((ra or 60) + 1, 600))
-    if status in (400, 404, 422):
+    if status == 404 or "model_not_found" in low or "does not exist" in low:
+        # el modelo ya no existe (Groq los apaga cada tanto): reintentar cada 15 min solo gasta llamadas
+        return _Fail("config", f"modelo no disponible ({status}): cámbialo en worker/.env: {(text or '')[:100]}", 6 * 3600)
+    if status in (400, 422):
         return _Fail("config", f"petición rechazada ({status}): {(text or '')[:120]}", 900)
     return _Fail("transient", f"error {status}", 120)
 
@@ -137,6 +141,7 @@ def _call_openai(p, prompt, max_tokens=None, ping=False, images=None):
     import requests
 
     if images:
+        images = images[: p.get("max_images") or len(images)]
         content = [{"type": "text", "text": prompt}] + [
             {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + _b64(im)}} for im in images]
         model = p.get("vision_model") or p["model"]

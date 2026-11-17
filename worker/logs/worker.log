@@ -50,3 +50,45 @@
 20:01:13 ✓ Revisión inicial correcta (Supabase, bucket, ffmpeg, IA).
 20:01:13 IA en orden de uso: groq → groq_cuenta2 → groq_cuenta3 → groq_8b → groq_cuenta2_8b → groq_cuenta3_8b → gemini
 20:01:13 Worker listo (encuadres: vertical, dividido, dos personas, difuminado; directos con reconexión y chat), esperando trabajos…
+20:44:40 Recibí la señal de apagado (15): salgo. Lo que estaba en proceso se retoma al volver a encender.
+20:45:11 Groq: 3 cuenta(s) configurada(s).
+20:45:11 Probando las llaves de IA (una petición mínima a cada una)…
+20:45:18   ✓ groq: openai/gpt-oss-120b
+20:45:18   ✓ groq_cuenta2: openai/gpt-oss-120b
+20:45:18   ✓ groq_cuenta3: openai/gpt-oss-120b
+20:45:18   ✓ groq_8b: openai/gpt-oss-20b
+20:45:18   ✓ groq_cuenta2_8b: openai/gpt-oss-20b
+20:45:18   ✓ groq_cuenta3_8b: openai/gpt-oss-20b
+20:45:18   ✓ gemini: gemini-3.5-flash-lite
+20:45:18 ✓ Revisión inicial correcta (Supabase, bucket, ffmpeg, IA).
+20:45:18 IA en orden de uso: groq → groq_cuenta2 → groq_cuenta3 → groq_8b → groq_cuenta2_8b → groq_cuenta3_8b → gemini
+20:45:18 Worker listo (encuadres: vertical, dividido, dos personas, difuminado; directos con reconexión y chat), esperando trabajos…
+20:51:41 [download bec290] Trabajo bec29020-f2f9-4d18-80d8-f93d62b480d1 → fuente c9d676f2-c2e9-442b-8076-5232e328e2a2 · prioridad 0 · intento 1
+20:51:42 [download bec290]   Tipo de contenido: GTA 6 · acción · juego: GTA 6 · clips de ~75 s
+20:51:42 [download bec290]   Encuadre pedido: crop | recuadro manual: no (automático)
+20:51:42 [download bec290] ▶ descarga
+20:54:55 [download bec290] ▶ transcripción
+20:55:11 [download bec290] ▶ análisis
+20:57:56 [download bec290]   Audio: 433 s de tiroteo, 284 s con explosión
+20:57:56 [download bec290]   Pistas: 5 s con volumen alto, 101 s de acción en pantalla, 178 frase(s) marcada(s)
+20:58:03 [download bec290]   IA: groq → petición rechazada (400): {"error":{"message":"Failed to validate JSON. Please adjust your prompt. See 'failed_generation' for more details.","typ (vuelvo a probarlo en 15 min). Paso al siguiente.
+20:58:10 [download bec290]   IA: groq_cuenta2 → petición rechazada (400): {"error":{"message":"Failed to validate JSON. Please adjust your prompt. See 'failed_generation' for more details.","typ (vuelvo a probarlo en 15 min). Paso al siguiente.
+20:58:17 [download bec290]   IA: usando groq_cuenta3 (openai/gpt-oss-120b)
+20:58:17 [download bec290]   IA: groq_cuenta3 → límite por minuto (vuelvo a probarlo en 15 s). Paso al siguiente.
+20:58:22 [download bec290]   IA: groq_8b → petición rechazada (400): {"error":{"message":"Failed to validate JSON. Please adjust your prompt. See 'failed_generation' for more details.","typ (vuelvo a probarlo en 15 min). Paso al siguiente.
+20:58:26 [download bec290]   IA: groq_cuenta2_8b → petición rechazada (400): {"error":{"message":"Failed to validate JSON. Please adjust your prompt. See 'failed_generation' for more details.","typ (vuelvo a probarlo en 15 min). Paso al siguiente.
+20:58:30 [download bec290]   IA: groq_cuenta3_8b → petición rechazada (400): {"error":{"message":"Failed to validate JSON. Please adjust your prompt. See 'failed_generation' for more details.","typ (vuelvo a probarlo en 15 min). Paso al siguiente.
+20:58:40 [download bec290]   IA: usando gemini (gemini-3.5-flash-lite)
+20:58:42 [download bec290]   IA: usando groq_cuenta3 (openai/gpt-oss-120b)
+20:58:42 [download bec290]   Segunda pasada: re-puntué 9 de 9 candidatos
+20:58:44 [download bec290]   IA: groq:vision → petición rechazada (404): {"error":{"message":"The model `meta-llama/llama-4-scout-17b-16e-instruct` does not exist or you do not have access to i (vuelvo a probarlo en 15 min). Paso al siguiente.
+20:58:45 [download bec290]   IA: groq_cuenta2:vision → petición rechazada (404): {"error":{"message":"The model `meta-llama/llama-4-scout-17b-16e-instruct` does not exist or you do not have access to i (vuelvo a probarlo en 15 min). Paso al siguiente.
+20:58:45 [download bec290]   IA: groq_cuenta3:vision → petición rechazada (404): {"error":{"message":"The model `meta-llama/llama-4-scout-17b-16e-instruct` does not exist or you do not have access to i (vuelvo a probarlo en 15 min). Paso al siguiente.
+21:00:27 [download bec290]   Verificación con imágenes: revisé 9 candidato(s), 3 bajaron de puntaje
+21:00:27 [download bec290] ▶ clips
+21:00:28 [download bec290]   Logo: lo pongo en br (24% del ancho)
+21:01:47 [download bec290]   Pitido: 5 grosería(s) tapada(s)
+21:01:50 [download bec290]   Volumen: -19.3 LUFS -> -14 LUFS
+21:01:50 [download bec290]   Efectos: zoom en 4.8 s, cámara lenta en 4.8 s
+21:03:04 [download bec290]   Viral: 67 pts → review
+21:04:22 [download bec290] Recibí la señal de apagado (15): salgo. Lo que estaba en proceso se retoma al volver a encender.

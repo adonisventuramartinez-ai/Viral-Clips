@@ -56,7 +56,7 @@ G, C, M = "api.groq.com", "api.cerebras.ai", "generativelanguage.googleapis.com"
 # 1) todo bien: usa Groq 70B y no toca a nadie más
 reset(**{G: [good()]})
 assert llm.ask("hola", check=parse) == '{"moments":[]}'
-assert calls == [(G, "llama-3.3-70b-versatile")], calls
+assert calls == [(G, "openai/gpt-oss-120b")], calls
 
 # 2) Groq se queda sin cupo diario (70B y 8B) -> pasa a Cerebras y NO vuelve a molestar a Groq
 reset(**{G: [R(429, "Rate limit reached ... tokens per day (TPD): Limit 100000", {"retry-after": "3000"})], C: [good()]})
@@ -138,7 +138,7 @@ sys.modules["requests"].post = fake_multi
 reset()
 assert len([n for n in llm.configured() if n.startswith("groq") and not n.endswith("_8b")]) == 20
 llm.ask("x", check=parse)
-assert auth_seen[-1][0] == "gsk_03" and auth_seen[-1][1] == "llama-3.3-70b-versatile", auth_seen   # saltó 01 y 02 (70B)
+assert auth_seen[-1][0] == "gsk_03" and auth_seen[-1][1] == "openai/gpt-oss-120b", auth_seen   # saltó 01 y 02 (70B)
 assert llm._cool["groq"] > time.time() + 600 and llm._cool["groq_cuenta2"] > time.time() + 600
 
 # 11) reparto: las siguientes preguntas empiezan por cuentas distintas (no revientan siempre la misma)
@@ -163,3 +163,20 @@ reset(); llm.ask("x", check=parse)
 assert "groq" in llm._dead and "groq_cuenta2" not in llm._dead
 
 print("OK: 13 pruebas de rotación pasaron")
+
+# 12) modelo apagado (404): enfriamiento largo y no 15 min; visión manda máximo 3 imágenes a Groq
+reset(**{G: [R(404, "The model `x` does not exist or you do not have access to it", {})]})
+os.environ["GROQ_API_KEY"] = "gsk_t"; os.environ.pop("GROQ_KEYS", None)
+f = llm._from_http(404, "The model `meta-llama/llama-4-scout` does not exist", {})
+assert f.kind == "config" and f.wait >= 6 * 3600, (f.kind, f.wait)
+g = llm._from_http(400, "Failed to validate JSON", {})
+assert g.kind == "config" and g.wait == 900
+sent = []
+sys.modules["requests"].post = lambda url, headers=None, json=None, timeout=None, **kw: (sent.append(json), good())[1]
+llm._cool.clear(); llm._dead.clear()
+p = [p for p in llm._providers() if p["name"] == "groq"][0]
+llm._call(p, "x", images=[b"a", b"b", b"c", b"d", b"e"])
+body = sent[-1]
+assert body["model"] == "qwen/qwen3.6-27b", body["model"]
+assert sum(1 for c in body["messages"][0]["content"] if c["type"] == "image_url") == 3
+print("ok vision/404")

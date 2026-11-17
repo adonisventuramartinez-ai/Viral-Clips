@@ -258,7 +258,7 @@ function TemplatesSection() {
 export default function Ajustes() {
   const rows: [string, string, string][] = [
     ["Quién elige los clips", "LLM_PROVIDER", "groq (gratis) o anthropic"],
-    ["Modelo de Groq", "GROQ_MODEL", "llama-3.3-70b-versatile"],
+    ["Modelo de Groq", "GROQ_MODEL", "openai/gpt-oss-120b"],
     ["Idioma del video", "LANGUAGE", "es"],
     ["Formato vertical", "CLIP_LAYOUT", "crop, split (cara arriba + gameplay), duo (dos personas) o blur"],
     ["Seguir a quien habla", "CLIP_FRAMING", "auto (sigue la cara) o center (fijo)"],

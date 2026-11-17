@@ -46,7 +46,7 @@ def groq_keys():
 
 GROQ_API_KEY = ",".join(groq_keys())   # compatibilidad: todas juntas
 CLAUDE_MODEL = os.environ.get("CLAUDE_MODEL", "claude-sonnet-5-5")
-GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_MODEL = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
 
 # Proveedor que se prueba primero (llm.py rota solo a los demás si se queda sin cupo). Por defecto: anthropic solo si hay llave.
 LLM_PROVIDER = os.environ.get("LLM_PROVIDER") or ("anthropic" if ANTHROPIC_API_KEY else "groq")

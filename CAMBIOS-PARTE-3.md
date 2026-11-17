@@ -19,7 +19,7 @@ Funciona en videos (Crear clips) y en En vivo, con una excepción: **la verifica
 - **No puedo probar con tus videos reales.** Probé con audio y fotogramas sintéticos y con videos generados con ffmpeg. Los umbrales (cuánto sube el volumen en un disparo, cuánto color tiene WASTED) están razonados, no calibrados con tu gameplay. Si ves falsos positivos o clips que se escapan, dime qué tipo de video fue y los ajusto.
 - **Las pantallas de GTA se reconocen por color, no leyendo letras.** Una escena nocturna muy apagada con un objeto rojo grande podría confundirse con WASTED; por eso se exigen 2 fotogramas seguidos y la verificación con imágenes sirve de segunda opinión.
 - **Discusiones sin saber quién habla.** Sin identificar voces (pyannote, Parte 5) no se puede contar cuántas personas hablan a la vez; se usa velocidad de habla + volumen + chat como aproximación.
-- **Visión en Groq:** usa el modelo `meta-llama/llama-4-scout-17b-16e-instruct`. Si Groq lo cambia o tu cuenta no lo tiene, pon otro en `GROQ_VISION_MODEL` o deja `VERIFY_IMAGES=0`. Tiene su propio enfriamiento: un 429 en visión no deja sin texto a esa cuenta.
+- **Visión en Groq:** usa el modelo `qwen/qwen3.6-27b` (antes llama-4-scout, apagado por Groq el 17/07/2026). Si Groq lo cambia o tu cuenta no lo tiene, pon otro en `GROQ_VISION_MODEL` o deja `VERIFY_IMAGES=0`. Tiene su propio enfriamiento: un 429 en visión no deja sin texto a esa cuenta.
 - **Tiempo:** el audio de 30 min se analiza en ~1 s y usa ~120 MB (se lee por bloques de 60 s). Las pantallas cuestan ~2 s por minuto de video 720p: un VOD de 4 h suma ~8 min.
 - Cada detector se apaga en `.env` (`DETECT_AUDIO`, `DETECT_SCREEN`, `DETECT_ARGUMENT`, `DEDUPE`, `VERIFY_IMAGES`). Si uno falla, el trabajo sigue sin él.
 

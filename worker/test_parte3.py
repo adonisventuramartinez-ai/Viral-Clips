@@ -270,7 +270,7 @@ sys.modules["requests"] = types.SimpleNamespace(post=fake_post, RequestException
 res = llm.ask_vision("mira", [b"\xff\xd8abc", b"\xff\xd8def"], check=vision._parse)
 check("Groq sin cupo → pasa a Gemini con visión", res["verdict"] == "ok" and sent[0][0] == "api.groq.com" and "gemini" in sent[1][0] or "generativelanguage" in sent[1][0])
 check("la petición lleva las imágenes en base64", isinstance(sent[0][2], list) and sent[0][2][1]["image_url"]["url"].startswith("data:image/jpeg;base64,"))
-check("Groq usa su modelo de visión", "llama-4" in sent[0][1])
+check("Groq usa su modelo de visión", "qwen3.6" in sent[0][1])
 check("con imágenes no se fuerza modo JSON", sent[0][3] is None)
 sent.clear()
 llm.ask_vision("mira", [b"x"], check=vision._parse)
