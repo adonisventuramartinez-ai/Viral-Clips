@@ -41,7 +41,7 @@ WrapStyle: 0
 
 [V4+ Styles]
 Format: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding
-Style: Cap,Montserrat,{st['size']},&H00{_hex(st['text'])},&H00{_hex(st['text'])},&H00{_hex(st['outline'], '000000')},&H80000000,-1,0,0,0,100,100,0,0,1,{st['outline_w']},2,2,60,60,{margin},1
+Style: Cap,Montserrat,{st['size']},&H00{_hex(st['text'])},&H00{_hex(st['text'])},&H00{_hex(st['outline'], '000000')},&H96000000,-1,0,0,0,100,100,0,0,1,{st['outline_w']},4,2,120,120,{margin},1
 Style: Hook,DejaVu Sans,64,&H00000000,&H00000000,&H00FFFFFF,&H00FFFFFF,-1,0,0,0,100,100,0,0,3,16,0,8,90,90,290,1
 
 [Events]
@@ -62,16 +62,40 @@ def _esc(text: str, upper: bool) -> str:
 
 
 HOOK_POP = "{\\fad(80,250)\\fscx82\\fscy82\\t(0,180,\\fscx100\\fscy100)}"   # el gancho aparece ya en el primer cuadro, con un golpe de escala
+# La palabra que se está diciendo entra grande y SE QUEDA grande hasta que pasa a la siguiente.
+WORD_HOLD = "{\\fscx100\\fscy100\\t(0,70,\\fscx118\\fscy118)}"
+LINE_CHARS = 16   # una sola línea: no se parte en dos y no choca con los botones del Reel
+LINE_GAP = 0.45   # un silencio corta la frase; no se quedan juntas dos palabras que no van juntas
 
 
-def build_ass(words, start, end, group=2, layout="crop", style=None, hook=None, hook_sec=3.5, tmap=None, n_speakers=0):
+def _lines(ws, max_words):
+    """Agrupa en frases cortas (tope de palabras y de letras). Una palabra larga va sola."""
+    lines, cur, n = [], [], 0
+    max_words = max(1, int(max_words))
+    for w in ws:
+        word = str(w.get("w") or "").strip()
+        if not word:
+            continue
+        gap = bool(cur) and w["start"] - cur[-1]["end"] > LINE_GAP
+        wide = bool(cur) and (len(cur) >= max_words or n + 1 + len(word) > LINE_CHARS)
+        if gap or wide:
+            lines.append(cur)
+            cur, n = [], 0
+        cur.append(w)
+        n += len(word) + (1 if n else 0)
+    if cur:
+        lines.append(cur)
+    return lines
+
+
+def build_ass(words, start, end, group=3, layout="crop", style=None, hook=None, hook_sec=3.5, tmap=None, n_speakers=0):
     tmap = tmap or (lambda t: t)
     st = _subs(style)
     ws = [w for w in words if w["start"] >= start - 0.05 and w["end"] <= end + 0.3]
     lines = [_header(layout, st)]
 
     white = "{\\c&H" + _hex(st["text"]) + "&}"
-    pop = "{\\fscx120\\fscy120\\t(0,100,\\fscx100\\fscy100)}" if st["pop"] else ""
+    pop = WORD_HOLD if st["pop"] else ""
     if n_speakers >= 2:
         import speakers
         actives = ["{\\c&H" + _hex(c, "00E0FF") + "&}" for c in speakers.colors(n_speakers, st["active"])]
@@ -86,8 +110,7 @@ def build_ass(words, start, end, group=2, layout="crop", style=None, hook=None, 
         h = _esc(str(hook).strip()[:70], True)
         lines.append(f"Dialogue: 1,{_t(0.0)},{_t(max(1.0, min(hook_sec, end - start - 0.2)))},Hook,,0,0,0,,{HOOK_POP}{h}\n")
 
-    for i in range(0, len(ws), group):
-        g = ws[i : i + group]
+    for g in _lines(ws, group):
         for j, w in enumerate(g):
             t0 = tmap(w["start"] - start)
             t1 = tmap((g[j + 1]["start"] if j + 1 < len(g) else w["end"]) - start)
@@ -336,10 +359,11 @@ def _render_core(source: Path, words, start: float, end: float, out: Path, workd
         sw, sh = _probe(source)
         if sw / sh > 9 / 16:
             import framing
-            keys = framing.camera_keys(source, start, dur, sw, sh, int(sh * 9 / 16) // 2 * 2 / sw)
+            found = framing.camera_keys(source, start, dur, sw, sh, int(sh * 9 / 16) // 2 * 2 / sw)
+            # Lista vacía = ya busqué y no hay cara: el recorte se queda al centro y no vuelve a detectar.
+            keys = found or []
             if not keys:
-                print("  Encuadre: no encontré personas, uso fondo borroso (blur)", flush=True)
-                layout = "blur"
+                print("  Encuadre: no vi una cara clara, recorto al centro", flush=True)
 
     has_aud = postfx.has_audio(source)
     beeps = []

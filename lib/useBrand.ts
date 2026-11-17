@@ -4,8 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 export type Subs = { text: string; active: string; outline: string; size: number; outline_w: number; upper: boolean; pop: boolean; offset: number };
 export type Brand = { enabled: boolean; pos: string; size: number; opacity: number; file?: string; subs?: Subs; hook?: boolean; hook_sec?: number };
 
-/** Estilos de subtítulos listos (los mismos valores los usa el worker). Fuente: DejaVu Sans Bold. */
+/** Estilos de subtítulos listos (los mismos valores los usa el worker). Fuente: Montserrat. */
 export const SUB_PRESETS: Record<string, { label: string; v: Subs }> = {
+  karaoke: { label: "Karaoke (palabra grande, recomendado)", v: { text: "FFFFFF", active: "FFE000", outline: "000000", size: 96, outline_w: 8, upper: true, pop: true, offset: 0 } },
   classic: { label: "Clásico (blanco + amarillo)", v: { text: "FFFFFF", active: "FFE000", outline: "000000", size: 86, outline_w: 7, upper: true, pop: true, offset: 0 } },
   neon:    { label: "Neón (cian + borde morado)", v: { text: "FFFFFF", active: "2EE6D6", outline: "8B3DFF", size: 90, outline_w: 9, upper: true, pop: true, offset: 0 } },
   green:   { label: "Verde grande", v: { text: "FFFFFF", active: "00E676", outline: "000000", size: 100, outline_w: 10, upper: true, pop: true, offset: 0 } },

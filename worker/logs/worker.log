@@ -92,3 +92,132 @@
 21:01:50 [download bec290]   Efectos: zoom en 4.8 s, cámara lenta en 4.8 s
 21:03:04 [download bec290]   Viral: 67 pts → review
 21:04:22 [download bec290] Recibí la señal de apagado (15): salgo. Lo que estaba en proceso se retoma al volver a encender.
+21:15:24 Groq: 3 cuenta(s) configurada(s).
+21:15:25 Probando las llaves de IA (una petición mínima a cada una)…
+21:15:37   ✓ groq: openai/gpt-oss-120b
+21:15:37   ✓ groq_cuenta2: openai/gpt-oss-120b
+21:15:37   ✓ groq_cuenta3: openai/gpt-oss-120b
+21:15:37   ✓ groq_8b: openai/gpt-oss-20b
+21:15:37   ✓ groq_cuenta2_8b: openai/gpt-oss-20b
+21:15:37   ✓ groq_cuenta3_8b: openai/gpt-oss-20b
+21:15:37   ✓ gemini: gemini-3.5-flash-lite
+21:15:37 ✓ Revisión inicial correcta (Supabase, bucket, ffmpeg, IA).
+21:15:37 IA en orden de uso: groq → groq_cuenta2 → groq_cuenta3 → groq_8b → groq_cuenta2_8b → groq_cuenta3_8b → gemini
+21:15:37 Worker listo (encuadres: vertical, dividido, dos personas, difuminado; directos con reconexión y chat), esperando trabajos…
+21:18:53 [download 1510ae] Trabajo 1510ae56-7735-49a5-b8b3-33e5f4756d57 → fuente 36bac975-3d0f-4858-a9b4-2928ebf4922b · prioridad 0 · intento 1
+21:18:53 [download 1510ae]   Tipo de contenido: GTA 6 · acción · juego: GTA 6 · clips de ~75 s
+21:18:53 [download 1510ae]   Encuadre pedido: crop | recuadro manual: no (automático)
+21:18:53 [download 1510ae] ▶ descarga
+21:22:21 [download 1510ae] ▶ transcripción
+21:22:44 [download 1510ae] ▶ análisis
+21:25:39 [download 1510ae]   Audio: 433 s de tiroteo, 284 s con explosión
+21:25:39 [download 1510ae]   Pistas: 5 s con volumen alto, 101 s de acción en pantalla, 184 frase(s) marcada(s)
+21:25:45 [download 1510ae]   IA: groq → petición rechazada (400): {"error":{"message":"Failed to validate JSON. Please adjust your prompt. See 'failed_generation' for more details.","typ (vuelvo a probarlo en 15 min). Paso al siguiente.
+21:25:52 [download 1510ae]   IA: usando groq_cuenta2 (openai/gpt-oss-120b)
+21:25:59 [download 1510ae]   IA: usando groq_cuenta3 (openai/gpt-oss-120b)
+21:26:01 [download 1510ae]   IA: groq:vision → modelo no disponible (404): cámbialo en worker/.env: {"error":{"message":"The model `qwen/qwen3.6-27b` does not exist or you do not have access to it."," (vuelvo a probarlo en 360 min). Paso al siguiente.
+21:26:01 [download 1510ae]   IA: groq_cuenta2:vision → modelo no disponible (404): cámbialo en worker/.env: {"error":{"message":"The model `qwen/qwen3.6-27b` does not exist or you do not have access to it."," (vuelvo a probarlo en 360 min). Paso al siguiente.
+21:26:01 [download 1510ae]   IA: groq_cuenta3:vision → modelo no disponible (404): cámbialo en worker/.env: {"error":{"message":"The model `qwen/qwen3.6-27b` does not exist or you do not have access to it."," (vuelvo a probarlo en 360 min). Paso al siguiente.
+21:27:20 [download 1510ae]   Verificación con imágenes: revisé 6 candidato(s), 4 bajaron de puntaje
+21:27:20 [download 1510ae] ▶ clips
+21:27:21 [download 1510ae]   Logo: lo pongo en br (24% del ancho)
+21:28:16 [download 1510ae]   Pitido: 3 grosería(s) tapada(s)
+21:28:19 [download 1510ae]   Volumen: -16.9 LUFS -> -14 LUFS
+21:28:19 [download 1510ae]   Efectos: zoom en 4.7 s, cámara lenta en 4.7 s
+21:29:14 [download 1510ae]   IA: usando groq_cuenta2 (openai/gpt-oss-120b)
+21:29:18 [download 1510ae]   IA: usando groq_cuenta3 (openai/gpt-oss-120b)
+21:29:18 [download 1510ae]   Viral: 77 pts → ready
+21:29:34 [download 1510ae]   IA: usando groq_cuenta2 (openai/gpt-oss-120b)
+21:30:47 [download 1510ae]   clip listo: Descubre el secreto oculto bajo la feria (84%)
+21:31:44 [download 1510ae]   Pitido: 6 grosería(s) tapada(s)
+21:31:46 [download 1510ae]   Volumen: -14.3 LUFS -> -14 LUFS
+21:31:47 [download 1510ae]   Efectos: zoom en 2.4 s, cámara lenta en 2.4 s
+21:32:42 [download 1510ae]   IA: usando groq_cuenta3 (openai/gpt-oss-120b)
+21:32:46 [download 1510ae]   IA: usando groq_cuenta2 (openai/gpt-oss-120b)
+21:32:46 [download 1510ae]   Viral: 78 pts → review · riesgos: puta
+21:33:01 [download 1510ae]   IA: usando groq_cuenta3 (openai/gpt-oss-120b)
+21:34:12 [download 1510ae]   clip listo: ¿Qué demonios pasa? Caos total en Leonida (91%)
+21:35:24 [download 1510ae]   Pitido: 3 grosería(s) tapada(s)
+21:35:27 [download 1510ae]   Volumen: -14.6 LUFS -> -14 LUFS
+21:35:27 [download 1510ae]   Efectos: zoom en 7.4 s, cámara lenta en 7.4 s
+21:36:36 [download 1510ae]   IA: usando groq_cuenta2 (openai/gpt-oss-120b)
+21:36:39 [download 1510ae]   IA: usando groq_cuenta3 (openai/gpt-oss-120b)
+21:36:39 [download 1510ae]   Viral: 82 pts → review · riesgos: puta
+21:36:52   Cola: 1 publicación(es) programada(s) en facebook
+21:36:54 [download 1510ae]   IA: usando groq_cuenta2 (openai/gpt-oss-120b)
+21:38:08 [download 1510ae]   clip listo: ¡Policía al acecho! Primer choque épico en GTA 6 (100%)
+21:38:08 [download 1510ae]   Gancho: arranque movido +1.1s (54→66 pts)
+21:39:11 [download 1510ae]   Encuadre: no encontré personas, uso fondo borroso (blur)
+21:39:11 [download 1510ae]   Pitido: 3 grosería(s) tapada(s)
+21:39:13 [download 1510ae]   Volumen: -16.9 LUFS -> -14 LUFS
+21:39:14 [download 1510ae]   Efectos: zoom en 13.2 s, cámara lenta en 13.2 s
+21:39:35   Estudio viral: thumbs listo para «¡Policía al acecho! Primer choque épico en GTA 6»
+21:40:55   Cola: 1 publicación(es) programada(s) en facebook
+21:41:00 [download 1510ae]   IA: usando groq_cuenta3 (openai/gpt-oss-120b)
+21:41:03 [download 1510ae]   IA: usando groq (openai/gpt-oss-120b)
+21:41:03 [download 1510ae]   Viral: 75 pts → ready
+21:41:18 [download 1510ae]   IA: usando groq_cuenta2 (openai/gpt-oss-120b)
+21:42:21 [download 1510ae]   clip listo: Desafío del maletero: ¿Qué es este reto? (84%)
+21:42:21 [download 1510ae] Resumen: 4 clip(s) · descarga 3 min 28 s · transcripción 22 s · análisis 4 min 36 s · clips 15 min 02 s
+21:42:22 [download 1510ae] Fin del trabajo (23 min 28 s)
+21:42:58   Cola: 1 publicación(es) programada(s) en facebook
+21:54:17   Estudio viral: thumbs listo para «Desafío del maletero: ¿Qué es este reto?»
+17:03:44 Groq: 3 cuenta(s) configurada(s).
+17:03:45 Probando las llaves de IA (una petición mínima a cada una)…
+17:03:48   ✓ groq: openai/gpt-oss-120b
+17:03:48   ✓ groq_cuenta2: openai/gpt-oss-120b
+17:03:48   ✓ groq_cuenta3: openai/gpt-oss-120b
+17:03:48   ✓ groq_8b: openai/gpt-oss-20b
+17:03:48   ✓ groq_cuenta2_8b: openai/gpt-oss-20b
+17:03:48   ✓ groq_cuenta3_8b: openai/gpt-oss-20b
+17:03:48   ✓ gemini: gemini-3.5-flash-lite
+17:03:48 ✓ Revisión inicial correcta (Supabase, bucket, ffmpeg, IA).
+17:03:48 IA en orden de uso: groq → groq_cuenta2 → groq_cuenta3 → groq_8b → groq_cuenta2_8b → groq_cuenta3_8b → gemini
+17:03:48 Worker listo (encuadres: vertical, dividido, dos personas, difuminado; directos con reconexión y chat), esperando trabajos…
+17:03:59 Fuente 'ElDotolNastra' → clips de: CEKY VICINY : «ME PUEDO ESTAR MURIENDO Y NO LLAMO A NADIE» EL DOTOL NASTRA
+17:04:07 [download 790133] Trabajo 7901338e-d920-4933-bd5b-e511863d3f7b → fuente fe6b3f6f-0dbd-425b-a6d6-9ab4942abfff · prioridad 0 · intento 1
+17:04:07 [download 790133]   Tipo de contenido: Entrevista · clips de ~75 s
+17:04:07 [download 790133]   Encuadre pedido: crop | recuadro manual: no (automático)
+17:04:07 [download 790133] ▶ descarga
+17:07:32 [download 790133] ▶ transcripción
+17:08:51 [download 790133]   Voces: 6 persona(s) distintas
+17:08:51 [download 790133] ▶ análisis
+17:09:07 [download 790133]   Pistas: 6 s con volumen alto, 0 s de acción en pantalla, 4 frase(s) marcada(s)
+17:09:11 [download 790133]   IA: usando groq (openai/gpt-oss-120b)
+17:09:15 [download 790133]   IA: usando groq_cuenta2 (openai/gpt-oss-120b)
+17:09:22 [download 790133]   IA: groq_cuenta3 → petición rechazada (400): {"error":{"message":"Failed to generate JSON. Please adjust your prompt. See 'failed_generation' for more details.","typ (vuelvo a probarlo en 15 min). Paso al siguiente.
+17:09:22 [download 790133]   IA: groq → límite por minuto (vuelvo a probarlo en 16 s). Paso al siguiente.
+17:09:23 [download 790133]   IA: groq_cuenta2 → límite por minuto (vuelvo a probarlo en 22 s). Paso al siguiente.
+17:09:27 [download 790133]   IA: groq_8b → petición rechazada (400): {"error":{"message":"Failed to validate JSON. Please adjust your prompt. See 'failed_generation' for more details.","typ (vuelvo a probarlo en 15 min). Paso al siguiente.
+17:09:31 [download 790133]   IA: groq_cuenta2_8b → petición rechazada (400): {"error":{"message":"Failed to validate JSON. Please adjust your prompt. See 'failed_generation' for more details.","typ (vuelvo a probarlo en 15 min). Paso al siguiente.
+17:09:35 [download 790133]   IA: groq_cuenta3_8b → petición rechazada (400): {"error":{"message":"Failed to validate JSON. Please adjust your prompt. See 'failed_generation' for more details.","typ (vuelvo a probarlo en 15 min). Paso al siguiente.
+17:09:45 [download 790133]   IA: gemini → respuesta que no se pudo leer (vuelvo a probarlo en 30 s). Paso al siguiente.
+17:09:49 [download 790133]   IA: usando groq (openai/gpt-oss-120b)
+17:09:50 [download 790133]   IA: groq_cuenta2 → límite por minuto (vuelvo a probarlo en 5 s). Paso al siguiente.
+17:09:50 [download 790133]   IA: groq → límite por minuto (vuelvo a probarlo en 42 s). Paso al siguiente.
+17:09:50 [download 790133]   IA: todos sin cupo, espero 5 s…
+17:10:03 [download 790133]   IA: usando groq_cuenta2 (openai/gpt-oss-120b)
+17:10:03 [download 790133]   IA: groq_cuenta2 → límite por minuto (vuelvo a probarlo en 52 s). Paso al siguiente.
+17:10:03 [download 790133]   IA: todos sin cupo, espero 12 s…
+17:10:24 [download 790133]   IA: gemini → respuesta que no se pudo leer (vuelvo a probarlo en 30 s). Paso al siguiente.
+17:10:24 [download 790133]   IA: todos sin cupo, espero 8 s…
+17:10:40 [download 790133]   IA: usando groq (openai/gpt-oss-120b)
+17:10:40 [download 790133]   IA: groq → límite por minuto (vuelvo a probarlo en 24 s). Paso al siguiente.
+17:10:40 [download 790133]   IA: todos sin cupo, espero 14 s…
+17:10:59 [download 790133]   IA: usando groq_cuenta2 (openai/gpt-oss-120b)
+17:11:00 [download 790133]   IA: groq_cuenta2 → límite por minuto (vuelvo a probarlo en 4 s). Paso al siguiente.
+17:11:08 [download 790133]   IA: usando gemini (gemini-3.5-flash-lite)
+17:11:08 [download 790133]   Segunda pasada: re-puntué 17 de 17 candidatos
+17:11:08 [download 790133] ▶ clips
+17:11:09 [download 790133]   Logo: lo pongo en br (24% del ancho)
+17:11:24 [download 790133]   Ritmo: quité 4.3 s de silencios/muletillas (3 corte(s), 0 muletilla(s))
+17:12:34 [download 790133]   Volumen: -20.5 LUFS -> -14 LUFS
+17:12:34 [download 790133]   Subtítulos: 2 personas, un color para cada una
+17:14:27 [download 790133]   IA: usando groq (openai/gpt-oss-120b)
+17:14:29 [download 790133]   IA: usando groq_cuenta2 (openai/gpt-oss-120b)
+17:14:29 [download 790133]   Viral: 76 pts → ready
+17:14:47 [download 790133]   IA: usando groq (openai/gpt-oss-120b)
+17:15:47 [download 790133]   clip listo: ¿Tú tienes cuarto? La verdad sobre su 'riqueza (82%)
+17:16:01   Cola: 1 publicación(es) programada(s) en facebook
+17:16:45 [download 790133]   Volumen: -19.8 LUFS -> -14 LUFS
+17:17:10 [download 790133] Recibí la señal de apagado (15): salgo. Lo que estaba en proceso se retoma al volver a encender.

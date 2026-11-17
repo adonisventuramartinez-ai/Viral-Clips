@@ -1,5 +1,6 @@
 """Pruebas de la Parte 4 (audio, efectos, cámara de streamer, GPU, subtítulos por persona). Sin internet. Ejecuta: python test_parte4.py"""
 import os
+import re
 import subprocess
 import tempfile
 from pathlib import Path
@@ -83,6 +84,14 @@ ass = render.build_ass(ws, 0, 20, tmap=postfx.make_tmap((10.0, 11.0, 0.5)), n_sp
 check("subtítulo se corre tras la cámara lenta", "0:00:13.00" in ass and "0:00:01.00" in ass)
 check("dos colores", "&H" + render._hex(speakers.PALETTE[0]) + "&" in ass)
 check("sin personas: un solo color", "&H" + render._hex(speakers.PALETTE[0]) + "&" not in render.build_ass(ws, 0, 20))
+check("la palabra activa se queda grande", render.WORD_HOLD in ass and "\\fscx120\\fscy120\\t(0,100,\\fscx100\\fscy100)" not in ass)
+frase = [{"w": "esto", "start": 0.0, "end": 0.3}, {"w": "es", "start": 0.3, "end": 0.5}, {"w": "brutal", "start": 0.5, "end": 0.9},
+         {"w": "luego", "start": 2.0, "end": 2.4}]
+karaoke = render.build_ass(frase, 0, 4)
+plano = re.sub(r"\{.*?\}", "", karaoke)
+check("frase corta en una línea", "ESTO ES BRUTAL" in plano)
+check("un silencio parte la frase", "BRUTAL LUEGO" not in plano and "LUEGO" in plano)
+check("margen seguro a los lados", ",120,120," in karaoke)
 
 # ---------------- personas
 turns = [(0, 5, "A"), (5, 10, "B")]

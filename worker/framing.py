@@ -119,10 +119,10 @@ def _mouth_motion(prev, cur, box):
     return float(np.abs(a - b).mean()) if a.size else 0.0
 
 
-def sample_faces(source, start, dur, src_w, src_h):
+def sample_faces(source, start, dur, src_w, src_h, min_frac=0.05):
     samples, prev = [], None
     for i, gray in enumerate(_read_frames(source, start, dur, src_w, src_h)):
-        faces = _detect(gray)
+        faces = _detect(gray, min_frac)
         for f in faces:
             f["m"] = _mouth_motion(prev, gray, f["box"]) if prev is not None else 0.0
             del f["box"]
@@ -213,7 +213,14 @@ def camera_keys(source, start, dur, src_w, src_h, crop_frac):
     """Claves de cámara para el clip, o None (usar centro). Nunca lanza error: si algo falla, centro."""
     try:
         samples = sample_faces(source, start, dur, src_w, src_h)
-        return plan(samples, crop_frac)
+        keys = plan(samples, crop_frac)
+        if keys is None:
+            # Segunda pasada: caras más chicas (entrevista lejos, gorra, poca luz).
+            samples = sample_faces(source, start, dur, src_w, src_h, min_frac=0.03)
+            keys = plan(samples, crop_frac)
+            if keys:
+                print("  Encuadre: la cara era pequeña, igual la seguí", flush=True)
+        return keys
     except ImportError:
         print("  Encuadre: falta scikit-image, uso el centro (pip install scikit-image).", flush=True)
     except Exception as e:  # noqa: BLE001

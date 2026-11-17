@@ -101,7 +101,7 @@ function SubsSection() {
   }
 
   const sample = ["ESTO", "ES", "UN", "CLIP"].map((w, i) => (
-    <span key={w} style={{ color: i === 1 ? toHash(subs.active) : toHash(subs.text), marginRight: 10, WebkitTextStroke: `${Math.max(1, subs.outline_w / 3)}px ${toHash(subs.outline)}`, paintOrder: "stroke fill" }}>{subs.upper ? w : w.toLowerCase()}</span>
+    <span key={w} style={{ color: i === 1 ? toHash(subs.active) : toHash(subs.text), marginRight: 10, display: "inline-block", transform: i === 1 && subs.pop ? "scale(1.18)" : undefined, textShadow: "0 3px 0 #000", WebkitTextStroke: `${Math.max(1, subs.outline_w / 3)}px ${toHash(subs.outline)}`, paintOrder: "stroke fill" }}>{subs.upper ? w : w.toLowerCase()}</span>
   ));
   return (
     <div className="card neon" style={{ maxWidth: 720, marginBottom: 18 }}>
