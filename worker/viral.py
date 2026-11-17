@@ -16,7 +16,9 @@ from datetime import datetime, timedelta, timezone
 import config
 
 POWER = ("nadie", "increíble", "insólito", "se salió", "explot", "escándalo", "pelea", "descubr", "confes", "reveló", "reaccion",
-         "no lo vas", "lo que pasó", "en vivo", "se armó", "tiraera", "verdad", "secreto", "viral", "locura", "tremendo", "épic")
+         "no lo vas", "lo que pasó", "en vivo", "se armó", "tiraera", "verdad", "secreto", "viral", "locura", "tremendo", "épic",
+         "brutal", "desastre", "traición", "peleó", "gritó", "lloró", "golpe", "sorprend", "mentira", "bochorno", "caos",
+         "tremenda", "brutalidad", "explosión", "escándalo", "polémica", "conflicto", "drama", "tensión", "shock")
 RISK_WORDS = ("estafador", "ladrón", "violador", "pedófilo", "asesino", "drogadicto", "corrupto", "puta", "maricón", "hijueputa")
 BROAD_TAGS = ("#fyp", "#viral", "#parati", "#foryou")
 _last = 0.0

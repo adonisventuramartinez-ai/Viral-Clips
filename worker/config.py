@@ -60,12 +60,12 @@ CLIP_LAYOUT = (os.environ.get("CLIP_LAYOUT") or "crop").strip().lower()
 # Encuadre: "auto" = sigue la cara de quien habla (necesita scikit-image); "center" = fijo según CLIP_FOCUS_X
 CLIP_FRAMING = (os.environ.get("CLIP_FRAMING") or "auto").strip().lower()
 # Calidad: CRF más bajo = más nítido y más pesado (17-20 va bien); nitidez 0 = apagada, 0.5 suave, 1.0 fuerte
-CLIP_CRF = int(os.environ.get("CLIP_CRF") or 17)
+CLIP_CRF = int(os.environ.get("CLIP_CRF") or 16)
 CLIP_PRESET = (os.environ.get("CLIP_PRESET") or "medium").strip()   # ultrafast ... veryfast, fast, medium, slow
 try:
-    CLIP_SHARPEN = min(1.5, max(0.0, float(os.environ.get("CLIP_SHARPEN") or 0.5)))
+    CLIP_SHARPEN = min(1.5, max(0.0, float(os.environ.get("CLIP_SHARPEN") or 0.6)))
 except ValueError:
-    CLIP_SHARPEN = 0.5
+    CLIP_SHARPEN = 0.6
 # Encuadre horizontal del recorte: 0 = izquierda, 0.5 = centro, 1 = derecha (útil si la persona no está en el centro)
 try:
     CLIP_FOCUS_X = min(1.0, max(0.0, float(os.environ.get("CLIP_FOCUS_X") or 0.5)))
@@ -84,7 +84,7 @@ SEGMENT_SECONDS = int(os.environ.get("SEGMENT_SECONDS", "45"))    # tamaño de c
 REVIEW_MINUTES = int(os.environ.get("REVIEW_MINUTES", "2"))       # cada cuánto revisa la IA (si la web no lo manda)
 LIVE_MIN_SCORE = int(os.environ.get("LIVE_MIN_SCORE", "55"))      # puntaje mínimo para crear un clip en vivo
 
-LIVE_MAX_NEW = int(os.environ.get("LIVE_MAX_NEW", "3"))           # máximo de clips nuevos por cada revisión en vivo
+LIVE_MAX_NEW = int(os.environ.get("LIVE_MAX_NEW", "5"))           # máximo de clips nuevos por cada revisión en vivo
 LIVE_CHAT = (os.environ.get("LIVE_CHAT") or "1").strip().lower() not in ("0", "false", "no", "off")   # leer el chat del directo
 LIVE_RECONNECTS = int(os.environ.get("LIVE_RECONNECTS", "6"))     # reconexiones seguidas antes de rendirse
 WATCH_SECONDS = int(os.environ.get("WATCH_SECONDS", "120"))       # cada cuánto mira si tus canales entraron en vivo
@@ -107,7 +107,7 @@ FB_AUTOPUBLISH = (os.environ.get("FB_AUTOPUBLISH") or "0").strip().lower() in ("
 FB_PAGE_ID = os.environ.get("FB_PAGE_ID", "").strip()
 FB_PAGE_TOKEN = os.environ.get("FB_PAGE_TOKEN", "").strip()
 FB_MIN_SCORE = int(os.environ.get("FB_MIN_SCORE") or 75)       # solo publica clips con este puntaje o más
-FB_MAX_PER_JOB = int(os.environ.get("FB_MAX_PER_JOB") or 3)    # tope por video procesado
+FB_MAX_PER_JOB = int(os.environ.get("FB_MAX_PER_JOB") or 5)    # tope por video procesado
 SCHEDULE_CHECK_SECONDS = int(os.environ.get("SCHEDULE_CHECK_SECONDS") or 60)   # cada cuánto revisa si hay clips programados
 PACK = (os.environ.get("PACK") or "1").strip().lower() not in ("0", "false", "no", "off")    # paquete de textos por red + ganchos (una llamada de IA por clip)
 THUMBS = (os.environ.get("THUMBS") or "1").strip().lower() not in ("0", "false", "no", "off")  # miniatura automática
@@ -221,7 +221,7 @@ POST_MAX_PER_DAY = int(os.environ.get("POST_MAX_PER_DAY") or 6)
 AUTO_QUEUE = (os.environ.get("AUTO_QUEUE") or "0").strip().lower() in ("1", "true", "yes", "on")   # programar solo los clips "listos" de la Parte 7
 AUTO_NETWORKS = [n.strip().lower() for n in (os.environ.get("AUTO_NETWORKS") or "").split(",") if n.strip()]   # vacío = todas las que tengan credenciales
 QUEUE_MAX_AHEAD_DAYS = int(os.environ.get("QUEUE_MAX_AHEAD_DAYS") or 3)    # no programa más lejos que esto
-QUEUE_MAX_PENDING = int(os.environ.get("QUEUE_MAX_PENDING") or 12)         # máximo de publicaciones en espera por red
+QUEUE_MAX_PENDING = int(os.environ.get("QUEUE_MAX_PENDING") or 20)         # máximo de publicaciones en espera por red
 QUEUE_CLIP_DAYS = int(os.environ.get("QUEUE_CLIP_DAYS") or 3)              # solo clips creados en los últimos N días
 POSTER_SECONDS = int(os.environ.get("POSTER_SECONDS") or 30)               # cada cuánto revisa si hay algo que publicar
 # Instagram Reels (Graph API): cuenta Business/Creator enlazada a tu página. El token de la página sirve.
@@ -237,7 +237,7 @@ YT_PRIVACY = (os.environ.get("YT_PRIVACY") or "public").strip().lower()   # publ
 # --- Parte 9: clips automáticos de lo mejor del momento (APAGADO por defecto) ---
 DISCOVER = (os.environ.get("DISCOVER") or "0").strip().lower() in ("1", "true", "yes", "on")
 DISCOVER_MINUTES = int(os.environ.get("DISCOVER_MINUTES") or 30)          # cada cuánto revisa cada fuente
-DISCOVER_MAX_PER_DAY = int(os.environ.get("DISCOVER_MAX_PER_DAY") or 4)   # videos nuevos que puede procesar en 24 h (cuida tu cupo de IA)
+DISCOVER_MAX_PER_DAY = int(os.environ.get("DISCOVER_MAX_PER_DAY") or 8)   # videos nuevos que puede procesar en 24 h (cuida tu cupo de IA)
 DISCOVER_MAX_QUEUED = int(os.environ.get("DISCOVER_MAX_QUEUED") or 2)     # no encola más si ya hay tantos videos esperando
 DISCOVER_INSPECT = int(os.environ.get("DISCOVER_INSPECT") or 6)           # máximo de videos que mira a fondo por revisión
 

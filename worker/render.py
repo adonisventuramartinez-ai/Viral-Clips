@@ -6,7 +6,7 @@ from pathlib import Path
 import config
 
 # ---------------------------------------------------------------- subtítulos (ASS)
-DEFAULT_SUBS = {"text": "FFFFFF", "active": "FFE000", "outline": "000000", "size": 78, "outline_w": 6,
+DEFAULT_SUBS = {"text": "FFFFFF", "active": "FFE000", "outline": "000000", "size": 82, "outline_w": 7,
                 "upper": True, "pop": True, "offset": 0}
 
 SPLIT_TOPS = {"split": 1312, "split_eq": 1000, "split_game": 780}
@@ -140,7 +140,7 @@ def _bitrate(dur: float) -> int:
     """Bitrate de video para que el clip pese como máximo CLIP_MAX_MB (Supabase rechaza 50 MB o más).
     Clips cortos: tope de calidad de 10 Mbps. Clips largos: baja solo lo necesario, hasta un piso de 1.2 Mbps."""
     total = config.CLIP_MAX_MB * 1_000_000 * 8 / max(dur, 1.0)
-    return int(min(10_000_000, max(1_200_000, total - 192_000)))
+    return int(min(12_000_000, max(1_500_000, total - 192_000)))
 # --------------------------------------------------------------------------------
 
 

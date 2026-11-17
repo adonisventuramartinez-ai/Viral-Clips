@@ -33,6 +33,18 @@ export default function ClipCard({ clip, onDeleted, onAdjusted }: { clip: Clip; 
   }
 
   // Gancho alternativo: rehace el clip con otro texto arriba (para probar A/B publicando las dos versiones)
+  async function narrate() {
+    setBusy(true); setNote(null);
+    const r = await fetch(`/api/clips/${clip.id}/rerender`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ start: clip.start, end: clip.end, narrate: true }),
+    }).catch(() => null);
+    const j = await r?.json().catch(() => ({}));
+    setBusy(false);
+    if (r?.ok) { setNote({ ok: true, text: "En cola: el worker genera la versión narrada y se actualiza solo." }); onAdjusted?.(); }
+    else setNote({ ok: false, text: j?.error ?? "No se pudo pedir la versión narrada" });
+  }
+
   async function tryHook(h: string) {
     setBusy(true); setNote(null);
     const r = await fetch(`/api/clips/${clip.id}/rerender`, {
@@ -145,6 +157,7 @@ export default function ClipCard({ clip, onDeleted, onAdjusted }: { clip: Clip; 
           {clip.pack?.hooks?.length ? <button className="btn sm ghost" onClick={() => setHooks(!hooks)} title="Otros 3 textos para el arranque del clip">🎣 Ganchos</button> : null}
           {clip.thumbUrl && <a className="btn sm ghost" href={clip.thumbUrl} target="_blank" rel="noreferrer" style={{ textAlign: "center" }} title="Miniatura automática">🖼 Miniatura</a>}
           <button className="btn sm ghost" onClick={() => setAdj(!adj)}>✏️ Ajustar</button>
+          <button className="btn sm ghost" onClick={narrate} disabled={busy} title="Genera una versión con voz narrando el contexto (Modo Original)">🎙 Pasar a narrado</button>
           <button className="btn sm" onClick={remove} disabled={busy} style={{ background: "#ef4444", color: "#fff", border: "none" }}>
             {busy ? "Eliminando…" : "Eliminar clip"}
           </button>

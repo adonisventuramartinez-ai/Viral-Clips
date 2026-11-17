@@ -14,7 +14,7 @@ import statistics
 import subprocess
 
 SAMPLE_FPS = 3.0
-DET_W = 640        # ancho al que se reduce el cuadro para buscar caras
+DET_W = 720        # ancho al que se reduce el cuadro para buscar caras (más alto = mejor detección, más CPU)
 WIN = 3            # +-1 s de ventana para decidir quién habla
 MIN_DWELL = 3      # muestras seguidas (~1 s) antes de mover la cámara
 MIN_GAP = 1.5      # segundos mínimos entre dos paneos

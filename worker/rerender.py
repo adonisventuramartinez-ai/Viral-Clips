@@ -47,6 +47,23 @@ def process_rerender(job):
                     brand=brand.load(work, template=(src.get("options") or {}).get("brand_template")), hook=(str(p.get("hook") or "").strip()[:70] or clip.get("title")),
                     profile=profiles.get((src.get("options") or {}).get("content_type"), (src.get("options") or {}).get("game")), opts=src.get("options"))
 
+        # "Pasar a narrado": envuelve el clip con la voz narradora (Modo Original en modo "card"). Si falla, se sube el clip sin narrar.
+        if p.get("narrate"):
+            try:
+                import original
+                cfg = original.load(work, content_type=(src.get("options") or {}).get("content_type", "podcast"))
+                cfg["narrate"] = True
+                cfg["intro"] = "card"
+                text = " ".join(str(w.get("w") or "") for w in words if w.get("w"))
+                ex = original.extras(text, cfg)
+                narrated = work / f"{cid}_narrated.mp4"
+                original.wrap_clip(out, ex, narrated, work, cfg, score=clip.get("viral_score") or 75)
+                if narrated.exists() and narrated.stat().st_size > 1000:
+                    out = narrated
+                    print("  Re-render: versión narrada lista", flush=True)
+            except Exception as e:  # noqa: BLE001
+                print(f"  Re-render: no pude narrar ({type(e).__name__}: {str(e)[:120]}), subo sin narrar.", flush=True)
+
         path = f"{clip['source_id']}/{cid}_{int(time.time())}.mp4"
         db.upload_clip(path, out)
         in_clip = [{"w": w["w"], "start": w["start"] + offset - start, "end": w["end"] + offset - start}
