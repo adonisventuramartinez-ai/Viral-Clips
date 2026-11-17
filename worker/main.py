@@ -16,6 +16,7 @@ import selfcheck
 import watcher
 import brand
 import energy
+import hook as hooks
 import jobq
 import lifecycle
 import logx
@@ -143,7 +144,16 @@ def process(job):
             alive()
             cid = str(uuid.uuid4())
             out = work / f"{cid}.mp4"
-            
+
+            if config.SMART_START and ocfg.get("smart_start", True):
+                try:   # que el clip entre en la primera frase fuerte y que el texto de arriba diga algo concreto (la gente decide en 2 s)
+                    new_start, note = hooks.refine_start(words, m["start"], m["end"])
+                    if note:
+                        print(f"  Gancho: {note}", flush=True)
+                        m["start"] = new_start
+                    m["hook"] = hooks.best_hook(m.get("hook"), m["title"], words, m["start"], m["end"])
+                except Exception as e:  # noqa: BLE001  (es un extra: si falla, el clip sale como lo eligió la IA)
+                    print(f"  Gancho: no pude mejorarlo ({type(e).__name__}: {str(e)[:100]})", flush=True)
             render_clip(video, words, m["start"], m["end"], out, work, custom_crop=custom_crop, layout=clip_layout, brand=logo,
                         hook=m.get("hook") or m["title"], profile=prof, opts=opts)
 

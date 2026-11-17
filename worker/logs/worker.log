@@ -1,0 +1,52 @@
+19:44:31 Groq: 3 cuenta(s) configurada(s).
+19:44:32 Probando las llaves de IA (una petición mínima a cada una)…
+19:44:37   ✓ groq: openai/gpt-oss-120b
+19:44:37   ✓ groq_cuenta2: openai/gpt-oss-120b
+19:44:37   ✓ groq_cuenta3: openai/gpt-oss-120b
+19:44:37   ✓ groq_8b: openai/gpt-oss-20b
+19:44:37   ✓ groq_cuenta2_8b: openai/gpt-oss-20b
+19:44:37   ✓ groq_cuenta3_8b: openai/gpt-oss-20b
+19:44:37   ✓ gemini: gemini-3.5-flash-lite
+19:44:37 ✓ Revisión inicial correcta (Supabase, bucket, ffmpeg, IA).
+19:44:37 IA en orden de uso: groq → groq_cuenta2 → groq_cuenta3 → groq_8b → groq_cuenta2_8b → groq_cuenta3_8b → gemini
+19:44:37 Worker listo (encuadres: vertical, dividido, dos personas, difuminado; directos con reconexión y chat), esperando trabajos…
+19:44:38 Recuperación: 1 trabajo(s) que quedaron a medias vuelven a la cola.
+19:44:38 [download 8b16bd] Trabajo 8b16bd52-ffbd-4253-94c9-757a2ef2a96e → fuente 2d4d8a2f-19f6-4dcd-acb8-e4b01dd49fb9 · prioridad 0 · intento 2
+19:44:39 [download 8b16bd]   Tipo de contenido: Entrevista · clips de ~75 s
+19:44:39 [download 8b16bd]   Encuadre pedido: crop | recuadro manual: no (automático)
+19:44:39 [download 8b16bd]   Reintento: limpié 0 clip(s) a medias del intento anterior
+19:44:39 [download 8b16bd] ▶ descarga
+19:46:00 [download 8b16bd] ▶ transcripción
+19:46:23 [download 8b16bd]   Voces: 6 persona(s) distintas
+19:46:23 [download 8b16bd] ▶ análisis
+19:46:28 [download 8b16bd]   Pistas: 6 s con volumen alto, 0 s de acción en pantalla, 6 frase(s) marcada(s)
+19:46:35 [download 8b16bd]   IA: usando groq (openai/gpt-oss-120b)
+19:46:40 [download 8b16bd]   IA: usando groq_cuenta2 (openai/gpt-oss-120b)
+19:46:40 [download 8b16bd] ▶ clips
+19:46:41 [download 8b16bd]   Logo: lo pongo en br (24% del ancho)
+19:46:55 [download 8b16bd]   Ritmo: quité 4.2 s de silencios/muletillas (3 corte(s), 0 muletilla(s))
+19:48:15 [download 8b16bd]   Volumen: -20.6 LUFS -> -14 LUFS
+19:50:20 [download 8b16bd]   IA: usando groq_cuenta3 (openai/gpt-oss-120b)
+19:50:22 [download 8b16bd]   IA: usando groq (openai/gpt-oss-120b)
+19:50:22 [download 8b16bd]   Viral: 73 pts → ready
+19:50:38 [download 8b16bd]   IA: usando groq_cuenta2 (openai/gpt-oss-120b)
+19:52:28 [download 8b16bd]   ✖ Falló la conexión con Supabase. Reintento en unos minutos. Intento 2 de 3; vuelvo a probar en 5 min 00 s.
+19:52:28 [download 8b16bd] Fin del trabajo (7 min 50 s)
+19:57:33 [download 8b16bd] Trabajo 8b16bd52-ffbd-4253-94c9-757a2ef2a96e → fuente 2d4d8a2f-19f6-4dcd-acb8-e4b01dd49fb9 · prioridad 0 · intento 3
+19:57:33 [download 8b16bd]   Tipo de contenido: Entrevista · clips de ~75 s
+19:57:33 [download 8b16bd]   Encuadre pedido: crop | recuadro manual: no (automático)
+19:57:33 [download 8b16bd]   Reintento: limpié 0 clip(s) a medias del intento anterior
+19:57:33 [download 8b16bd] ▶ descarga
+19:57:42 [download 8b16bd] Recibí la señal de apagado (15): salgo. Lo que estaba en proceso se retoma al volver a encender.
+20:01:05 Groq: 3 cuenta(s) configurada(s).
+20:01:06 Probando las llaves de IA (una petición mínima a cada una)…
+20:01:13   ✓ groq: openai/gpt-oss-120b
+20:01:13   ✓ groq_cuenta2: openai/gpt-oss-120b
+20:01:13   ✓ groq_cuenta3: openai/gpt-oss-120b
+20:01:13   ✓ groq_8b: openai/gpt-oss-20b
+20:01:13   ✓ groq_cuenta2_8b: openai/gpt-oss-20b
+20:01:13   ✓ groq_cuenta3_8b: openai/gpt-oss-20b
+20:01:13   ✓ gemini: gemini-3.5-flash-lite
+20:01:13 ✓ Revisión inicial correcta (Supabase, bucket, ffmpeg, IA).
+20:01:13 IA en orden de uso: groq → groq_cuenta2 → groq_cuenta3 → groq_8b → groq_cuenta2_8b → groq_cuenta3_8b → gemini
+20:01:13 Worker listo (encuadres: vertical, dividido, dos personas, difuminado; directos con reconexión y chat), esperando trabajos…

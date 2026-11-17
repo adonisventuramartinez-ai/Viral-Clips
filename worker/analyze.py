@@ -23,7 +23,7 @@ Te paso un trozo de la transcripción de {kind}. Cada línea empieza con [segund
 Elige hasta {want} momentos (si hay muchos, ordénalos de mejor a peor y no repitas el mismo tema) con alto potencial viral.
 Cada clip debe:
 - durar cerca de {secs} segundos (entre {lo} y {hi});
-- empezar con un gancho que enganche en los primeros 3 segundos;
+- EMPEZAR EN LO MEJOR: el start cae en la primera frase fuerte (una pregunta, algo que sorprende, un grito, el inicio del conflicto). NUNCA empieces en saludos, "bueno", "eh", "entonces", "o sea", ni en una frase que dependa de la anterior ("pero", "y eso", "por eso"). La gente decide en 2 segundos si se queda;
 - terminar al cerrar una idea completa;
 - entenderse solo, sin contexto previo.
 
@@ -33,7 +33,7 @@ las que tienen 💬 hicieron explotar el chat, 💥 significa tiroteo o explosi�
 fuerte y rápido). Son buenas pistas de que pasó algo, pero decide tú por el contenido.
 Usa EXACTAMENTE los segundos de las marcas [..] para start y end.
 Responde SOLO con JSON, sin texto extra:
-{{"moments":[{{"start":<seg>,"end":<seg>,"title":"título corto y llamativo (máx 70 car.)","hook":"frase gancho de 3 a 7 palabras que sale arriba del clip al empezar (provoca curiosidad, sin spoilear)","score":<0-100 probabilidad viral>,"reason":"por qué funciona, 1 frase","description":"descripción para redes, 1 o 2 frases con gancho","hashtags":["#tema1","#tema2","#tema3","#tema4","#tema5"]}}]}}
+{{"moments":[{{"start":<seg>,"end":<seg>,"title":"título corto y llamativo (máx 70 car.)","hook":"3 a 7 palabras (máx. 40 caracteres) que salen arriba del clip al empezar: deja una duda abierta o promete algo concreto, por ejemplo Le dijo la verdad en su cara / Esto lo cambió todo; sin spoilear el final; NO uses frases vacías como MIRA ESTO o INCREÍBLE","score":<0-100 probabilidad viral>,"reason":"por qué funciona, 1 frase","description":"descripción para redes, 1 o 2 frases con gancho","hashtags":["#tema1","#tema2","#tema3","#tema4","#tema5"]}}]}}
 
 TRANSCRIPCIÓN:
 {text}

@@ -6,4 +6,5 @@
 2. Reconstruye el worker (Docker) para que instale `fonts-montserrat`, `opencv-python-headless` y `edge-tts`.
 3. En la web: Ajustes de IA → Modo Original. Ahí eliges voz, dramómetro, encuesta A/B, TOP y crédito.
 4. La voz usa internet (edge-tts). Si no hay internet el clip sale igual, sin voz.
-5. Modo Original aplica a videos nuevos (Crear clips). Los re-renders y el modo En vivo salen sin tarjetas.
+5. Por defecto el clip arranca DIRECTO con el gancho encima (`INTRO_MODE=cold`); la tarjeta narrada de antes es opcional (`card`) y hace que la gente se vaya. Ver `CAMBIOS-PARTE-15.md`.
+6. Modo Original aplica a videos nuevos (Crear clips). Los re-renders y el modo En vivo salen sin tarjetas.

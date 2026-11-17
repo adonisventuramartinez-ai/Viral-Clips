@@ -164,7 +164,14 @@ except ValueError:
 CLIP_ZOOM = (os.environ.get("CLIP_ZOOM") or "auto").strip().lower()
 CLIP_SLOWMO = (os.environ.get("CLIP_SLOWMO") or "auto").strip().lower()
 CLIP_TIGHTEN = (os.environ.get("CLIP_TIGHTEN") or "auto").strip().lower()   # quitar silencios y muletillas: auto (según el tipo) | 1 | 0
-INTRO_MODE = (os.environ.get("INTRO_MODE") or "card").strip().lower()       # "card" = tarjeta con voz antes del clip | "cold" = el clip arranca ya, con el texto encima
+INTRO_MODE = (os.environ.get("INTRO_MODE") or "cold").strip().lower()       # "cold" (por defecto) = el clip arranca ya, con el texto encima | "card" = tarjeta con voz ANTES del clip (la gente se va en esos 2 s)
+if INTRO_MODE not in ("cold", "card"):
+    INTRO_MODE = "cold"
+SMART_START = _flag("SMART_START")   # mover el inicio del clip a la primera frase fuerte (saltar saludos y muletillas) y cambiar ganchos genéricos
+try:
+    CLIP_MAX_MB = min(49.0, max(8.0, float(os.environ.get("CLIP_MAX_MB") or 44)))   # tope por clip: Supabase rechaza archivos de 50 MB o más
+except ValueError:
+    CLIP_MAX_MB = 44.0
 try:
     CLIP_SLOW_RATE = min(0.9, max(0.5, float(os.environ.get("CLIP_SLOW_RATE") or 0.5)))
 except ValueError:

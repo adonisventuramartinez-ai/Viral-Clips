@@ -84,11 +84,13 @@ assert np.abs(a - b).mean() > 10, "la cámara no se movió"
 print("OK: render 4K -> 1080x1920 con paneo (", round(out.stat().st_size / 1e6, 1), "MB )")
 framing.camera_keys = orig
 
-# tope de tamaño: presupuesto de ~60 MB; el bitrate máximo es 14 Mbps y el mínimo 6 Mbps (la prueba vieja suponía 44 MB / 12 Mbps)
-assert render._bitrate(20) == 14_000_000                      # clip corto: tope de calidad
-assert render._bitrate(40) * 40 / 8 < 61e6                    # dentro del presupuesto mientras el piso de 6 Mbps lo permita
-assert render._bitrate(60) == 6_000_000 or render._bitrate(60) * 60 / 8 < 61e6
-assert render._bitrate(150) == 6_000_000                      # clip largo: se queda en el piso (puede pasar de 60 MB)
+# tope de tamaño: nunca más de CLIP_MAX_MB (44 por defecto; Supabase rechaza 50 MB), tope de calidad 10 Mbps y piso 1.2 Mbps
+assert render._bitrate(20) == 10_000_000                      # clip corto: tope de calidad
+for d in (8, 15, 30, 45, 60, 90, 120, 180, 300):
+    size = (render._bitrate(d) + 192_000) * d / 8              # video + audio
+    assert render._bitrate(d) == 1_200_000 or size <= config.CLIP_MAX_MB * 1e6 * 1.001, (d, size)
+assert render._bitrate(60) > render._bitrate(120) > render._bitrate(300)   # más largo = menos bitrate
+assert render._bitrate(3600) == 1_200_000                     # clip larguísimo: piso de calidad
 print("OK: bitrate dinámico")
 
 # ---------------- detección real de caras (astronauta de scikit-image) ----------------

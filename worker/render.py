@@ -42,7 +42,7 @@ WrapStyle: 0
 [V4+ Styles]
 Format: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding
 Style: Cap,Montserrat,{st['size']},&H00{_hex(st['text'])},&H00{_hex(st['text'])},&H00{_hex(st['outline'], '000000')},&H80000000,-1,0,0,0,100,100,0,0,1,{st['outline_w']},2,2,60,60,{margin},1
-Style: Hook,DejaVu Sans,64,&H00000000,&H00000000,&H00FFFFFF,&H00FFFFFF,-1,0,0,0,100,100,0,0,3,16,0,8,90,90,230,1
+Style: Hook,DejaVu Sans,64,&H00000000,&H00000000,&H00FFFFFF,&H00FFFFFF,-1,0,0,0,100,100,0,0,3,16,0,8,90,90,290,1
 
 [Events]
 Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
@@ -59,6 +59,9 @@ def _t(sec: float) -> str:
 def _esc(text: str, upper: bool) -> str:
     text = text.upper() if upper else text
     return text.replace("{", "(").replace("}", ")").replace("\\", "/")
+
+
+HOOK_POP = "{\\fad(80,250)\\fscx82\\fscy82\\t(0,180,\\fscx100\\fscy100)}"   # el gancho aparece ya en el primer cuadro, con un golpe de escala
 
 
 def build_ass(words, start, end, group=2, layout="crop", style=None, hook=None, hook_sec=3.5, tmap=None, n_speakers=0):
@@ -81,7 +84,7 @@ def build_ass(words, start, end, group=2, layout="crop", style=None, hook=None, 
 
     if hook and str(hook).strip():
         h = _esc(str(hook).strip()[:70], True)
-        lines.append(f"Dialogue: 1,{_t(0.15)},{_t(max(1.0, min(hook_sec, end - start - 0.2)))},Hook,,0,0,0,,{h}\n")
+        lines.append(f"Dialogue: 1,{_t(0.0)},{_t(max(1.0, min(hook_sec, end - start - 0.2)))},Hook,,0,0,0,,{HOOK_POP}{h}\n")
 
     for i in range(0, len(ws), group):
         g = ws[i : i + group]
@@ -111,10 +114,10 @@ def _probe(path: Path):
 
 # --- ARREGLO DEFINITIVO: Bitrate calculado para no pasar de 35 MB en Supabase ---
 def _bitrate(dur: float) -> int:
-    # Apuntamos a un máximo de 35 MB (dejando 15 MB de margen para las tarjetas del Modo Original)
-    total = 35_000_000 * 8 / max(dur, 1.0)
-    # Limitamos entre 1.2 Mbps (mínimo calidad) y 5 Mbps (para no pasarse en clips muy cortos)
-    return int(min(5_000_000, max(1_200_000, total - 128_000)))
+    """Bitrate de video para que el clip pese como máximo CLIP_MAX_MB (Supabase rechaza 50 MB o más).
+    Clips cortos: tope de calidad de 10 Mbps. Clips largos: baja solo lo necesario, hasta un piso de 1.2 Mbps."""
+    total = config.CLIP_MAX_MB * 1_000_000 * 8 / max(dur, 1.0)
+    return int(min(10_000_000, max(1_200_000, total - 192_000)))
 # --------------------------------------------------------------------------------
 
 

@@ -10,10 +10,10 @@ const BUCKET = "uploads";
 const FILE = "brand/original.json";
 const VOICES = ["es-DO-EmilioNeural", "es-DO-RamonaNeural", "es-MX-JorgeNeural", "es-MX-DaliaNeural", "es-US-AlonsoNeural", "es-ES-AlvaroNeural"];
 
-type Original = { enabled: boolean; show: string; page: string; credit: string; narrate: boolean; voice: string; meter: boolean; poll: boolean; top: boolean; top_n: number };
+type Original = { enabled: boolean; show: string; page: string; credit: string; narrate: boolean; voice: string; meter: boolean; poll: boolean; top: boolean; top_n: number; intro: "cold" | "card"; smart_start: boolean };
 const DEFAULT: Original = {
   enabled: true, show: "La Casa de Alofoke 3", page: "", credit: "Contenido de La Casa de Alofoke, usado con permiso de Alofoke.",
-  narrate: true, voice: "es-DO-EmilioNeural", meter: true, poll: true, top: true, top_n: 5,
+  narrate: true, voice: "es-DO-EmilioNeural", meter: true, poll: true, top: true, top_n: 5, intro: "cold", smart_start: true,
 };
 
 async function read(db: any): Promise<Original> {
@@ -46,6 +46,8 @@ export async function POST(req: Request) {
     poll: b.poll !== false,
     top: b.top !== false,
     top_n: Math.min(10, Math.max(3, Math.round(Number(b.top_n)) || cur.top_n)),
+    intro: b.intro === "card" ? "card" : b.intro === "cold" ? "cold" : cur.intro,
+    smart_start: b.smart_start !== false,
   };
   const body = new Blob([JSON.stringify(next)], { type: "application/json" });
   const { error } = await db.storage.from(BUCKET).upload(FILE, body, { upsert: true, contentType: "application/json" });

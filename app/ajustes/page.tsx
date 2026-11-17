@@ -138,8 +138,8 @@ function SubsSection() {
 }
 
 
-type Orig = { enabled: boolean; show: string; page: string; credit: string; narrate: boolean; voice: string; meter: boolean; poll: boolean; top: boolean; top_n: number };
-const ORIG_DEFAULT: Orig = { enabled: true, show: "La Casa de Alofoke 3", page: "", credit: "", narrate: true, voice: "es-DO-EmilioNeural", meter: true, poll: true, top: true, top_n: 5 };
+type Orig = { enabled: boolean; show: string; page: string; credit: string; narrate: boolean; voice: string; meter: boolean; poll: boolean; top: boolean; top_n: number; intro: "cold" | "card"; smart_start: boolean };
+const ORIG_DEFAULT: Orig = { enabled: true, show: "La Casa de Alofoke 3", page: "", credit: "", narrate: true, voice: "es-DO-EmilioNeural", meter: true, poll: true, top: true, top_n: 5, intro: "cold", smart_start: true };
 const VOICE_LABELS: Record<string, string> = {
   "es-DO-EmilioNeural": "Dominicano (hombre)", "es-DO-RamonaNeural": "Dominicana (mujer)", "es-MX-JorgeNeural": "México (hombre)",
   "es-MX-DaliaNeural": "México (mujer)", "es-US-AlonsoNeural": "Latino EE. UU. (hombre)", "es-ES-AlvaroNeural": "España (hombre)",
@@ -171,7 +171,7 @@ function OriginalSection() {
     <div className="card neon" style={{ maxWidth: 720, marginBottom: 18 }}>
       <h3 style={{ marginBottom: 6 }}>🎬 Modo Original (sin mostrar tu cara ni hablar)</h3>
       <p className="sub" style={{ marginBottom: 10, fontSize: 13 }}>
-        Cada clip sale con aporte propio hecho por la IA: contexto con voz narradora, dramómetro, encuesta A/B y descripción. Facebook premia lo original; esto ayuda, pero no garantiza la monetización.
+        Cada clip sale con aporte propio hecho por la IA: gancho y contexto encima del video, dramómetro animado, encuesta A/B con voz y descripción. Facebook premia lo original; esto ayuda, pero no garantiza la monetización.
       </p>
       {chk("Activar Modo Original", "enabled", "Si lo apagas, los clips salen como antes.")}
       <label style={{ marginTop: 8 }}>Nombre del programa</label>
@@ -181,9 +181,15 @@ function OriginalSection() {
       <label style={{ marginTop: 12 }}>Línea de crédito/permiso (va en la descripción)</label>
       <input value={o.credit} onChange={(e) => set({ credit: e.target.value })} maxLength={200} />
       <hr style={{ border: 0, borderTop: "1px solid var(--line)", margin: "16px 0" }} />
-      {chk("Voz narradora con IA", "narrate", "Lee el contexto y la encuesta. Necesita internet en el PC del worker. Si falla, el clip sale sin voz.")}
+      <label>Cómo empieza el clip</label>
+      <select value={o.intro} onChange={(e) => set({ intro: e.target.value as Orig["intro"] })}>
+        <option value="cold">Directo al momento, con el gancho encima (recomendado)</option>
+        <option value="card">Con una tarjeta narrada antes (la gente tiende a irse en esos 2 segundos)</option>
+      </select>
+      {chk("Empezar en lo mejor", "smart_start", "Salta saludos y muletillas del arranque (“bueno, eh…”), entra en la primera frase fuerte y cambia ganchos vacíos como “MIRA ESTO” por uno del propio clip.")}
+      {chk("Voz narradora con IA", "narrate", "Lee la encuesta del final (y el contexto si usas la tarjeta de antes). Necesita internet en el PC del worker. Si falla, el clip sale sin voz.")}
       {o.narrate && (<><label>Voz</label><select value={o.voice} onChange={(e) => set({ voice: e.target.value })}>{voices.map((v) => <option key={v} value={v}>{VOICE_LABELS[v] ?? v}</option>)}</select></>)}
-      {chk("Dramómetro", "meter", "Una barra con el nivel de drama del momento, arriba a la derecha los primeros segundos.")}
+      {chk("Dramómetro", "meter", "Una barra que se llena con el nivel de drama del momento, arriba, los primeros segundos.")}
       {chk("Encuesta A/B al final", "poll", "Pregunta de “¿quién tiene la razón?” para que la gente comente A o B.")}
       {chk("TOP automático", "top", "Después de cada video arma un TOP con los mejores momentos y cuenta regresiva.")}
       {o.top && (<><label>Cuántos clips lleva el TOP: {o.top_n}</label><input type="range" min={3} max={10} value={o.top_n} onChange={(e) => set({ top_n: Number(e.target.value) })} /></>)}
