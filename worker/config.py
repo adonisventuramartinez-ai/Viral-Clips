@@ -71,6 +71,41 @@ try:
     CLIP_FOCUS_X = min(1.0, max(0.0, float(os.environ.get("CLIP_FOCUS_X") or 0.5)))
 except ValueError:
     CLIP_FOCUS_X = 0.5
+# Subtítulos (render.py) - ajustables sin tocar código:
+try:
+    CLIP_SUB_SIZE = min(140, max(40, int(os.environ.get("CLIP_SUB_SIZE") or 82)))       # tamaño base de los subtítulos
+except ValueError:
+    CLIP_SUB_SIZE = 82
+try:
+    CLIP_SUB_OUTLINE = min(14, max(0, int(os.environ.get("CLIP_SUB_OUTLINE") or 7)))     # contorno de los subtítulos
+except ValueError:
+    CLIP_SUB_OUTLINE = 7
+try:
+    CLIP_HOOK_SIZE = min(100, max(40, int(os.environ.get("CLIP_HOOK_SIZE") or 72)))      # tamaño del gancho arriba del clip
+except ValueError:
+    CLIP_HOOK_SIZE = 72
+
+# Calibración del encuadre (framing.py) - ajustables sin tocar código:
+try:
+    CLIP_MIN_DWELL = min(10, max(1, int(os.environ.get("CLIP_MIN_DWELL") or 3)))          # muestras seguidas antes de mover la cámara
+except ValueError:
+    CLIP_MIN_DWELL = 3
+try:
+    CLIP_MIN_GAP = min(5.0, max(0.5, float(os.environ.get("CLIP_MIN_GAP") or 1.5)))       # segundos mínimos entre paneos
+except ValueError:
+    CLIP_MIN_GAP = 1.5
+try:
+    CLIP_URGENT_EDGE = min(0.6, max(0.1, float(os.environ.get("CLIP_URGENT_EDGE") or 0.36)))  # si la cara cae en el exterior, reacciona rápido
+except ValueError:
+    CLIP_URGENT_EDGE = 0.36
+try:
+    CLIP_RAMP = min(2.0, max(0.2, float(os.environ.get("CLIP_RAMP") or 0.5)))             # duración del paneo
+except ValueError:
+    CLIP_RAMP = 0.5
+try:
+    CLIP_MIN_COVERAGE = min(0.5, max(0.05, float(os.environ.get("CLIP_MIN_COVERAGE") or 0.2)))  # si hay caras en menos de esta fracción, usa el centro
+except ValueError:
+    CLIP_MIN_COVERAGE = 0.2
 COOKIES_FILE = os.environ.get("COOKIES_FILE", "")  # cookies.txt de YouTube si te pide "confirmar que no eres un bot"
 
 # --- NUEVO: Ruta del logo para el Brand Kit ---

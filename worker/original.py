@@ -16,10 +16,10 @@ DEFAULTS = {
     "smart_start": config.SMART_START,   # empezar en la primera frase fuerte (lo lee main.py)
 }
 
-PROMPT = """Eres el editor de una página de clips de "{show}" para Facebook. Español dominicano natural, sin groserías, sin insultos.
+PROMPT = """Eres el editor de una página de clips de "{show}" para Facebook. Español dominicano natural, sin groserías, sin insultos. Piensa como un editor que quiere que la gente NO pueda dejar de ver el clip.
 Del fragmento saca texto ORIGINAL (no copies frases largas textuales). Devuelve:
-- context: 1 frase (máx 90 caracteres) que ponga en situación a quien no vio el programa SIN contar el final ("Antes de esto, ..."), legible en voz alta.
-- outro: 1 pregunta corta (máx 60 caracteres) que divida opiniones y dé ganas de comentar.
+- context: 1 frase (máx 90 caracteres) que ponga en situación a quien no vio el programa SIN contar el final ("Antes de esto, ..."), legible en voz alta. Debe generar curiosidad, no revelar el desenlace.
+- outro: 1 pregunta corta (máx 60 caracteres) que divida opiniones y dé ganas de comentar. Evita frases vacías ("¿Qué te parece?").
 - poll: {{"q":"pregunta de 'quién tiene la razón' (máx 50 car.)","a":"bando A (máx 22 car.)","b":"bando B (máx 22 car.)"}}. Los dos bandos deben ser claros, opuestos y defendibles (nombres de personas o posturas), sin insultos.
 - caption: descripción del post, 2 frases con punto de vista propio, sin spoilear el final, que cierre invitando a comentar.
 Responde SOLO JSON: {{"context":"...","outro":"...","poll":{{"q":"...","a":"...","b":"..."}},"caption":"..."}}
@@ -84,11 +84,33 @@ def tts(text, out, voice):
             return out
     except Exception as e:
         print(f"  Voz: edge-tts no disponible ({type(e).__name__}); pruebo espeak-ng.", flush=True)
+    # Plan B: espeak-ng (offline, voz robótica pero siempre disponible)
     if shutil.which("espeak-ng"):
         wav = out.with_suffix(".wav")
-        r = subprocess.run(["espeak-ng", "-v", "es", "-s", "160", "-w", str(wav), text], capture_output=True)
-        if r.returncode == 0 and wav.exists():
+        r = subprocess.run(["espeak-ng", "-v", "es", "-s", "150", "-p", "40", "-w", str(wav), text], capture_output=True)
+        if r.returncode == 0 and wav.exists() and wav.stat().st_size > 500:
             return wav
+    # Plan C: pyttsx3 (offline, si está instalado)
+    try:
+        import pyttsx3
+        wav = out.with_suffix(".wav")
+        eng = pyttsx3.init()
+        eng.setProperty("rate", 150)
+        eng.save_to_file(text, str(wav))
+        eng.runAndWait()
+        if wav.exists() and wav.stat().st_size > 500:
+            return wav
+    except Exception:  # noqa: BLE001
+        pass
+    # Plan D: gTTS (online, voz natural; necesita internet)
+    try:
+        from gtts import gTTS
+        mp3 = out.with_suffix(".mp3")
+        gTTS(text=text, lang="es").save(str(mp3))
+        if mp3.exists() and mp3.stat().st_size > 500:
+            return mp3
+    except Exception:  # noqa: BLE001
+        pass
     return None
 
 def _dur(path):

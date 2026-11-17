@@ -1,6 +1,6 @@
 """Clips automáticos de lo mejor del momento.
 
-Vigila FUENTES que tú eliges (canales de YouTube, una búsqueda, ej. "La Casa de Alofoke 3", o una página de Facebook), encuentra videos nuevos que van fuerte
+Vigila FUENTES que tú eliges (canales de YouTube, una búsqueda, ej. "La Casa de Alofoke 3", una página de Facebook o un canal de Twitch), encuentra videos nuevos que van fuerte
 (más vistas por hora desde que se subieron) y crea solo el trabajo de clips. Cada clip pasa por el área viral (Parte 7) y, con
 AUTO_QUEUE=1, entra a la cola de publicación (Parte 8).
 
@@ -157,25 +157,35 @@ def list_candidates(feed, limit=8):
     """Ids y datos básicos de lo más reciente de la fuente (yt-dlp, sin descargar). Devuelve [{id, url, title, view_count, duration}]."""
     if feed.get("kind") == "facebook":
         return fb_list(feed, limit)
+
     import yt_dlp
     target = (feed.get("target") or "").strip()
-    if feed.get("kind") == "search":
+    if feed.get("kind") == "twitch":
+        base = target.rstrip("/")
+        if not base.startswith("http"):
+            base = "https://www.twitch.tv/" + base.lstrip("@/")
+        urls = [base.rstrip("/") + "/videos?filter=archives&sort=time"]
+        fallback_url = lambda vid: f"https://www.twitch.tv/videos/{vid}"
+    elif feed.get("kind") == "search":
         urls = [f"ytsearchdate{limit}:{target}"]
+        fallback_url = lambda vid: f"https://www.youtube.com/watch?v={vid}"
     else:
         base = target.rstrip("/")
         urls = [base + "/videos", base + "/streams"] if "/watch" not in base and "playlist" not in base else [base]
+        fallback_url = lambda vid: f"https://www.youtube.com/watch?v={vid}"
+
     out, seen = [], set()
     for u in urls:
         try:
             with yt_dlp.YoutubeDL({**_opts(), "extract_flat": "in_playlist", "playlistend": limit}) as y:
                 info = y.extract_info(u, download=False)
-        except Exception:  # noqa: BLE001  (esa pestaña no existe o YouTube no respondió)
+        except Exception:  # noqa: BLE001  (esa pestaña no existe o la red no respondió)
             continue
         for e in (info or {}).get("entries") or []:
             vid = (e or {}).get("id")
             if vid and vid not in seen:
                 seen.add(vid)
-                out.append({"id": vid, "url": e.get("url") or f"https://www.youtube.com/watch?v={vid}", "title": e.get("title")})
+                out.append({"id": vid, "url": e.get("url") or fallback_url(vid), "title": e.get("title")})
     return out
 
 

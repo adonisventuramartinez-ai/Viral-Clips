@@ -16,12 +16,13 @@ import subprocess
 SAMPLE_FPS = 3.0
 DET_W = 720        # ancho al que se reduce el cuadro para buscar caras (más alto = mejor detección, más CPU)
 WIN = 3            # +-1 s de ventana para decidir quién habla
-MIN_DWELL = 3      # muestras seguidas (~1 s) antes de mover la cámara
-MIN_GAP = 1.5      # segundos mínimos entre dos paneos
-URGENT_EDGE = 0.36  # si la cara cae en el 14% exterior del recuadro (casi cortada), la cámara reacciona rápido
+import config as _cfg
+MIN_DWELL = _cfg.CLIP_MIN_DWELL
+MIN_GAP = _cfg.CLIP_MIN_GAP
+URGENT_EDGE = _cfg.CLIP_URGENT_EDGE
 URGENT_DWELL = 2   # muestras seguidas (~0.7 s) para ese caso
-RAMP = 0.5         # duración del paneo
-MIN_COVERAGE = 0.2  # si hay caras en menos de esta fracción del clip, se usa el centro
+RAMP = _cfg.CLIP_RAMP
+MIN_COVERAGE = _cfg.CLIP_MIN_COVERAGE
 
 _det = None
 

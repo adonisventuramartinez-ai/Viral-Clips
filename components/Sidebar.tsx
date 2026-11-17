@@ -22,6 +22,7 @@ const items: [string, string, React.ReactNode][] = [
   ["/auto", "Clips automáticos", I("M13 2L4 14h7l-1 8 9-12h-7z")],
   ["/cola", "Cola", I("M8 6h12M8 12h12M8 18h12M3.5 6h.01M3.5 12h.01M3.5 18h.01")],
   ["/biblioteca", "Biblioteca", I("M5 4h4v16H5zM11 4h4v16h-4zM17 6l3 .8-3.5 13.2-3-.8")],
+  ["/resumen", "Crear resumen", I("M4 4h16v16H4zM8 8h8M8 12h8M8 16h5")],
   ["/en-vivo", "En vivo", I("M12 12m-2 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0M7.5 7.5a6 6 0 0 0 0 9M16.5 7.5a6 6 0 0 1 0 9M4.5 4.5a10 10 0 0 0 0 15M19.5 4.5a10 10 0 0 1 0 15")],
   ["/ajustes", "Ajustes IA", I("M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19 12l2-1-2-4-2 1a7 7 0 0 0-2-1l-.5-2h-5L9 8a7 7 0 0 0-2 1L5 8l-2 4 2 1a7 7 0 0 0 0 2l-2 1 2 4 2-1a7 7 0 0 0 2 1l.5 2h5l.5-2a7 7 0 0 0 2-1l2 1 2-4-2-1")],
 ];

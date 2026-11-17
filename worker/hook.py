@@ -14,13 +14,15 @@ import viral
 
 # Muletillas y saludos: nunca deberían ser lo primero que se oye.
 FILLER_OPEN = {"bueno", "eh", "ehh", "este", "mmm", "mm", "ok", "okay", "pues", "hola", "buenas", "bienvenidos",
-               "saludos", "dale", "ya", "listo", "aja", "ajá", "a ver", "vamos"}
+               "saludos", "dale", "ya", "listo", "aja", "ajá", "a ver", "vamos", "entonces", "claro", "mira",
+               "oye", "oigan", "amigos", "gente", "hermano", "mano", "klk", "qué lo qué"}
 # Palabras que enganchan con lo que se dijo ANTES (el clip no se entiende empezando ahí).
 DEPENDENT_OPEN = {"y", "pero", "porque", "entonces", "sino", "tambien", "ademas", "luego", "eso", "esa", "ese", "asi",
                   "o", "ni", "aunque", "mientras"}
 # Ganchos genéricos que no dicen nada: se cambian por algo del propio clip.
 GENERIC = {"mira esto", "mira", "mira lo que paso", "nadie lo esperaba", "momento clave", "no lo vas a creer", "increible",
-           "wow", "mira lo que hizo", "esto es una locura", "no lo vas a creer", "tienes que ver esto", "momento viral"}
+           "wow", "mira lo que hizo", "esto es una locura", "no lo vas a creer", "tienes que ver esto", "momento viral",
+           "no te lo pierdas", "esto es increible", "mira esto que paso", "no vas a creer", "esto es brutal"}
 TAIL_STOP = {"de", "la", "el", "los", "las", "un", "una", "que", "y", "o", "a", "en", "con", "por", "para", "su", "se", "lo", "al", "del"}
 
 SENT_END = re.compile(r"[.?!…]+[\"')\]]*$")

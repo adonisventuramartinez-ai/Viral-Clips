@@ -6,7 +6,7 @@ from pathlib import Path
 import config
 
 # ---------------------------------------------------------------- subtítulos (ASS)
-DEFAULT_SUBS = {"text": "FFFFFF", "active": "FFE000", "outline": "000000", "size": 82, "outline_w": 7,
+DEFAULT_SUBS = {"text": "FFFFFF", "active": "FFE000", "outline": "000000", "size": config.CLIP_SUB_SIZE, "outline_w": config.CLIP_SUB_OUTLINE,
                 "upper": True, "pop": True, "offset": 0}
 
 SPLIT_TOPS = {"split": 1312, "split_eq": 1000, "split_game": 780}
@@ -42,7 +42,7 @@ WrapStyle: 0
 [V4+ Styles]
 Format: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding
 Style: Cap,Montserrat,{st['size']},&H00{_hex(st['text'])},&H00{_hex(st['text'])},&H00{_hex(st['outline'], '000000')},&H96000000,-1,0,0,0,100,100,0,0,1,{st['outline_w']},4,2,120,120,{margin},1
-Style: Hook,DejaVu Sans,64,&H00000000,&H00000000,&H00FFFFFF,&H00FFFFFF,-1,0,0,0,100,100,0,0,3,16,0,8,90,90,290,1
+Style: Hook,DejaVu Sans,{config.CLIP_HOOK_SIZE},&H00000000,&H00000000,&H00FFFFFF,&H00FFFFFF,-1,0,0,0,100,100,0,0,3,18,0,8,90,90,290,1
 
 [Events]
 Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text

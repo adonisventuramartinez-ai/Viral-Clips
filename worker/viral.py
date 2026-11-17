@@ -19,7 +19,8 @@ POWER = ("nadie", "increíble", "insólito", "se salió", "explot", "escándalo"
          "no lo vas", "lo que pasó", "en vivo", "se armó", "tiraera", "verdad", "secreto", "viral", "locura", "tremendo", "épic",
          "brutal", "desastre", "traición", "peleó", "gritó", "lloró", "golpe", "sorprend", "mentira", "bochorno", "caos",
          "tremenda", "brutalidad", "explosión", "escándalo", "polémica", "conflicto", "drama", "tensión", "shock")
-RISK_WORDS = ("estafador", "ladrón", "violador", "pedófilo", "asesino", "drogadicto", "corrupto", "puta", "maricón", "hijueputa")
+RISK_WORDS = ("estafador", "ladrón", "violador", "pedófilo", "asesino", "drogadicto", "corrupto", "puta", "maricón", "hijueputa",
+              "maldito", "imbécil", "idiota", "pendejo", "cabrón", "mierda", "coño", "carajo", "jodido", "basura", "escoria")
 BROAD_TAGS = ("#fyp", "#viral", "#parati", "#foryou")
 _last = 0.0
 
@@ -162,13 +163,19 @@ def next_slots(now=None, taken=(), n=1, slots=None, tz=None, min_gap_min=None, m
 
 
 # ----------------------------------------------------------------------------- IA
-PROMPT = """Eres experto en contenido viral para Facebook Reels, TikTok y Shorts en español dominicano natural. Sin groserías ni insultos, sin inventar datos.
+PROMPT = """Eres experto en contenido viral para Facebook Reels, TikTok y Shorts en español dominicano natural. Sin groserías ni insultos, sin inventar datos. Piensa como un editor que quiere que la gente NO pueda dejar de ver el clip.
 Del clip de "{show}" devuelve SOLO JSON:
 {{"titles":[{{"t":"título 1 (25-65 car.)","angle":"curiosidad"}},{{"t":"...","angle":"polémica"}},{{"t":"...","angle":"pregunta"}},{{"t":"...","angle":"emoción"}},{{"t":"...","angle":"dato"}}],
 "thumb_texts":["2-4 palabras","2-4 palabras","2-4 palabras"],
 "hashtags":["#tema1","#tema2","#nicho1","#nicho2","#tema3"],
 "risks":["solo si hay insulto, acusación grave contra una persona real o algo que Facebook pueda bloquear; si no, lista vacía"]}}
-Los títulos generan curiosidad SIN contar el final, y no repiten el título actual. Los hashtags son 5, sin espacios.
+Reglas de los títulos:
+- Generan curiosidad SIN contar el final (nunca reveles el desenlace).
+- Empiezan con una promesa o una duda abierta; evita frases vacías ("MIRA ESTO", "INCREÍBLE").
+- Usan palabras de drama/emoción cuando el clip las tiene (pelea, secreto, verdad, escándalo, etc.).
+- No repiten el título actual; cada uno tiene un ángulo distinto.
+- Máximo 65 caracteres; mejor entre 30 y 55.
+Los hashtags son 5, sin espacios, mezcla de amplios (#fyp) y del tema/nicho.
 
 Título actual: {title}
 Gancho: {hook}
