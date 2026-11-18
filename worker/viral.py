@@ -26,7 +26,8 @@ POWER = ("nadie", "increíble", "insólito", "se salió", "explot", "escándalo"
          "reaccion", "sorpresa", "shock", "impacto", "viral", "tendencia", "boom", "explosion", "locura")
 RISK_WORDS = ("estafador", "ladrón", "violador", "pedófilo", "asesino", "drogadicto", "corrupto", "puta", "maricón", "hijueputa",
               "maldito", "imbécil", "idiota", "pendejo", "cabrón", "mierda", "coño", "carajo", "jodido", "basura", "escoria",
-              "mata", "muerte", "amenaza", "violencia", "golpe", "arma", "disparo", "sangre", "herido", "muerto")
+              "mata", "muerte", "amenaza", "violencia", "golpe", "arma", "disparo", "sangre", "herido", "muerto",
+              "racista", "sexista", "homofobo", "machista", "abusador", "acosador", "manipulador", "mentiroso", "traidor")
 BROAD_TAGS = ("#fyp", "#viral", "#parati", "#foryou", "#foryoupage", "#trending", "#parati", "#viralvideo")
 _last = 0.0
 

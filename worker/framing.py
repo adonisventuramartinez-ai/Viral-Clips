@@ -59,6 +59,7 @@ def _raw_boxes(gray, min_frac=0.05):
     import cv2
     g = np.ascontiguousarray(gray)
     g = cv2.createCLAHE(clipLimit=6.0, tileGridSize=(8, 8)).apply(g)   # escenas oscuras (estudios de podcast): realza sin quemar (máximo)
+g = cv2.GaussianBlur(g, (3, 3), 0)   # suaviza para reducir ruido en detección
     ms = (max(8, int(w * min_frac * 0.7)),) * 2   # caras aún más pequeñas también cuentan (entrevistas lejos, planos abiertos)
 
     def run(neigh):

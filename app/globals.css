@@ -1,23 +1,23 @@
 :root {
-  --bg: #05051a;
-  --bg2: #0a0a2e;
-  --panel: rgba(14, 16, 40, 0.72);
-  --panel2: rgba(18, 21, 48, 0.85);
-  --line: rgba(60, 65, 120, 0.35);
-  --line2: rgba(100, 105, 180, 0.25);
+  --bg: #030318;
+  --bg2: #080828;
+  --panel: rgba(12, 14, 36, 0.72);
+  --panel2: rgba(16, 20, 46, 0.85);
+  --line: rgba(70, 75, 140, 0.35);
+  --line2: rgba(110, 115, 190, 0.25);
   --text: #f0f2fa;
   --muted: #8b92b8;
   --muted2: #6b72a0;
   --red: #ff3d7f;
   --red2: #ff6b9d;
-  --cyan: #3de8d8;
-  --cyan2: #6ff5e8;
-  --violet: #9b4dff;
-  --violet2: #b87aff;
-  --magenta: #e03bff;
-  --orange: #ffaa33;
-  --grad: linear-gradient(135deg, #9b4dff 0%, #e03bff 40%, #ffaa33 100%);
-  --grad2: linear-gradient(135deg, #3de8d8 0%, #9b4dff 100%);
+  --cyan: #22d3ee;
+  --cyan2: #67e8f9;
+  --violet: #7c3aed;
+  --violet2: #a78bfa;
+  --magenta: #e11d48;
+  --orange: #f97316;
+  --grad: linear-gradient(135deg, #7c3aed 0%, #e11d48 40%, #f97316 100%);
+  --grad2: linear-gradient(135deg, #22d3ee 0%, #7c3aed 100%);
   --side: 88px;
   --radius: 16px;
   --radius-sm: 10px;
@@ -42,9 +42,9 @@ html, body {
 body {
   min-height: 100vh;
   background:
-    radial-gradient(1200px 600px at 85% -10%, rgba(155, 77, 255, 0.12), transparent),
-    radial-gradient(900px 500px at 0% 0%, rgba(224, 59, 255, 0.08), transparent),
-    radial-gradient(600px 400px at 50% 100%, rgba(61, 232, 216, 0.05), transparent),
+    radial-gradient(1200px 600px at 85% -10%, rgba(225, 29, 72, 0.10), transparent),
+    radial-gradient(900px 500px at 0% 0%, rgba(124, 58, 237, 0.08), transparent),
+    radial-gradient(600px 400px at 50% 100%, rgba(34, 211, 238, 0.05), transparent),
     var(--bg);
   background-attachment: fixed;
 }
