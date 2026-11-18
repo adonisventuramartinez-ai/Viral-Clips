@@ -80,7 +80,13 @@ def download(url: str, workdir: Path, quality: str, range_from, range_to):
                 continue
             raise   # otro tipo de error (bot, privado, borrado…): se muestra tal cual
 
-    raise RuntimeError(
-        "YouTube no entregó ningún formato descargable. Reconstruye el worker (cierra y abre INICIAR-WORKER.bat) "
-        "para actualizar yt-dlp, y si sigue igual prueba con cookies.txt (COOKIES_FILE). Detalle: " + str(last_err)[:250]
-    )
+    url_low = str(url).lower()
+    if "instagram.com" in url_low:
+        hint = ("Instagram requiere login: pon tus cookies en worker/cookies.txt y configura COOKIES_FILE en .env. "
+                "O usa un video público de YouTube/Twitch.")
+    elif "twitch.tv" in url_low:
+        hint = ("Twitch puede requerir cookies para VODs. Configura COOKIES_FILE en .env si falla.")
+    else:
+        hint = ("Reconstruye el worker (cierra y abre INICIAR-WORKER.bat) para actualizar yt-dlp, "
+                "y si sigue igual prueba con cookies.txt (COOKIES_FILE).")
+    raise RuntimeError(f"No se pudo descargar el video. {hint} Detalle: " + str(last_err)[:250])

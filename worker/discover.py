@@ -166,6 +166,12 @@ def list_candidates(feed, limit=8):
             base = "https://www.twitch.tv/" + base.lstrip("@/")
         urls = [base.rstrip("/") + "/videos?filter=archives&sort=time"]
         fallback_url = lambda vid: f"https://www.twitch.tv/videos/{vid}"
+    elif feed.get("kind") == "instagram":
+        base = target.rstrip("/")
+        if not base.startswith("http"):
+            base = "https://www.instagram.com/" + base.lstrip("@/") + "/"
+        urls = [base]
+        fallback_url = lambda vid: f"https://www.instagram.com/reel/{vid}/"
     elif feed.get("kind") == "search":
         urls = [f"ytsearchdate{limit}:{target}"]
         fallback_url = lambda vid: f"https://www.youtube.com/watch?v={vid}"
