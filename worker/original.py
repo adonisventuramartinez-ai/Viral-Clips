@@ -16,10 +16,10 @@ DEFAULTS = {
     "smart_start": config.SMART_START,   # empezar en la primera frase fuerte (lo lee main.py)
 }
 
-PROMPT = """Eres el editor de una página de clips de "{show}" para Facebook. Español dominicano natural, sin groserías, sin insultos. Piensa como un editor que quiere que la gente NO pueda dejar de ver el clip.
+PROMPT = """Eres el editor de una página de clips de "{show}" para Facebook. Español dominicano natural, sin groserías, sin insultos. Piensa como un editor que quiere que la gente NO pueda dejar de ver el clip. Usa jerga dominicana cuando encaje (klk, vaina, tíguere, chercha, jevi).
 Del fragmento saca texto ORIGINAL (no copies frases largas textuales). Devuelve:
-- context: 1 frase (máx 90 caracteres) que ponga en situación a quien no vio el programa SIN contar el final ("Antes de esto, ..."), legible en voz alta. Debe generar curiosidad, no revelar el desenlace.
-- outro: 1 pregunta corta (máx 60 caracteres) que divida opiniones y dé ganas de comentar. Evita frases vacías ("¿Qué te parece?").
+- context: 1 frase (máx 90 caracteres) que ponga en situación a quien no vio el programa SIN contar el final ("Antes de esto, ..."), legible en voz alta. Debe generar curiosidad, no revelar el desenlace. Usa palabras de drama/emoción cuando el clip las tiene.
+- outro: 1 pregunta corta (máx 60 caracteres) que divida opiniones y dé ganas de comentar. Evita frases vacías ("¿Qué te parece?"). Que sea polémica pero sin insultos.
 - poll: {{"q":"pregunta de 'quién tiene la razón' (máx 50 car.)","a":"bando A (máx 22 car.)","b":"bando B (máx 22 car.)"}}. Los dos bandos deben ser claros, opuestos y defendibles (nombres de personas o posturas), sin insultos.
 - caption: descripción del post, 2 frases con punto de vista propio, sin spoilear el final, que cierre invitando a comentar.
 Responde SOLO JSON: {{"context":"...","outro":"...","poll":{{"q":"...","a":"...","b":"..."}},"caption":"..."}}
@@ -135,7 +135,7 @@ WrapStyle: 0
 Format: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding
 Style: Big,Montserrat,92,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,6,2,5,80,80,0,1
 Style: Small,Montserrat,54,&H0000E0FF,&H0000E0FF,&H00000000,&H00000000,-1,0,0,0,100,100,3,0,1,4,0,8,90,90,330,1
-Style: Meter,Montserrat,46,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,2,0,1,5,0,8,0,0,125,1
+Style: Meter,Montserrat,56,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,2,0,1,6,0,8,0,0,125,1
 Style: Intro,Montserrat,46,&H00FFFFFF,&H00FFFFFF,&H78000000,&H00000000,-1,0,0,0,100,100,0,0,3,14,0,8,70,70,560,1
 Style: Q,Montserrat,88,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,6,2,8,80,80,430,1
 Style: Letter,Montserrat,150,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,7,0,5,0,0,0,1
@@ -245,7 +245,7 @@ def _meter_level(pct):
 def _meter_ass(pct, path, intro=None, show_meter=True):
     """Dramómetro (la barra se llena en ~1 s) y, en apertura directa (INTRO_MODE=cold), el texto de contexto debajo del gancho."""
     pct = int(min(99, max(35, pct)))
-    x0, x1, y0, y1 = 250, 830, 200, 246          # 580 x 46 px, centrada, debajo de la zona de la barra del teléfono
+    x0, x1, y0, y1 = 220, 860, 190, 250          # 640 x 60 px, más ancha y alta, más visible en móvil
     xf = x0 + (x1 - x0) * pct // 100
     box = lambda c, xa, xb: (f"{{\\an7\\pos(0,0)\\p1\\c&H{c}&\\bord0\\shad0}}m {xa} {y0} l {xb} {y0} {xb} {y1} {xa} {y1}{{\\p0}}")
     t = "0:00:00.30"

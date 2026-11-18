@@ -32,6 +32,10 @@ export default function Sidebar() {
   if (path === "/login") return null;
   return (
     <aside className="side">
+      <div style={{ textAlign: "center", padding: "8px 0 12px", borderBottom: "1px solid var(--glass-border)", marginBottom: 8 }}>
+        <div style={{ fontSize: 22, fontWeight: 800, background: "var(--grad)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", letterSpacing: "-0.03em" }}>CF</div>
+        <div style={{ fontSize: 9, color: "var(--muted)", letterSpacing: "0.1em", textTransform: "uppercase", marginTop: 2 }}>ClipForge</div>
+      </div>
       {items.map(([href, label, icon]) => (
         <Link key={href} href={href} className={path.startsWith(href) ? "on" : ""}>
           {icon}

@@ -58,8 +58,8 @@ def _raw_boxes(gray, min_frac=0.05):
         return [(r["c"], r["r"], r["width"], r["height"]) for r in raw]
     import cv2
     g = np.ascontiguousarray(gray)
-    g = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(4, 4)).apply(g)   # escenas oscuras (estudios de podcast): realza sin quemar
-    ms = (max(12, int(w * min_frac)),) * 2
+    g = cv2.createCLAHE(clipLimit=4.0, tileGridSize=(8, 8)).apply(g)   # escenas oscuras (estudios de podcast): realza sin quemar (más agresivo)
+    ms = (max(10, int(w * min_frac * 0.8)),) * 2   # caras un poco más pequeñas también cuentan (entrevistas lejos)
 
     def run(neigh):
         out = [tuple(r) for r in a.detectMultiScale(g, 1.1, neigh, minSize=ms)]
@@ -68,7 +68,11 @@ def _raw_boxes(gray, min_frac=0.05):
         return out
 
     out = run(4)
-    return out if out else run(3)   # si no vio nada, un segundo intento menos exigente (poca luz)
+    if not out:
+        out = run(3)   # si no vio nada, un segundo intento menos exigente (poca luz)
+    if not out:
+        out = run(2)   # tercer intento aún más permisivo (caras muy pequeñas o poca luz extrema)
+    return out
 
 
 # ---------------------------------------------------------------- lectura y detección
@@ -98,7 +102,9 @@ def _detect(gray, min_frac=0.05):
     h, w = gray.shape
     faces = []
     for (x, y, bw, bh) in _raw_boxes(gray, min_frac):
-        if y + bh / 2 > h * 0.8:   # caras muy abajo suelen ser falsos positivos
+        if y + bh / 2 > h * 0.75:   # caras muy abajo suelen ser falsos positivos (más estricto)
+            continue
+if bw < w * 0.02:          # caras demasiado pequeñas (ruido)
             continue
         faces.append({"x": (x + bw / 2) / w, "w": bw / w, "y": (y + bh / 2) / h, "box": (y, x, bw, bh)})
     # quita cajas repetidas (misma cara detectada dos veces)

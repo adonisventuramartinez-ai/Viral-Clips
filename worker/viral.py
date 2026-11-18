@@ -18,9 +18,13 @@ import config
 POWER = ("nadie", "increíble", "insólito", "se salió", "explot", "escándalo", "pelea", "descubr", "confes", "reveló", "reaccion",
          "no lo vas", "lo que pasó", "en vivo", "se armó", "tiraera", "verdad", "secreto", "viral", "locura", "tremendo", "épic",
          "brutal", "desastre", "traición", "peleó", "gritó", "lloró", "golpe", "sorprend", "mentira", "bochorno", "caos",
-         "tremenda", "brutalidad", "explosión", "escándalo", "polémica", "conflicto", "drama", "tensión", "shock")
+         "tremenda", "brutalidad", "explosión", "escándalo", "polémica", "conflicto", "drama", "tensión", "shock",
+         "traicion", "engañ", "sorpres", "revelacion", "confesion", "pelea", "discusion", "grito", "llanto", "golpe",
+         "tremendo", "brutal", "desastre", "caos", "bochorno", "verguenza", "humillacion", "venganza",
+         "klk", "vaina", "tiguere", "chercha", "jevi", "pariguayo", "dime a ver", "manin", "colmadito")
 RISK_WORDS = ("estafador", "ladrón", "violador", "pedófilo", "asesino", "drogadicto", "corrupto", "puta", "maricón", "hijueputa",
-              "maldito", "imbécil", "idiota", "pendejo", "cabrón", "mierda", "coño", "carajo", "jodido", "basura", "escoria")
+              "maldito", "imbécil", "idiota", "pendejo", "cabrón", "mierda", "coño", "carajo", "jodido", "basura", "escoria",
+              "mata", "muerte", "amenaza", "violencia", "golpe", "arma", "disparo", "sangre", "herido", "muerto")
 BROAD_TAGS = ("#fyp", "#viral", "#parati", "#foryou")
 _last = 0.0
 
@@ -163,7 +167,7 @@ def next_slots(now=None, taken=(), n=1, slots=None, tz=None, min_gap_min=None, m
 
 
 # ----------------------------------------------------------------------------- IA
-PROMPT = """Eres experto en contenido viral para Facebook Reels, TikTok y Shorts en español dominicano natural. Sin groserías ni insultos, sin inventar datos. Piensa como un editor que quiere que la gente NO pueda dejar de ver el clip.
+PROMPT = """Eres experto en contenido viral para Facebook Reels, TikTok y Shorts en español dominicano natural. Sin groserías ni insultos, sin inventar datos. Piensa como un editor que quiere que la gente NO pueda dejar de ver el clip. Usa jerga dominicana cuando encaje (klk, vaina, tíguere, chercha, jevi, pariguayo).
 Del clip de "{show}" devuelve SOLO JSON:
 {{"titles":[{{"t":"título 1 (25-65 car.)","angle":"curiosidad"}},{{"t":"...","angle":"polémica"}},{{"t":"...","angle":"pregunta"}},{{"t":"...","angle":"emoción"}},{{"t":"...","angle":"dato"}}],
 "thumb_texts":["2-4 palabras","2-4 palabras","2-4 palabras"],

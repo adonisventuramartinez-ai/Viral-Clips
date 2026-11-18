@@ -61,9 +61,9 @@ def _esc(text: str, upper: bool) -> str:
     return text.replace("{", "(").replace("}", ")").replace("\\", "/")
 
 
-HOOK_POP = "{\\fad(80,250)\\fscx82\\fscy82\\t(0,180,\\fscx100\\fscy100)}"   # el gancho aparece ya en el primer cuadro, con un golpe de escala
+HOOK_POP = "{\\fad(60,200)\\fscx78\\fscy78\\t(0,160,\\fscx100\\fscy100)\\t(0,160,\\fry0.5)}"   # el gancho aparece ya en el primer cuadro, con un golpe de escala y un leve giro
 # La palabra que se está diciendo entra grande y SE QUEDA grande hasta que pasa a la siguiente.
-WORD_HOLD = "{\\fscx100\\fscy100\\t(0,70,\\fscx118\\fscy118)}"
+WORD_HOLD = "{\\fscx100\\fscy100\\t(0,60,\\fscx122\\fscy122)\\fad(40,0)}"   # entrada más rápida y con fade-in
 LINE_CHARS = 16   # una sola línea: no se parte en dos y no choca con los botones del Reel
 LINE_GAP = 0.45   # un silencio corta la frase; no se quedan juntas dos palabras que no van juntas
 
