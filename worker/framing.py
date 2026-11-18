@@ -107,11 +107,11 @@ def _detect(gray, min_frac=0.05):
     for (x, y, bw, bh) in _raw_boxes(gray, min_frac):
         if y + bh / 2 > h * 0.75:   # caras muy abajo suelen ser falsos positivos (más estricto)
             continue
-if bw < w * 0.02:          # caras demasiado pequeñas (ruido)
+        if bw < w * 0.02:          # caras demasiado pequeñas (ruido)
             continue
-if bw > w * 0.5:           # caras demasiado grandes (falsos positivos)
+        if bw > w * 0.5:           # caras demasiado grandes (falsos positivos)
             continue
-if bh < h * 0.02:          # caras demasiado bajas (ruido)
+        if bh < h * 0.02:          # caras demasiado bajas (ruido)
             continue
         faces.append({"x": (x + bw / 2) / w, "w": bw / w, "y": (y + bh / 2) / h, "box": (y, x, bw, bh)})
     # quita cajas repetidas (misma cara detectada dos veces)

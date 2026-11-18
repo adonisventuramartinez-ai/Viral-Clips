@@ -312,3 +312,150 @@
 21:58:01 [download f01e23]   Reintento: limpié 0 clip(s) a medias del intento anterior
 21:58:01 [download f01e23] ▶ descarga
 21:59:10 [download f01e23] Recibí la señal de apagado (15): salgo. Lo que estaba en proceso se retoma al volver a encender.
+02:18:46 Groq: 7 cuenta(s) configurada(s).
+02:18:46 Probando las llaves de IA (una petición mínima a cada una)…
+02:18:54   ✓ groq: openai/gpt-oss-120b
+02:18:54   ✓ groq_cuenta2: openai/gpt-oss-120b
+02:18:54   ✓ groq_cuenta3: openai/gpt-oss-120b
+02:18:54   ✓ groq_cuenta4: openai/gpt-oss-120b
+02:18:54   ✓ groq_cuenta5: openai/gpt-oss-120b
+02:18:54   ✓ groq_cuenta6: openai/gpt-oss-120b
+02:18:54   ✓ groq_cuenta7: openai/gpt-oss-120b
+02:18:54   ✓ groq_8b: openai/gpt-oss-20b
+02:18:54   ✓ groq_cuenta2_8b: openai/gpt-oss-20b
+02:18:54   ✓ groq_cuenta3_8b: openai/gpt-oss-20b
+02:18:54   ✓ groq_cuenta4_8b: openai/gpt-oss-20b
+02:18:54   ✓ groq_cuenta5_8b: openai/gpt-oss-20b
+02:18:54   ✓ groq_cuenta6_8b: openai/gpt-oss-20b
+02:18:54   ✓ groq_cuenta7_8b: openai/gpt-oss-20b
+02:18:54   ✓ gemini: gemini-3.5-flash-lite
+02:18:54 ⚠  El encuadre automatico no esta disponible (IndentationError); los clips saldran centrados. Reconstruye el worker (docker build) para instalar scikit-image.
+02:18:54 ✓ Revisión inicial correcta (Supabase, bucket, ffmpeg, IA).
+02:18:54 IA en orden de uso: groq → groq_cuenta2 → groq_cuenta3 → groq_cuenta4 → groq_cuenta5 → groq_cuenta6 → groq_cuenta7 → groq_8b → groq_cuenta2_8b → groq_cuenta3_8b → groq_cuenta4_8b → groq_cuenta5_8b → groq_cuenta6_8b → groq_cuenta7_8b → gemini
+02:18:54 Worker listo (encuadres: vertical, dividido, dos personas, difuminado; directos con reconexión y chat), esperando trabajos…
+02:18:56 [download d7229b] Trabajo d7229b6f-90c5-4a97-9e56-ac757806c160 → fuente 8622351a-d2e3-4f10-aa44-168a055834c4 · prioridad 0 · intento 1
+02:18:56 [download d7229b]   Tipo de contenido: General · clips de ~90 s
+02:18:56 [download d7229b]   Encuadre pedido: crop | recuadro manual: no (automático)
+02:18:56 [download d7229b] ▶ descarga
+02:27:54 Groq: 7 cuenta(s) configurada(s).
+02:27:54 Probando las llaves de IA (una petición mínima a cada una)…
+02:28:02   ✓ groq: openai/gpt-oss-120b
+02:28:02   ✓ groq_cuenta2: openai/gpt-oss-120b
+02:28:02   ✓ groq_cuenta3: openai/gpt-oss-120b
+02:28:02   ✓ groq_cuenta4: openai/gpt-oss-120b
+02:28:02   ✓ groq_cuenta5: openai/gpt-oss-120b
+02:28:02   ✓ groq_cuenta6: openai/gpt-oss-120b
+02:28:02   ✓ groq_cuenta7: openai/gpt-oss-120b
+02:28:02   ✓ groq_8b: openai/gpt-oss-20b
+02:28:02   ✓ groq_cuenta2_8b: openai/gpt-oss-20b
+02:28:02   ✓ groq_cuenta3_8b: openai/gpt-oss-20b
+02:28:02   ✓ groq_cuenta4_8b: openai/gpt-oss-20b
+02:28:02   ✓ groq_cuenta5_8b: openai/gpt-oss-20b
+02:28:02   ✓ groq_cuenta6_8b: openai/gpt-oss-20b
+02:28:02   ✓ groq_cuenta7_8b: openai/gpt-oss-20b
+02:28:02   ✓ gemini: gemini-3.5-flash-lite
+02:28:02 ⚠  El encuadre automatico no esta disponible (IndentationError); los clips saldran centrados. Reconstruye el worker (docker build) para instalar scikit-image.
+02:28:02 ✓ Revisión inicial correcta (Supabase, bucket, ffmpeg, IA).
+02:28:02 IA en orden de uso: groq → groq_cuenta2 → groq_cuenta3 → groq_cuenta4 → groq_cuenta5 → groq_cuenta6 → groq_cuenta7 → groq_8b → groq_cuenta2_8b → groq_cuenta3_8b → groq_cuenta4_8b → groq_cuenta5_8b → groq_cuenta6_8b → groq_cuenta7_8b → gemini
+02:28:02 Worker listo (encuadres: vertical, dividido, dos personas, difuminado; directos con reconexión y chat), esperando trabajos…
+02:28:03 [download 30edd4] Trabajo 30edd417-bdde-483e-883f-24591fe55e28 → fuente b454776e-7d4a-44ed-a3b1-48e7eef59abe · prioridad 0 · intento 1
+02:28:03 [download 30edd4]   Tipo de contenido: General · clips de ~90 s
+02:28:03 [download 30edd4]   Encuadre pedido: crop | recuadro manual: no (automático)
+02:28:03 [download 30edd4] ▶ descarga
+02:33:30 [download 30edd4] Recibí la señal de apagado (15): salgo. Lo que estaba en proceso se retoma al volver a encender.
+02:33:36 Groq: 7 cuenta(s) configurada(s).
+02:33:36 Probando las llaves de IA (una petición mínima a cada una)…
+02:33:43   ✓ groq: openai/gpt-oss-120b
+02:33:43   ✓ groq_cuenta2: openai/gpt-oss-120b
+02:33:43   ✓ groq_cuenta3: openai/gpt-oss-120b
+02:33:43   ✓ groq_cuenta4: openai/gpt-oss-120b
+02:33:43   ✓ groq_cuenta5: openai/gpt-oss-120b
+02:33:43   ✓ groq_cuenta6: openai/gpt-oss-120b
+02:33:43   ✓ groq_cuenta7: openai/gpt-oss-120b
+02:33:43   ✓ groq_8b: openai/gpt-oss-20b
+02:33:43   ✓ groq_cuenta2_8b: openai/gpt-oss-20b
+02:33:43   ✓ groq_cuenta3_8b: openai/gpt-oss-20b
+02:33:43   ✓ groq_cuenta4_8b: openai/gpt-oss-20b
+02:33:43   ✓ groq_cuenta5_8b: openai/gpt-oss-20b
+02:33:43   ✓ groq_cuenta6_8b: openai/gpt-oss-20b
+02:33:43   ✓ groq_cuenta7_8b: openai/gpt-oss-20b
+02:33:43   ✓ gemini: gemini-3.5-flash-lite
+02:33:43 ⚠  El encuadre automatico no esta disponible (IndentationError); los clips saldran centrados. Reconstruye el worker (docker build) para instalar scikit-image.
+02:33:43 ✓ Revisión inicial correcta (Supabase, bucket, ffmpeg, IA).
+02:33:43 IA en orden de uso: groq → groq_cuenta2 → groq_cuenta3 → groq_cuenta4 → groq_cuenta5 → groq_cuenta6 → groq_cuenta7 → groq_8b → groq_cuenta2_8b → groq_cuenta3_8b → groq_cuenta4_8b → groq_cuenta5_8b → groq_cuenta6_8b → groq_cuenta7_8b → gemini
+02:33:43 Worker listo (encuadres: vertical, dividido, dos personas, difuminado; directos con reconexión y chat), esperando trabajos…
+02:33:43 Recuperación: 1 trabajo(s) que quedaron a medias vuelven a la cola.
+02:33:48 Groq: 7 cuenta(s) configurada(s).
+02:33:48 Probando las llaves de IA (una petición mínima a cada una)…
+02:33:55   ✓ groq: openai/gpt-oss-120b
+02:33:55   ✓ groq_cuenta2: openai/gpt-oss-120b
+02:33:55   ✓ groq_cuenta3: openai/gpt-oss-120b
+02:33:55   ✓ groq_cuenta4: openai/gpt-oss-120b
+02:33:55   ✓ groq_cuenta5: openai/gpt-oss-120b
+02:33:55   ✓ groq_cuenta6: openai/gpt-oss-120b
+02:33:55   ✓ groq_cuenta7: openai/gpt-oss-120b
+02:33:55   ✓ groq_8b: openai/gpt-oss-20b
+02:33:55   ✓ groq_cuenta2_8b: openai/gpt-oss-20b
+02:33:55   ✓ groq_cuenta3_8b: openai/gpt-oss-20b
+02:33:55   ✓ groq_cuenta4_8b: openai/gpt-oss-20b
+02:33:55   ✓ groq_cuenta5_8b: openai/gpt-oss-20b
+02:33:55   ✓ groq_cuenta6_8b: openai/gpt-oss-20b
+02:33:55   ✓ groq_cuenta7_8b: openai/gpt-oss-20b
+02:33:55   ✓ gemini: gemini-3.5-flash-lite
+02:33:55 ⚠  El encuadre automatico no esta disponible (IndentationError); los clips saldran centrados. Reconstruye el worker (docker build) para instalar scikit-image.
+02:33:55 ✓ Revisión inicial correcta (Supabase, bucket, ffmpeg, IA).
+02:33:55 IA en orden de uso: groq → groq_cuenta2 → groq_cuenta3 → groq_cuenta4 → groq_cuenta5 → groq_cuenta6 → groq_cuenta7 → groq_8b → groq_cuenta2_8b → groq_cuenta3_8b → groq_cuenta4_8b → groq_cuenta5_8b → groq_cuenta6_8b → groq_cuenta7_8b → gemini
+02:33:55 Worker listo (encuadres: vertical, dividido, dos personas, difuminado; directos con reconexión y chat), esperando trabajos…
+02:33:56 Recuperación: 1 trabajo(s) que quedaron a medias vuelven a la cola.
+02:33:56 [download 30edd4] Trabajo 30edd417-bdde-483e-883f-24591fe55e28 → fuente b454776e-7d4a-44ed-a3b1-48e7eef59abe · prioridad 0 · intento 3
+02:33:56 [download 30edd4]   Tipo de contenido: General · clips de ~90 s
+02:33:56 [download 30edd4]   Encuadre pedido: crop | recuadro manual: no (automático)
+02:33:57 [download 30edd4]   Reintento: limpié 0 clip(s) a medias del intento anterior
+02:33:57 [download 30edd4] ▶ descarga
+22:35:07 Groq: 7 cuenta(s) configurada(s).
+22:35:07 Probando las llaves de IA (una petición mínima a cada una)…
+22:35:14   ✓ groq: openai/gpt-oss-120b
+22:35:14   ✓ groq_cuenta2: openai/gpt-oss-120b
+22:35:14   ✓ groq_cuenta3: openai/gpt-oss-120b
+22:35:14   ✓ groq_cuenta4: openai/gpt-oss-120b
+22:35:14   ✓ groq_cuenta5: openai/gpt-oss-120b
+22:35:14   ✓ groq_cuenta6: openai/gpt-oss-120b
+22:35:14   ✓ groq_cuenta7: openai/gpt-oss-120b
+22:35:14   ✓ groq_8b: openai/gpt-oss-20b
+22:35:14   ✓ groq_cuenta2_8b: openai/gpt-oss-20b
+22:35:14   ✓ groq_cuenta3_8b: openai/gpt-oss-20b
+22:35:14   ✓ groq_cuenta4_8b: openai/gpt-oss-20b
+22:35:14   ✓ groq_cuenta5_8b: openai/gpt-oss-20b
+22:35:14   ✓ groq_cuenta6_8b: openai/gpt-oss-20b
+22:35:14   ✓ groq_cuenta7_8b: openai/gpt-oss-20b
+22:35:14   ✓ gemini: gemini-3.5-flash-lite
+22:35:14 ⚠  El encuadre automatico no esta disponible (IndentationError); los clips saldran centrados. Reconstruye el worker (docker build) para instalar scikit-image.
+22:35:14 ✓ Revisión inicial correcta (Supabase, bucket, ffmpeg, IA).
+22:35:14 IA en orden de uso: groq → groq_cuenta2 → groq_cuenta3 → groq_cuenta4 → groq_cuenta5 → groq_cuenta6 → groq_cuenta7 → groq_8b → groq_cuenta2_8b → groq_cuenta3_8b → groq_cuenta4_8b → groq_cuenta5_8b → groq_cuenta6_8b → groq_cuenta7_8b → gemini
+22:35:14 Worker listo (encuadres: vertical, dividido, dos personas, difuminado; directos con reconexión y chat), esperando trabajos…
+22:36:05 [download daf20f] Trabajo daf20f00-fce2-421d-b484-fec2424934b3 → fuente 0c1d376c-cdfa-481b-99b8-c3bcc01a9312 · prioridad 0 · intento 1
+22:36:05 [download daf20f]   Tipo de contenido: General · clips de ~90 s
+22:36:05 [download daf20f]   Encuadre pedido: crop | recuadro manual: no (automático)
+22:36:05 [download daf20f] ▶ descarga
+22:42:21 [download daf20f] ▶ transcripción
+22:43:20 [download daf20f]   Voces: 6 persona(s) distintas
+22:43:20 [download daf20f] ▶ análisis
+22:46:33 [download daf20f]   Pistas: 4 s con volumen alto, 124 s de acción en pantalla, 85 frase(s) marcada(s)
+22:46:38 [download daf20f]   IA: usando groq (openai/gpt-oss-120b)
+22:46:40 [download daf20f]   IA: usando groq_cuenta2 (openai/gpt-oss-120b)
+22:46:46 [download daf20f]   IA: usando groq_cuenta3 (openai/gpt-oss-120b)
+22:46:49 [download daf20f]   IA: usando groq_cuenta4 (openai/gpt-oss-120b)
+22:46:54 [download daf20f]   IA: usando groq_cuenta5 (openai/gpt-oss-120b)
+22:46:57 [download daf20f]   IA: usando groq_cuenta6 (openai/gpt-oss-120b)
+22:46:57 [download daf20f]   Segunda pasada: re-puntué 15 de 15 candidatos
+22:46:57 [download daf20f] ▶ clips
+22:46:59 [download daf20f]   Logo: lo pongo en br (24% del ancho)
+22:47:18 [download daf20f]   Ritmo: quité 10.7 s de silencios/muletillas (3 corte(s), 0 muletilla(s))
+22:47:18 [download daf20f]   ✖ Error inesperado: IndentationError: unindent does not match any outer indentation level (framing.py, line 116) Intento 1 de 3; vuelvo a probar en 1 min 00 s.
+22:47:19 [download daf20f] Fin del trabajo (11 min 14 s)
+22:48:24 [download daf20f] Trabajo daf20f00-fce2-421d-b484-fec2424934b3 → fuente 0c1d376c-cdfa-481b-99b8-c3bcc01a9312 · prioridad 0 · intento 2
+22:48:24 [download daf20f]   Tipo de contenido: General · clips de ~90 s
+22:48:24 [download daf20f]   Encuadre pedido: crop | recuadro manual: no (automático)
+22:48:24 [download daf20f]   Reintento: limpié 0 clip(s) a medias del intento anterior
+22:48:24 [download daf20f] ▶ descarga
+22:48:32 [download daf20f] Recibí la señal de apagado (15): salgo. Lo que estaba en proceso se retoma al volver a encender.
