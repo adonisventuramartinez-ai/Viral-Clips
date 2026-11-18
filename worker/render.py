@@ -41,7 +41,7 @@ WrapStyle: 0
 
 [V4+ Styles]
 Format: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding
-Style: Cap,Montserrat,{st['size']},&H00{_hex(st['text'])},&H00{_hex(st['text'])},&H00{_hex(st['outline'], '000000')},&H96000000,-1,0,0,0,100,100,0,0,1,{st['outline_w']},4,2,120,120,{margin},1
+Style: Cap,Montserrat,{st['size']},&H00{_hex(st['text'])},&H00{_hex(st['text'])},&H00{_hex(st['outline'], '000000')},&H96000000,-1,0,0,0,100,100,0,0,1,{st['outline_w']},5,2,120,120,{margin},1
 Style: Hook,DejaVu Sans,{config.CLIP_HOOK_SIZE},&H00000000,&H00000000,&H00FFFFFF,&H00FFFFFF,-1,0,0,0,100,100,0,0,3,18,0,8,90,90,290,1
 
 [Events]
@@ -61,7 +61,7 @@ def _esc(text: str, upper: bool) -> str:
     return text.replace("{", "(").replace("}", ")").replace("\\", "/")
 
 
-HOOK_POP = "{\\fad(60,200)\\fscx78\\fscy78\\t(0,160,\\fscx100\\fscy100)\\t(0,160,\\fry0.5)}"   # el gancho aparece ya en el primer cuadro, con un golpe de escala y un leve giro
+HOOK_POP = "{\\fad(50,180)\\fscx75\\fscy75\\t(0,150,\\fscx100\\fscy100)\\t(0,150,\\fry0.8)\\blur0.5}"   # el gancho aparece ya en el primer cuadro, con golpe de escala, giro y leve blur
 # La palabra que se está diciendo entra grande y SE QUEDA grande hasta que pasa a la siguiente.
 WORD_HOLD = "{\\fscx100\\fscy100\\t(0,60,\\fscx122\\fscy122)\\fad(40,0)}"   # entrada más rápida y con fade-in
 LINE_CHARS = 16   # una sola línea: no se parte en dos y no choca con los botones del Reel

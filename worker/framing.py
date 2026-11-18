@@ -58,8 +58,8 @@ def _raw_boxes(gray, min_frac=0.05):
         return [(r["c"], r["r"], r["width"], r["height"]) for r in raw]
     import cv2
     g = np.ascontiguousarray(gray)
-    g = cv2.createCLAHE(clipLimit=4.0, tileGridSize=(8, 8)).apply(g)   # escenas oscuras (estudios de podcast): realza sin quemar (más agresivo)
-    ms = (max(10, int(w * min_frac * 0.8)),) * 2   # caras un poco más pequeñas también cuentan (entrevistas lejos)
+    g = cv2.createCLAHE(clipLimit=6.0, tileGridSize=(8, 8)).apply(g)   # escenas oscuras (estudios de podcast): realza sin quemar (máximo)
+    ms = (max(8, int(w * min_frac * 0.7)),) * 2   # caras aún más pequeñas también cuentan (entrevistas lejos, planos abiertos)
 
     def run(neigh):
         out = [tuple(r) for r in a.detectMultiScale(g, 1.1, neigh, minSize=ms)]

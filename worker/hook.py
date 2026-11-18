@@ -22,7 +22,8 @@ DEPENDENT_OPEN = {"y", "pero", "porque", "entonces", "sino", "tambien", "ademas"
 # Ganchos genéricos que no dicen nada: se cambian por algo del propio clip.
 GENERIC = {"mira esto", "mira", "mira lo que paso", "nadie lo esperaba", "momento clave", "no lo vas a creer", "increible",
            "wow", "mira lo que hizo", "esto es una locura", "no lo vas a creer", "tienes que ver esto", "momento viral",
-           "no te lo pierdas", "esto es increible", "mira esto que paso", "no vas a creer", "esto es brutal"}
+           "no te lo pierdas", "esto es increible", "mira esto que paso", "no vas a creer", "esto es brutal",
+           "klk", "vaina", "tremendo", "brutal", "loco", "insano", "salvaje", "fuerte", "duro"}
 TAIL_STOP = {"de", "la", "el", "los", "las", "un", "una", "que", "y", "o", "a", "en", "con", "por", "para", "su", "se", "lo", "al", "del",
              "del", "al", "por", "para", "con", "sin", "sobre", "entre", "hasta", "desde", "hacia", "según", "durante"}
 

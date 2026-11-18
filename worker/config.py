@@ -29,7 +29,7 @@ def groq_keys():
     Se lee en cada llamada, así que agregar una cuenta no requiere tocar el código.
     """
     raw = [os.environ.get("GROQ_KEYS", ""), os.environ.get("GROQ_API_KEY", "")]
-    raw += [os.environ.get(f"GROQ_API_KEY_{i}", "") for i in range(1, 100)]
+    raw += [os.environ.get(f"GROQ_API_KEY_{i}", "") for i in range(1, 1000)]   # hasta 999 llaves por variable de entorno
     path = Path(os.environ.get("GROQ_KEYS_FILE") or Path(__file__).with_name("groq_keys.txt"))
     try:
         raw.append("\n".join(l.split("#")[0] for l in path.read_text(encoding="utf-8").splitlines()))

@@ -21,11 +21,13 @@ POWER = ("nadie", "increíble", "insólito", "se salió", "explot", "escándalo"
          "tremenda", "brutalidad", "explosión", "escándalo", "polémica", "conflicto", "drama", "tensión", "shock",
          "traicion", "engañ", "sorpres", "revelacion", "confesion", "pelea", "discusion", "grito", "llanto", "golpe",
          "tremendo", "brutal", "desastre", "caos", "bochorno", "verguenza", "humillacion", "venganza",
-         "klk", "vaina", "tiguere", "chercha", "jevi", "pariguayo", "dime a ver", "manin", "colmadito")
+         "klk", "vaina", "tiguere", "chercha", "jevi", "pariguayo", "dime a ver", "manin", "colmadito",
+         "escandalo", "polémica", "controversia", "debate", "discusion", "pelea", "conflicto", "tension", "drama",
+         "reaccion", "sorpresa", "shock", "impacto", "viral", "tendencia", "boom", "explosion", "locura")
 RISK_WORDS = ("estafador", "ladrón", "violador", "pedófilo", "asesino", "drogadicto", "corrupto", "puta", "maricón", "hijueputa",
               "maldito", "imbécil", "idiota", "pendejo", "cabrón", "mierda", "coño", "carajo", "jodido", "basura", "escoria",
               "mata", "muerte", "amenaza", "violencia", "golpe", "arma", "disparo", "sangre", "herido", "muerto")
-BROAD_TAGS = ("#fyp", "#viral", "#parati", "#foryou")
+BROAD_TAGS = ("#fyp", "#viral", "#parati", "#foryou", "#foryoupage", "#trending", "#parati", "#viralvideo")
 _last = 0.0
 
 
