@@ -84,6 +84,15 @@ def hook_score(text):
         s -= 12
     if len(words) < 6:
         s -= 8
+    # Bonus por palabras de alto impacto en los primeros 3 segundos
+    if any(w in first for w in ("nadie", "increíble", "brutal", "escándalo", "pelea", "secreto", "verdad", "mentira")):
+        s += 8
+    # Bonus por pregunta retórica
+    if "?" in first and len(words) >= 8:
+        s += 6
+    # Penalización por arranque lento (pocas palabras en los primeros 3s)
+    if len(words) < 4:
+        s -= 10
     return max(0, min(100, s))
 
 
