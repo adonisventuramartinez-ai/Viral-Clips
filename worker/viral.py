@@ -24,10 +24,11 @@ POWER = ("nadie", "increíble", "insólito", "se salió", "explot", "escándalo"
          "klk", "vaina", "tiguere", "chercha", "jevi", "pariguayo", "dime a ver", "manin", "colmadito",
          "escandalo", "polémica", "controversia", "debate", "discusion", "pelea", "conflicto", "tension", "drama",
          "reaccion", "sorpresa", "shock", "impacto", "viral", "tendencia", "boom", "explosion", "locura",
-         "klk", "vaina", "tiguere", "chercha", "jevi", "pariguayo", "dime a ver", "manin", "colmadito",
          "chisme", "cotilleo", "intriga", "misterio", "secreto", "revelacion", "confesion", "descubrimiento",
-         "sorpres", "impacto", "shock", "wow", "brutal", "tremendo", "insano", "salvaje", "fuerte", "duro", "loco",
-         "increible", "asombroso", "espectacular", "impresionante", "alucinante", "flipante", "brutal", "tremendo")
+         "insano", "salvaje", "fuerte", "duro", "loco", "increible", "asombroso", "espectacular", "impresionante",
+         "alucinante", "flipante", "brutal", "tremendo", "increible", "asombroso", "espectacular",
+         "confesion", "revelacion", "descubrimiento", "sorpresa", "shock", "impacto", "viral", "tendencia",
+         "boom", "explosion", "locura", "insano", "salvaje", "fuerte", "duro", "loco", "increible")
 RISK_WORDS = ("estafador", "ladrón", "violador", "pedófilo", "asesino", "drogadicto", "corrupto", "puta", "maricón", "hijueputa",
               "maldito", "imbécil", "idiota", "pendejo", "cabrón", "mierda", "coño", "carajo", "jodido", "basura", "escoria",
               "mata", "muerte", "amenaza", "violencia", "golpe", "arma", "disparo", "sangre", "herido", "muerto",
@@ -118,17 +119,19 @@ def hook_score(text):
 def combine(model_score, title_sc, hook_sc, duration):
     """Puntaje final 0-100: 50% lo que vio la IA al elegir el momento, 20% título, 20% arranque, 10% duración ideal (15-60 s)."""
     d = 100 if 25 <= duration <= 40 else (90 if 20 <= duration < 25 or 40 < duration <= 50 else (80 if 15 <= duration < 20 or 50 < duration <= 60 else (70 if 8 <= duration < 15 or 60 < duration <= 90 else 40)))
-    return round(0.45 * float(model_score or 0) + 0.2 * title_sc + 0.25 * hook_sc + 0.1 * d)   # más peso al hook (retención)
+    return round(0.4 * float(model_score or 0) + 0.2 * title_sc + 0.3 * hook_sc + 0.1 * d)   # aún más peso al hook (retención)
 
 
 def verdict(score, risks=()):
     if risks:
         return "review"
-    if score >= config.VIRAL_MIN_SCORE + 5:
+    if score >= config.VIRAL_MIN_SCORE + 10:
         return "ready"
     if score >= config.VIRAL_MIN_SCORE:
         return "review"  # borderline: needs human check
-    return "review" if score >= config.VIRAL_REVIEW_SCORE else "rejected"
+    if score >= config.VIRAL_REVIEW_SCORE:
+        return "review"
+    return "rejected"
 
 
 def hashtag_mix(ai_tags, base_tags=(), show="", limit=6):

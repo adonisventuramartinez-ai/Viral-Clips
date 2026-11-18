@@ -63,7 +63,7 @@ def _esc(text: str, upper: bool) -> str:
 
 HOOK_POP = "{\\fad(30,140)\\fscx65\\fscy65\\t(0,130,\\fscx100\\fscy100)\\t(0,130,\\fry1.2)\\blur1.0\\bord3}"   # el gancho aparece ya en el primer cuadro, con golpe de escala, giro, blur y borde (más fuerte)
 # La palabra que se está diciendo entra grande y SE QUEDA grande hasta que pasa a la siguiente.
-WORD_HOLD = "{\\fscx100\\fscy100\\t(0,45,\\fscx128\\fscy128)\\fad(25,0)\\blur0.4\\bord1}"   # entrada más rápida, fade-in, blur y borde
+WORD_HOLD = "{\\fscx100\\fscy100\\t(0,40,\\fscx130\\fscy130)\\fad(20,0)\\blur0.5\\bord2}"   # entrada más rápida, fade-in, blur y borde
 LINE_CHARS = 18   # una sola línea: no se parte en dos y no choca con los botones del Reel (más caracteres)
 LINE_GAP = 0.4   # un silencio corta la frase; no se quedan juntas dos palabras que no van juntas (más sensible)
 

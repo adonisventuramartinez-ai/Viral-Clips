@@ -150,7 +150,7 @@ def sample_faces(source, start, dur, src_w, src_h, min_frac=0.05):
 def _left(center, crop_frac):
     """Centro deseado (fracción del ancho) -> posición del recorte como fracción del ESPACIO SOBRANTE (0 = pegado a
     la izquierda, 1 = pegado a la derecha), que es lo que usa x=(iw-ow)*fracción en ffmpeg."""
-    left = min(max(center - crop_frac / 2.5, 0.0), 1.0 - crop_frac)   # aún más centrado
+    left = min(max(center - crop_frac / 2.8, 0.0), 1.0 - crop_frac)   # aún más centrado
     return left / (1.0 - crop_frac)
 
 

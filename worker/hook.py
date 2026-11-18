@@ -65,6 +65,8 @@ def start_score(ws, i):
         s += 6
     if "?" in text:
         s += 4
+    if any(w in text.lower() for w in ("nadie", "increible", "brutal", "escandalo")):
+        s += 8
     first = norm(ws[i]["w"])
     if first in DEPENDENT_OPEN:
         s -= 15
@@ -143,11 +145,17 @@ def is_generic(h):
     if n in GENERIC:
         return True
     # Detectar ganchos que son solo exclamaciones
-    if n in ("wow", "omg", "wtf", "no", "si", "ok", "bueno"):
+    if n in ("wow", "omg", "wtf", "no", "si", "ok", "bueno", "klk", "vaina"):
         return True
     # Detectar ganchos repetitivos (misma palabra 3+ veces)
     words = n.split()
     if len(set(words)) == 1 and len(words) >= 3:
+        return True
+    # Detectar ganchos muy cortos (menos de 3 palabras)
+    if len(words) < 3:
+        return True
+    # Detectar ganchos que son solo números
+    if all(w.isdigit() for w in words):
         return True
     return False
 
