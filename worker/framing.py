@@ -17,11 +17,11 @@ SAMPLE_FPS = 3.0
 DET_W = 720        # ancho al que se reduce el cuadro para buscar caras (más alto = mejor detección, más CPU)
 WIN = 3            # +-1 s de ventana para decidir quién habla
 import config as _cfg
-MIN_DWELL = _cfg.CLIP_MIN_DWELL
+MIN_DWELL = max(2, _cfg.CLIP_MIN_DWELL - 1)   # reacciona un poco más rápido
 MIN_GAP = _cfg.CLIP_MIN_GAP
 URGENT_EDGE = _cfg.CLIP_URGENT_EDGE
 URGENT_DWELL = 2   # muestras seguidas (~0.7 s) para ese caso
-RAMP = _cfg.CLIP_RAMP
+RAMP = max(0.3, _cfg.CLIP_RAMP - 0.1)   # paneo un poco más rápido por defecto
 MIN_COVERAGE = _cfg.CLIP_MIN_COVERAGE
 
 _det = None
@@ -61,6 +61,7 @@ def _raw_boxes(gray, min_frac=0.05):
     g = cv2.createCLAHE(clipLimit=8.0, tileGridSize=(8, 8)).apply(g)   # escenas oscuras (estudios de podcast): realza sin quemar (ultra)
 g = cv2.GaussianBlur(g, (3, 3), 0)   # suaviza para reducir ruido en detección
 g = cv2.equalizeHist(g)   # ecualización de histograma para mejor contraste
+g = cv2.medianBlur(g, 3)   # filtro mediana para eliminar ruido salt-and-pepper
     ms = (max(8, int(w * min_frac * 0.7)),) * 2   # caras aún más pequeñas también cuentan (entrevistas lejos, planos abiertos)
 
     def run(neigh):
@@ -84,7 +85,7 @@ def _read_frames(source, start, dur, src_w, src_h, det_w=DET_W, fps=SAMPLE_FPS):
 
     h = max(2, int(round(det_w * src_h / src_w / 2)) * 2)
     cmd = ["ffmpeg", "-v", "error", "-ss", f"{start:.2f}", "-t", f"{dur:.2f}", "-i", str(source),
-           "-vf", f"fps={fps},scale={det_w}:{h}:flags=bilinear,format=gray",
+           "-vf", f"fps={fps},scale={det_w}:{h}:flags=lanczos,format=gray",
            "-f", "rawvideo", "-pix_fmt", "gray", "-"]
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
     size = det_w * h
@@ -109,6 +110,8 @@ def _detect(gray, min_frac=0.05):
 if bw < w * 0.02:          # caras demasiado pequeñas (ruido)
             continue
 if bw > w * 0.5:           # caras demasiado grandes (falsos positivos)
+            continue
+if bh < h * 0.02:          # caras demasiado bajas (ruido)
             continue
         faces.append({"x": (x + bw / 2) / w, "w": bw / w, "y": (y + bh / 2) / h, "box": (y, x, bw, bh)})
     # quita cajas repetidas (misma cara detectada dos veces)
@@ -147,7 +150,7 @@ def sample_faces(source, start, dur, src_w, src_h, min_frac=0.05):
 def _left(center, crop_frac):
     """Centro deseado (fracción del ancho) -> posición del recorte como fracción del ESPACIO SOBRANTE (0 = pegado a
     la izquierda, 1 = pegado a la derecha), que es lo que usa x=(iw-ow)*fracción en ffmpeg."""
-    left = min(max(center - crop_frac / 2, 0.0), 1.0 - crop_frac)
+    left = min(max(center - crop_frac / 2.5, 0.0), 1.0 - crop_frac)   # aún más centrado
     return left / (1.0 - crop_frac)
 
 
@@ -196,7 +199,7 @@ def plan(samples, crop_frac):
     # mediana de 3 muestras: un cuadro suelto con ruido no mueve la cámara
     tg = [statistics.median(tg[max(0, i - 1): i + 2]) for i in range(len(tg))]
 
-    dead = 0.2 * crop_frac
+    dead = 0.15 * crop_frac   # zona muerta más pequeña para más precisión
     edge = URGENT_EDGE * crop_frac
     cur = statistics.median(tg[: max(3, int(SAMPLE_FPS * 2))])
     keys = [(0.0, _left(cur, crop_frac))]

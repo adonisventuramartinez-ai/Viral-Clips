@@ -16,7 +16,7 @@ DEFAULTS = {
     "smart_start": config.SMART_START,   # empezar en la primera frase fuerte (lo lee main.py)
 }
 
-PROMPT = """Eres el editor de una página de clips de "{show}" para Facebook. Español dominicano natural, sin groserías, sin insultos. Piensa como un editor que quiere que la gente NO pueda dejar de ver el clip. Usa jerga dominicana cuando encaje (klk, vaina, tíguere, chercha, jevi, pariguayo, colmadito, manin). Sé creativo y original.
+PROMPT = """Eres el editor de una página de clips de "{show}" para Facebook. Español dominicano natural, sin groserías, sin insultos. Piensa como un editor que quiere que la gente NO pueda dejar de ver el clip. Usa jerga dominicana cuando encaje (klk, vaina, tíguere, chercha, jevi, pariguayo, colmadito, manin). Sé creativo, original y atrevido. Los titulos deben generar curiosidad extrema. El contexto debe ser intrigante y no revelar el final. La encuesta debe dividir opiniones. El caption debe invitar a comentar. Sé creativo y original.
 Del fragmento saca texto ORIGINAL (no copies frases largas textuales). Devuelve:
 - context: 1 frase (máx 90 caracteres) que ponga en situación a quien no vio el programa SIN contar el final ("Antes de esto, ..."), legible en voz alta. Debe generar curiosidad, no revelar el desenlace. Usa palabras de drama/emoción cuando el clip las tiene.
 - outro: 1 pregunta corta (máx 60 caracteres) que divida opiniones y dé ganas de comentar. Evita frases vacías ("¿Qué te parece?"). Que sea polémica pero sin insultos.
@@ -133,21 +133,21 @@ WrapStyle: 0
 
 [V4+ Styles]
 Format: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding
-Style: Big,Montserrat,100,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,8,3,5,80,80,0,1
+Style: Big,Montserrat,104,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,9,3,5,80,80,0,1
 Style: Small,Montserrat,58,&H0000E0FF,&H0000E0FF,&H00000000,&H00000000,-1,0,0,0,100,100,3,0,1,5,0,8,90,90,330,1
 Style: Meter,Montserrat,60,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,2,0,1,7,0,8,0,0,125,1
-Style: Intro,Montserrat,46,&H00FFFFFF,&H00FFFFFF,&H78000000,&H00000000,-1,0,0,0,100,100,0,0,3,14,0,8,70,70,560,1
+Style: Intro,Montserrat,50,&H00FFFFFF,&H00FFFFFF,&H78000000,&H00000000,-1,0,0,0,100,100,0,0,3,16,0,8,70,70,560,1
 Style: Q,Montserrat,92,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,7,2,8,80,80,430,1
 Style: Letter,Montserrat,150,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,7,0,5,0,0,0,1
 Style: Opt,Montserrat,64,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,6,0,4,0,0,0,1
 Style: Cta,Montserrat,70,&H0000E0FF,&H0000E0FF,&H00000000,&H00000000,-1,0,0,0,100,100,2,0,1,6,2,8,60,60,1290,1
-Style: Page,Montserrat,44,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,2,0,1,4,0,8,60,60,1420,1
+Style: Page,Montserrat,48,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,2,0,1,5,0,8,60,60,1420,1
 
 [Events]
 Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
 """
 
-POP = "{\\fad(200,180)\\fscx80\\fscy80\\t(0,280,\\fscx100\\fscy100)\\blur0.5}"
+POP = "{\\fad(180,160)\\fscx75\\fscy75\\t(0,260,\\fscx100\\fscy100)\\blur0.6\\bord1}"
 
 
 def grab_frame(clip, at, out):
@@ -193,7 +193,7 @@ def _render_card(ass_text, d, out, workdir, voice=None, color="0x101820", bg=Non
 def make_card(text, small, min_dur, out, workdir, voice=None, color="0x101820", bg=None):
     """Tarjeta de texto. Si pasas bg (imagen), el fondo es ese cuadro borroso, oscurecido y con un movimiento lento,
     para que no se vea una pantalla muerta; sin bg queda el color plano de siempre."""
-    d = max(min_dur, _dur(voice) + 0.5) if voice else min_dur
+    d = max(min_dur, _dur(voice) + 0.7) if voice else min_dur
     ass = (_HEAD + f"Dialogue: 0,0:00:00.00,0:00:{d + 1:05.2f},Big,,0,0,0,,{POP}{_esc(text)}\n"
            + (f"Dialogue: 0,0:00:00.00,0:00:{d + 1:05.2f},Small,,0,0,0,,{{\\fad(250,200)}}{_esc(small)}\n" if small else ""))
     return _render_card(ass, d, out, workdir, voice, color, bg)
@@ -229,7 +229,7 @@ def _poll_ass(p, page, d):
 
 
 def make_poll_card(p, page, min_dur, out, workdir, voice=None, bg=None):
-    d = max(min_dur, _dur(voice) + 0.5) if voice else min_dur
+    d = max(min_dur, _dur(voice) + 0.7) if voice else min_dur
     return _render_card(_poll_ass(p, page, d), d, out, workdir, voice, "0x101820", bg)
 
 
@@ -255,7 +255,7 @@ def _meter_ass(pct, path, intro=None, show_meter=True):
         grow = f"\\clip({x0},{y0},{x0},{y1})\\t(0,1100,\\clip({x0},{y0},{xf},{y1}))"
         fill = (f"{{\\an7\\pos(0,0)\\p1\\c&H{_meter_color(pct)}&\\bord0\\shad0{grow}}}"
                 f"m {x0} {y0} l {xf} {y0} {xf} {y1} {x0} {y1}{{\\p0}}")
-        ev += (f"Dialogue: 1,{t},{e},Meter,,0,0,0,,{{\\fad(200,300)}}DRAMÓMETRO {pct}% · {_meter_level(pct)}\n"
+        ev += (f"Dialogue: 1,{t},{e},Meter,,0,0,0,,{{\\fad(200,300)}}DRAMÓMETRO {pct}% · NIVEL MÁXIMO {_meter_level(pct)}\n"
                f"Dialogue: 0,{t},{e},Meter,,0,0,0,,{{\\fad(200,300)}}{box('303030', x0 - 6, x1 + 6)}\n"
                f"Dialogue: 2,{t},{e},Meter,,0,0,0,,{{\\fad(200,300)}}{fill}\n")
     if intro:   # sale un instante después del gancho (que ya está arriba desde el primer cuadro) y debajo de él

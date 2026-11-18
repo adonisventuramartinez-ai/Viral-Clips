@@ -16,7 +16,10 @@ import viral
 FILLER_OPEN = {"bueno", "eh", "ehh", "este", "mmm", "mm", "ok", "okay", "pues", "hola", "buenas", "bienvenidos",
                "saludos", "dale", "ya", "listo", "aja", "ajá", "a ver", "vamos", "entonces", "claro", "mira",
                "oye", "oigan", "amigos", "gente", "hermano", "mano", "klk", "qué lo qué", "klk", "vaina",
-               "tiguere", "chercha", "jevi", "pariguayo", "dime a ver", "manin", "colmadito", "jevi", "pariguayo"}
+               "tiguere", "chercha", "jevi", "pariguayo", "dime a ver", "manin", "colmadito", "jevi", "pariguayo",
+               "oye", "mira", "escucha", "atiende", "fijate", "imaginate", "sabes", "sabes que", "sabes qué",
+               "la verdad", "la neta", "en serio", "en verdad", "de verdad", "de veras", "en realidad",
+               "pues", "entonces", "asi que", "así que", "por eso", "por lo tanto", "de hecho", "de hecho que"}
 # Palabras que enganchan con lo que se dijo ANTES (el clip no se entiende empezando ahí).
 DEPENDENT_OPEN = {"y", "pero", "porque", "entonces", "sino", "tambien", "ademas", "luego", "eso", "esa", "ese", "asi",
                   "o", "ni", "aunque", "mientras", "que", "como", "cuando", "donde", "quien", "cual",
@@ -31,7 +34,7 @@ TAIL_STOP = {"de", "la", "el", "los", "las", "un", "una", "que", "y", "o", "a", 
              "del", "al", "por", "para", "con", "sin", "sobre", "entre", "hasta", "desde", "hacia", "según", "durante"}
 
 SENT_END = re.compile(r"[.?!…]+[\"')\]]*$")
-GAP_SENTENCE = 0.7      # una pausa así separa frases aunque Whisper no ponga punto
+GAP_SENTENCE = 0.6      # una pausa así separa frases aunque Whisper no ponga punto (más sensible)
 
 
 def norm(text):
@@ -58,6 +61,10 @@ def start_score(ws, i):
     """0-100: qué tan bien engancha un clip que empiece en la palabra i."""
     text = " ".join(str(x["w"]) for x in ws[i:i + 14])
     s = viral.hook_score(text)
+    if "!" in text:
+        s += 6
+    if "?" in text:
+        s += 4
     first = norm(ws[i]["w"])
     if first in DEPENDENT_OPEN:
         s -= 15
@@ -79,7 +86,7 @@ def _cut_point(ws, i):
     return max(w - 0.12, (ws[i - 1]["end"] + w) / 2)
 
 
-def refine_start(words, start, end, max_shift=6.0, min_len=12.0, min_gain=10):
+def refine_start(words, start, end, max_shift=8.0, min_len=12.0, min_gain=10):
     """Devuelve (inicio, nota). Si hay una frase más fuerte en los primeros `max_shift` s (y el clip sigue durando
     al menos `min_len`), el clip entra ahí. Si no, quita solo muletillas sueltas del arranque. `nota` es None si no cambió nada."""
     ws = _in_clip(words or [], start, end)
@@ -111,7 +118,7 @@ def refine_start(words, start, end, max_shift=6.0, min_len=12.0, min_gain=10):
 
 
 # ----------------------------------------------------------------------------- texto del gancho
-def clean_hook(h, max_words=7, max_chars=44):
+def clean_hook(h, max_words=9, max_chars=52):
     """Limpia el gancho: sin comillas ni emojis, corto (cabe en 2 líneas arriba del clip) y sin terminar en 'de la…'."""
     h = "".join(ch for ch in str(h or "") if ord(ch) < 0x2190)
     h = re.sub(r"[\"“”«»]", "", h)
@@ -131,14 +138,25 @@ def clean_hook(h, max_words=7, max_chars=44):
 
 def is_generic(h):
     n = norm(h)
-    return (not n) or n in GENERIC or len(n.split()) < 2
+    if not n or len(n.split()) < 2:
+        return True
+    if n in GENERIC:
+        return True
+    # Detectar ganchos que son solo exclamaciones
+    if n in ("wow", "omg", "wtf", "no", "si", "ok", "bueno"):
+        return True
+    # Detectar ganchos repetitivos (misma palabra 3+ veces)
+    words = n.split()
+    if len(set(words)) == 1 and len(words) >= 3:
+        return True
+    return False
 
 
 def _sentence_text(ws, a, b):
     return " ".join(str(x["w"]) for x in ws[a:b]).strip().capitalize()
 
 
-def derive_hook(words, start, end, horizon=14.0):
+def derive_hook(words, start, end, horizon=16.0):
     """Saca un gancho del propio clip: la frase con más gancho de los primeros `horizon` s. '' si no hay nada decente."""
     ws = _in_clip(words or [], start, min(end, start + horizon))
     if len(ws) < 4:

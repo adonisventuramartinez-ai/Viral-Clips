@@ -81,6 +81,14 @@ try:
 except ValueError:
     CLIP_SUB_SHADOW = 5
 try:
+    CLIP_SUB_BLUR = min(2.0, max(0.0, float(os.environ.get("CLIP_SUB_BLUR") or 0.3)))  # blur de los subtítulos
+except ValueError:
+    CLIP_SUB_BLUR = 0.3
+try:
+    CLIP_SUB_SHADOW = min(10, max(0, int(os.environ.get("CLIP_SUB_SHADOW") or 5)))      # sombra de los subtítulos
+except ValueError:
+    CLIP_SUB_SHADOW = 5
+try:
     CLIP_SUB_OUTLINE = min(14, max(0, int(os.environ.get("CLIP_SUB_OUTLINE") or 7)))     # contorno de los subtítulos
 except ValueError:
     CLIP_SUB_OUTLINE = 7
@@ -94,6 +102,20 @@ try:
     VIRAL_POWER_BOOST = min(2.0, max(0.5, float(os.environ.get("VIRAL_POWER_BOOST") or 1.0)))   # multiplicador de palabras de poder en el puntaje
 except ValueError:
     VIRAL_POWER_BOOST = 1.0
+try:
+    VIRAL_HASHTAG_LIMIT = min(8, max(3, int(os.environ.get("VIRAL_HASHTAG_LIMIT") or 6)))   # máximo de hashtags en el paquete viral
+except ValueError:
+    VIRAL_HASHTAG_LIMIT = 6
+
+# Hook (hook.py) - ajustables sin tocar código:
+try:
+    HOOK_MAX_SHIFT = min(10.0, max(2.0, float(os.environ.get("HOOK_MAX_SHIFT") or 6.0)))   # segundos máximos para mover el inicio
+except ValueError:
+    HOOK_MAX_SHIFT = 6.0
+try:
+    HOOK_MIN_GAIN = min(30, max(5, int(os.environ.get("HOOK_MIN_GAIN") or 10)))   # ganancia mínima para mover el inicio
+except ValueError:
+    HOOK_MIN_GAIN = 10
 
 # Calibración del encuadre (framing.py) - ajustables sin tocar código:
 try:

@@ -61,11 +61,11 @@ def _esc(text: str, upper: bool) -> str:
     return text.replace("{", "(").replace("}", ")").replace("\\", "/")
 
 
-HOOK_POP = "{\\fad(40,160)\\fscx70\\fscy70\\t(0,140,\\fscx100\\fscy100)\\t(0,140,\\fry1.0)\\blur0.8\\bord2}"   # el gancho aparece ya en el primer cuadro, con golpe de escala, giro, blur y borde
+HOOK_POP = "{\\fad(30,140)\\fscx65\\fscy65\\t(0,130,\\fscx100\\fscy100)\\t(0,130,\\fry1.2)\\blur1.0\\bord3}"   # el gancho aparece ya en el primer cuadro, con golpe de escala, giro, blur y borde (más fuerte)
 # La palabra que se está diciendo entra grande y SE QUEDA grande hasta que pasa a la siguiente.
-WORD_HOLD = "{\\fscx100\\fscy100\\t(0,50,\\fscx125\\fscy125)\\fad(30,0)\\blur0.3}"   # entrada más rápida, fade-in y leve blur
-LINE_CHARS = 16   # una sola línea: no se parte en dos y no choca con los botones del Reel
-LINE_GAP = 0.45   # un silencio corta la frase; no se quedan juntas dos palabras que no van juntas
+WORD_HOLD = "{\\fscx100\\fscy100\\t(0,45,\\fscx128\\fscy128)\\fad(25,0)\\blur0.4\\bord1}"   # entrada más rápida, fade-in, blur y borde
+LINE_CHARS = 18   # una sola línea: no se parte en dos y no choca con los botones del Reel (más caracteres)
+LINE_GAP = 0.4   # un silencio corta la frase; no se quedan juntas dos palabras que no van juntas (más sensible)
 
 
 def _lines(ws, max_words):
@@ -161,7 +161,7 @@ def _fit_filter(sw: int, sh: int, aspect: float, fx: float = 0.5) -> str:
         cw, ch = min(sw, _even(sh * aspect)), sh
     else:
         cw, ch = sw, min(sh, _even(sw / aspect))
-    return f"crop=w={cw}:h={ch}:x='(iw-ow)*{fx:.3f}':y='(ih-oh)/2'"
+    return f"crop=w={cw}:h={ch}:x='(iw-ow)*{min(1.0, max(0.0, fx + 0.02)):.3f}':y='(ih-oh)/2'"
 
 
 def _crop_filter(source: Path, start: float, dur: float, custom_crop: dict = None, keys=None):
@@ -181,7 +181,7 @@ def _crop_filter(source: Path, start: float, dur: float, custom_crop: dict = Non
             import framing
             xexpr = framing.x_expression(keys)
         else:
-            xexpr = f"(iw-ow)*{config.CLIP_FOCUS_X:.3f}"
+            xexpr = f"(iw-ow)*{min(1.0, max(0.0, config.CLIP_FOCUS_X + 0.03)):.3f}"   # un poco más a la derecha por defecto
         return f"crop=w={cw}:h={ch}:x='{xexpr}':y=0"
     ch, cw = int(sw * 16 / 9) // 2 * 2, sw
     return f"crop=w={cw}:h={min(ch, sh)}:x=0:y='(ih-oh)/2'"

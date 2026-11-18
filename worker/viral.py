@@ -24,13 +24,17 @@ POWER = ("nadie", "increíble", "insólito", "se salió", "explot", "escándalo"
          "klk", "vaina", "tiguere", "chercha", "jevi", "pariguayo", "dime a ver", "manin", "colmadito",
          "escandalo", "polémica", "controversia", "debate", "discusion", "pelea", "conflicto", "tension", "drama",
          "reaccion", "sorpresa", "shock", "impacto", "viral", "tendencia", "boom", "explosion", "locura",
-         "klk", "vaina", "tiguere", "chercha", "jevi", "pariguayo", "dime a ver", "manin", "colmadito", "jevi",
-         "pariguayo", "dime a ver", "manin", "colmadito", "jevi", "pariguayo", "dime a ver", "manin", "colmadito")
+         "klk", "vaina", "tiguere", "chercha", "jevi", "pariguayo", "dime a ver", "manin", "colmadito",
+         "chisme", "cotilleo", "intriga", "misterio", "secreto", "revelacion", "confesion", "descubrimiento",
+         "sorpres", "impacto", "shock", "wow", "brutal", "tremendo", "insano", "salvaje", "fuerte", "duro", "loco",
+         "increible", "asombroso", "espectacular", "impresionante", "alucinante", "flipante", "brutal", "tremendo")
 RISK_WORDS = ("estafador", "ladrón", "violador", "pedófilo", "asesino", "drogadicto", "corrupto", "puta", "maricón", "hijueputa",
               "maldito", "imbécil", "idiota", "pendejo", "cabrón", "mierda", "coño", "carajo", "jodido", "basura", "escoria",
               "mata", "muerte", "amenaza", "violencia", "golpe", "arma", "disparo", "sangre", "herido", "muerto",
               "racista", "sexista", "homofobo", "machista", "abusador", "acosador", "manipulador", "mentiroso", "traidor",
-              "nazi", "terrorista", "extremista", "radical", "fanatico", "intolerante", "discriminador", "opresor")
+              "nazi", "terrorista", "extremista", "radical", "fanatico", "intolerante", "discriminador", "opresor",
+              "odio", "discriminacion", "acoso", "bullying", "amenaza", "intimidacion", "persecucion", "hostigamiento",
+              "agresion", "ataque", "violacion", "abuso", "maltrato", "tortura", "crueldad", "barbarie")
 BROAD_TAGS = ("#fyp", "#viral", "#parati", "#foryou", "#foryoupage", "#trending", "#parati", "#viralvideo",
               "#fypシ", "#parati", "#viral", "#trending", "#foryou", "#foryoupage", "#viralvideo", "#parati")
 _last = 0.0
@@ -46,9 +50,9 @@ def title_score(title):
     n = len(t)
     s += 20 if 25 <= n <= 65 else (8 if 15 <= n < 25 or 65 < n <= 80 else -15)
     low = t.lower()
-    s += min(24, 8 * sum(1 for w in POWER if w in low))
+    s += min(30, 6 * sum(1 for w in POWER if w in low))
     if "?" in t or "¿" in t:
-        s += 8
+        s += 10
     if re.search(r"\d", t):
         s += 5
     letters = [c for c in t if c.isalpha()]
@@ -58,6 +62,15 @@ def title_score(title):
         s -= 8
     if any(w in low for w in RISK_WORDS):
         s -= 25
+    # Bonus por emojis (más engagement)
+    if re.search(r"[\U0001F300-\U0001F9FF]", t):
+        s += 5
+    # Bonus por números al inicio (listas funcionan bien)
+    if re.match(r"^\d", t):
+        s += 6
+    # Penalización por títulos muy genéricos
+    if low in ("clip", "video", "momento", "highlights", "mejores momentos"):
+        s -= 20
     return max(0, min(100, s))
 
 
@@ -90,6 +103,12 @@ def hook_score(text):
     # Bonus por pregunta retórica
     if "?" in first and len(words) >= 8:
         s += 6
+    # Bonus por exclamación
+    if "!" in first and len(words) >= 6:
+        s += 4
+    # Bonus por números (listas funcionan bien)
+    if re.search(r"\d", first):
+        s += 3
     # Penalización por arranque lento (pocas palabras en los primeros 3s)
     if len(words) < 4:
         s -= 10
@@ -98,19 +117,21 @@ def hook_score(text):
 
 def combine(model_score, title_sc, hook_sc, duration):
     """Puntaje final 0-100: 50% lo que vio la IA al elegir el momento, 20% título, 20% arranque, 10% duración ideal (15-60 s)."""
-    d = 100 if 15 <= duration <= 60 else (70 if 8 <= duration < 15 or 60 < duration <= 90 else 40)
-    return round(0.5 * float(model_score or 0) + 0.2 * title_sc + 0.2 * hook_sc + 0.1 * d)
+    d = 100 if 25 <= duration <= 40 else (90 if 20 <= duration < 25 or 40 < duration <= 50 else (80 if 15 <= duration < 20 or 50 < duration <= 60 else (70 if 8 <= duration < 15 or 60 < duration <= 90 else 40)))
+    return round(0.45 * float(model_score or 0) + 0.2 * title_sc + 0.25 * hook_sc + 0.1 * d)   # más peso al hook (retención)
 
 
 def verdict(score, risks=()):
     if risks:
         return "review"
-    if score >= config.VIRAL_MIN_SCORE:
+    if score >= config.VIRAL_MIN_SCORE + 5:
         return "ready"
+    if score >= config.VIRAL_MIN_SCORE:
+        return "review"  # borderline: needs human check
     return "review" if score >= config.VIRAL_REVIEW_SCORE else "rejected"
 
 
-def hashtag_mix(ai_tags, base_tags=(), show="", limit=5):
+def hashtag_mix(ai_tags, base_tags=(), show="", limit=6):
     """Mezcla ideal: 1 amplio (#fyp), 1-2 del programa/nicho, el resto del tema. Sin repetidos, sin espacios, con #."""
     def clean(t):
         t = "#" + re.sub(r"[^\w]", "", str(t).replace(" ", ""), flags=re.U).lstrip("#")
@@ -123,6 +144,7 @@ def hashtag_mix(ai_tags, base_tags=(), show="", limit=5):
             seen.add(t.lower())
             out.append(t)
     add("#fyp")
+    add("#viral")
     if show:
         add(show.replace(" ", ""))
     for t in list(base_tags or []) + list(ai_tags or []):
@@ -183,7 +205,7 @@ def next_slots(now=None, taken=(), n=1, slots=None, tz=None, min_gap_min=None, m
 
 
 # ----------------------------------------------------------------------------- IA
-PROMPT = """Eres experto en contenido viral para Facebook Reels, TikTok y Shorts en español dominicano natural. Sin groserías ni insultos, sin inventar datos. Piensa como un editor que quiere que la gente NO pueda dejar de ver el clip. Usa jerga dominicana cuando encaje (klk, vaina, tíguere, chercha, jevi, pariguayo, colmadito, manin). Sé creativo, original y atrevido.
+PROMPT = """Eres experto en contenido viral para Facebook Reels, TikTok y Shorts en español dominicano natural. Sin groserías ni insultos, sin inventar datos. Piensa como un editor que quiere que la gente NO pueda dejar de ver el clip. Usa jerga dominicana cuando encaje (klk, vaina, tíguere, chercha, jevi, pariguayo, colmadito, manin). Sé creativo, original y atrevido. Los titulos deben generar curiosidad extrema, usar palabras de poder y crear urgencia. Los hashtags deben ser especificos y relevantes. Los riesgos deben incluir cualquier contenido sensible.
 Del clip de "{show}" devuelve SOLO JSON:
 {{"titles":[{{"t":"título 1 (25-65 car.)","angle":"curiosidad"}},{{"t":"...","angle":"polémica"}},{{"t":"...","angle":"pregunta"}},{{"t":"...","angle":"emoción"}},{{"t":"...","angle":"dato"}}],
 "thumb_texts":["2-4 palabras","2-4 palabras","2-4 palabras"],
