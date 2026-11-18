@@ -76,7 +76,7 @@ export default function Conectar() {
     const r = await fetch("/api/conexiones", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ network: n.id, fields }) }).catch(() => null);
     const j = await r?.json().catch(() => ({}));
     setBusy("");
-    setNote((o) => ({ ...o, [n.id]: r?.ok ? "Guardado ✔. El worker lo toma en unos 2 minutos (sin reiniciar)." : j?.error ?? "No se pudo guardar" }));
+    setNote((o) => ({ ...o, [n.id]: r?.ok ? (j?.pageInfo?.name ? `Guardado ✔. Página: ${j.pageInfo.name}. El worker lo toma en unos 2 minutos.` : "Guardado ✔. El worker lo toma en unos 2 minutos (sin reiniciar).") : j?.error ?? "No se pudo guardar" }));
     if (r?.ok) form.reset();
     load();
   }
@@ -99,9 +99,13 @@ export default function Conectar() {
           return (
             <div key={n.id} className="card">
               <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-                <b style={{ fontSize: 17 }}>{n.icon} {n.name}</b>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  {n.id === "facebook" && it?.pagePhoto && <img src={it.pagePhoto} alt="" style={{ width: 40, height: 40, borderRadius: "50%", border: "2px solid var(--glass-border)" }} />}
+                  <b style={{ fontSize: 17 }}>{n.icon} {n.id === "facebook" && it?.pageName ? it.pageName : n.name}</b>
+                </div>
                 <span>{live ? "✅ Conectado (el worker lo está usando)" : has ? "⏳ Guardado: el worker lo toma en unos minutos" : "⚪ Sin conectar"}</span>
               </div>
+              {n.id === "facebook" && it?.pageName && <small style={{ color: "var(--muted)", display: "block", marginTop: 4 }}>Página: {it.pageName} · ID: {it.saved?.page_id}</small>}
               {it?.updatedAt && <small style={{ color: "var(--muted)" }}>Última vez guardado: {ago(it.updatedAt)}</small>}
               <form onSubmit={(e) => save(e, n)} style={{ display: "grid", gap: 8, marginTop: 12 }}>
                 {n.fields.map((x) => (

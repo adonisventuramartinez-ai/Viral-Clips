@@ -12,6 +12,7 @@ const FIELDS: Record<string, string[]> = {
 };
 const SECRET = new Set(["page_token", "token", "client_secret", "refresh_token", "api_key"]);
 const msg = (m: string) => (/connections/i.test(m) ? "Falta correr 0013_conexiones.sql en Supabase" : m);
+const FB_API = "https://graph.facebook.com/v21.0";
 const mask = (k: string, v: string) => (!v ? "" : SECRET.has(k) ? "••••" + v.slice(-4) : v);
 
 export async function GET() {
@@ -21,11 +22,23 @@ export async function GET() {
   if (error) return NextResponse.json({ error: msg(error.message) }, { status: 500 });
   const { data: ws } = await db.from("worker_status").select("info,seen_at").eq("id", 1).maybeSingle();
   const info = (ws?.info ?? {}) as { networks?: string[] };
-  const items: Record<string, { saved: Record<string, string>; updatedAt: string | null }> = {};
+  const items: Record<string, { saved: Record<string, string>; updatedAt: string | null; pageName?: string; pagePhoto?: string }> = {};
   for (const n of Object.keys(FIELDS)) {
     const row = (data ?? []).find((r: any) => r.network === n);
     const d = (row?.data ?? {}) as Record<string, string>;
-    items[n] = { saved: Object.fromEntries(FIELDS[n].map((k) => [k, mask(k, String(d[k] ?? ""))])), updatedAt: row?.updated_at ?? null };
+    const item: any = { saved: Object.fromEntries(FIELDS[n].map((k) => [k, mask(k, String(d[k] ?? ""))])), updatedAt: row?.updated_at ?? null };
+    // Para Facebook: obtener nombre y foto de la página si hay token
+    if (n === "facebook" && d.page_id && d.page_token) {
+      try {
+        const r = await fetch(`${FB_API}/${d.page_id}?fields=name,picture{url}&access_token=${encodeURIComponent(d.page_token)}`, { cache: "no-store" });
+        if (r.ok) {
+          const j = await r.json();
+          item.pageName = j.name ?? null;
+          item.pagePhoto = j.picture?.data?.url ?? null;
+        }
+      } catch { /* ignore */ }
+    }
+    items[n] = item;
   }
   return NextResponse.json({ items, connected: info.networks ?? [], seenAt: ws?.seen_at ?? null });
 }
@@ -46,9 +59,24 @@ export async function POST(req: Request) {
   }
   if (net === "facebook" && merged.page_id && !/^\d{5,}$/.test(merged.page_id)) return NextResponse.json({ error: "El ID de la página debe ser solo números" }, { status: 400 });
   if (net === "instagram" && merged.user_id && !/^\d{5,}$/.test(merged.user_id)) return NextResponse.json({ error: "El ID de Instagram debe ser solo números" }, { status: 400 });
+  // Para Facebook: verificar la página y obtener nombre/foto antes de guardar
+  let pageInfo: { name?: string; photo?: string } = {};
+  if (net === "facebook" && merged.page_id && merged.page_token) {
+    try {
+      const r = await fetch(`${FB_API}/${merged.page_id}?fields=name,picture{url}&access_token=${encodeURIComponent(merged.page_token)}`, { cache: "no-store" });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        return NextResponse.json({ error: `Facebook rechazó el token o el ID de página: ${j?.error?.message ?? r.statusText}` }, { status: 400 });
+      }
+      const j = await r.json();
+      pageInfo = { name: j.name, photo: j.picture?.data?.url };
+    } catch (e: any) {
+      return NextResponse.json({ error: `No se pudo verificar la página: ${e?.message ?? "error de red"}` }, { status: 400 });
+    }
+  }
   const { error } = await db.from("connections").upsert({ network: net, data: merged, updated_at: new Date().toISOString() });
   if (error) return NextResponse.json({ error: msg(error.message) }, { status: 500 });
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, pageInfo });
 }
 
 export async function DELETE(req: Request) {
