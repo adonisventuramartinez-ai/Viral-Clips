@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 
-type Item = { saved: Record<string, string>; updatedAt: string | null };
+type Item = { saved: Record<string, string>; updatedAt: string | null; pageName?: string; pagePhoto?: string };
 type Field = { k: string; label: string; ph: string; optional?: boolean };
 type Net = { id: string; name: string; icon: string; fields: Field[]; steps: string[]; note?: string };
 
