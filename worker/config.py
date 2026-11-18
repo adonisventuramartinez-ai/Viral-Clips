@@ -77,6 +77,10 @@ try:
 except ValueError:
     CLIP_SUB_SIZE = 82
 try:
+    CLIP_SUB_SHADOW = min(10, max(0, int(os.environ.get("CLIP_SUB_SHADOW") or 5)))      # sombra de los subtítulos
+except ValueError:
+    CLIP_SUB_SHADOW = 5
+try:
     CLIP_SUB_OUTLINE = min(14, max(0, int(os.environ.get("CLIP_SUB_OUTLINE") or 7)))     # contorno de los subtítulos
 except ValueError:
     CLIP_SUB_OUTLINE = 7
@@ -84,6 +88,12 @@ try:
     CLIP_HOOK_SIZE = min(100, max(40, int(os.environ.get("CLIP_HOOK_SIZE") or 72)))      # tamaño del gancho arriba del clip
 except ValueError:
     CLIP_HOOK_SIZE = 72
+
+# IA (viral.py) - ajustables sin tocar código:
+try:
+    VIRAL_POWER_BOOST = min(2.0, max(0.5, float(os.environ.get("VIRAL_POWER_BOOST") or 1.0)))   # multiplicador de palabras de poder en el puntaje
+except ValueError:
+    VIRAL_POWER_BOOST = 1.0
 
 # Calibración del encuadre (framing.py) - ajustables sin tocar código:
 try:

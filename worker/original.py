@@ -16,7 +16,7 @@ DEFAULTS = {
     "smart_start": config.SMART_START,   # empezar en la primera frase fuerte (lo lee main.py)
 }
 
-PROMPT = """Eres el editor de una página de clips de "{show}" para Facebook. Español dominicano natural, sin groserías, sin insultos. Piensa como un editor que quiere que la gente NO pueda dejar de ver el clip. Usa jerga dominicana cuando encaje (klk, vaina, tíguere, chercha, jevi).
+PROMPT = """Eres el editor de una página de clips de "{show}" para Facebook. Español dominicano natural, sin groserías, sin insultos. Piensa como un editor que quiere que la gente NO pueda dejar de ver el clip. Usa jerga dominicana cuando encaje (klk, vaina, tíguere, chercha, jevi, pariguayo, colmadito, manin). Sé creativo y original.
 Del fragmento saca texto ORIGINAL (no copies frases largas textuales). Devuelve:
 - context: 1 frase (máx 90 caracteres) que ponga en situación a quien no vio el programa SIN contar el final ("Antes de esto, ..."), legible en voz alta. Debe generar curiosidad, no revelar el desenlace. Usa palabras de drama/emoción cuando el clip las tiene.
 - outro: 1 pregunta corta (máx 60 caracteres) que divida opiniones y dé ganas de comentar. Evita frases vacías ("¿Qué te parece?"). Que sea polémica pero sin insultos.
@@ -133,9 +133,9 @@ WrapStyle: 0
 
 [V4+ Styles]
 Format: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding
-Style: Big,Montserrat,96,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,7,2,5,80,80,0,1
+Style: Big,Montserrat,100,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,8,3,5,80,80,0,1
 Style: Small,Montserrat,58,&H0000E0FF,&H0000E0FF,&H00000000,&H00000000,-1,0,0,0,100,100,3,0,1,5,0,8,90,90,330,1
-Style: Meter,Montserrat,56,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,2,0,1,6,0,8,0,0,125,1
+Style: Meter,Montserrat,60,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,2,0,1,7,0,8,0,0,125,1
 Style: Intro,Montserrat,46,&H00FFFFFF,&H00FFFFFF,&H78000000,&H00000000,-1,0,0,0,100,100,0,0,3,14,0,8,70,70,560,1
 Style: Q,Montserrat,92,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,7,2,8,80,80,430,1
 Style: Letter,Montserrat,150,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,7,0,5,0,0,0,1
@@ -147,7 +147,7 @@ Style: Page,Montserrat,44,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,1
 Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
 """
 
-POP = "{\\fad(250,200)\\fscx85\\fscy85\\t(0,320,\\fscx100\\fscy100)}"
+POP = "{\\fad(200,180)\\fscx80\\fscy80\\t(0,280,\\fscx100\\fscy100)\\blur0.5}"
 
 
 def grab_frame(clip, at, out):

@@ -23,12 +23,16 @@ POWER = ("nadie", "increíble", "insólito", "se salió", "explot", "escándalo"
          "tremendo", "brutal", "desastre", "caos", "bochorno", "verguenza", "humillacion", "venganza",
          "klk", "vaina", "tiguere", "chercha", "jevi", "pariguayo", "dime a ver", "manin", "colmadito",
          "escandalo", "polémica", "controversia", "debate", "discusion", "pelea", "conflicto", "tension", "drama",
-         "reaccion", "sorpresa", "shock", "impacto", "viral", "tendencia", "boom", "explosion", "locura")
+         "reaccion", "sorpresa", "shock", "impacto", "viral", "tendencia", "boom", "explosion", "locura",
+         "klk", "vaina", "tiguere", "chercha", "jevi", "pariguayo", "dime a ver", "manin", "colmadito", "jevi",
+         "pariguayo", "dime a ver", "manin", "colmadito", "jevi", "pariguayo", "dime a ver", "manin", "colmadito")
 RISK_WORDS = ("estafador", "ladrón", "violador", "pedófilo", "asesino", "drogadicto", "corrupto", "puta", "maricón", "hijueputa",
               "maldito", "imbécil", "idiota", "pendejo", "cabrón", "mierda", "coño", "carajo", "jodido", "basura", "escoria",
               "mata", "muerte", "amenaza", "violencia", "golpe", "arma", "disparo", "sangre", "herido", "muerto",
-              "racista", "sexista", "homofobo", "machista", "abusador", "acosador", "manipulador", "mentiroso", "traidor")
-BROAD_TAGS = ("#fyp", "#viral", "#parati", "#foryou", "#foryoupage", "#trending", "#parati", "#viralvideo")
+              "racista", "sexista", "homofobo", "machista", "abusador", "acosador", "manipulador", "mentiroso", "traidor",
+              "nazi", "terrorista", "extremista", "radical", "fanatico", "intolerante", "discriminador", "opresor")
+BROAD_TAGS = ("#fyp", "#viral", "#parati", "#foryou", "#foryoupage", "#trending", "#parati", "#viralvideo",
+              "#fypシ", "#parati", "#viral", "#trending", "#foryou", "#foryoupage", "#viralvideo", "#parati")
 _last = 0.0
 
 
@@ -170,7 +174,7 @@ def next_slots(now=None, taken=(), n=1, slots=None, tz=None, min_gap_min=None, m
 
 
 # ----------------------------------------------------------------------------- IA
-PROMPT = """Eres experto en contenido viral para Facebook Reels, TikTok y Shorts en español dominicano natural. Sin groserías ni insultos, sin inventar datos. Piensa como un editor que quiere que la gente NO pueda dejar de ver el clip. Usa jerga dominicana cuando encaje (klk, vaina, tíguere, chercha, jevi, pariguayo).
+PROMPT = """Eres experto en contenido viral para Facebook Reels, TikTok y Shorts en español dominicano natural. Sin groserías ni insultos, sin inventar datos. Piensa como un editor que quiere que la gente NO pueda dejar de ver el clip. Usa jerga dominicana cuando encaje (klk, vaina, tíguere, chercha, jevi, pariguayo, colmadito, manin). Sé creativo, original y atrevido.
 Del clip de "{show}" devuelve SOLO JSON:
 {{"titles":[{{"t":"título 1 (25-65 car.)","angle":"curiosidad"}},{{"t":"...","angle":"polémica"}},{{"t":"...","angle":"pregunta"}},{{"t":"...","angle":"emoción"}},{{"t":"...","angle":"dato"}}],
 "thumb_texts":["2-4 palabras","2-4 palabras","2-4 palabras"],

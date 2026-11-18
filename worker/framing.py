@@ -58,8 +58,9 @@ def _raw_boxes(gray, min_frac=0.05):
         return [(r["c"], r["r"], r["width"], r["height"]) for r in raw]
     import cv2
     g = np.ascontiguousarray(gray)
-    g = cv2.createCLAHE(clipLimit=6.0, tileGridSize=(8, 8)).apply(g)   # escenas oscuras (estudios de podcast): realza sin quemar (máximo)
+    g = cv2.createCLAHE(clipLimit=8.0, tileGridSize=(8, 8)).apply(g)   # escenas oscuras (estudios de podcast): realza sin quemar (ultra)
 g = cv2.GaussianBlur(g, (3, 3), 0)   # suaviza para reducir ruido en detección
+g = cv2.equalizeHist(g)   # ecualización de histograma para mejor contraste
     ms = (max(8, int(w * min_frac * 0.7)),) * 2   # caras aún más pequeñas también cuentan (entrevistas lejos, planos abiertos)
 
     def run(neigh):
@@ -106,6 +107,8 @@ def _detect(gray, min_frac=0.05):
         if y + bh / 2 > h * 0.75:   # caras muy abajo suelen ser falsos positivos (más estricto)
             continue
 if bw < w * 0.02:          # caras demasiado pequeñas (ruido)
+            continue
+if bw > w * 0.5:           # caras demasiado grandes (falsos positivos)
             continue
         faces.append({"x": (x + bw / 2) / w, "w": bw / w, "y": (y + bh / 2) / h, "box": (y, x, bw, bh)})
     # quita cajas repetidas (misma cara detectada dos veces)

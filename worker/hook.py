@@ -15,15 +15,18 @@ import viral
 # Muletillas y saludos: nunca deberían ser lo primero que se oye.
 FILLER_OPEN = {"bueno", "eh", "ehh", "este", "mmm", "mm", "ok", "okay", "pues", "hola", "buenas", "bienvenidos",
                "saludos", "dale", "ya", "listo", "aja", "ajá", "a ver", "vamos", "entonces", "claro", "mira",
-               "oye", "oigan", "amigos", "gente", "hermano", "mano", "klk", "qué lo qué"}
+               "oye", "oigan", "amigos", "gente", "hermano", "mano", "klk", "qué lo qué", "klk", "vaina",
+               "tiguere", "chercha", "jevi", "pariguayo", "dime a ver", "manin", "colmadito", "jevi", "pariguayo"}
 # Palabras que enganchan con lo que se dijo ANTES (el clip no se entiende empezando ahí).
 DEPENDENT_OPEN = {"y", "pero", "porque", "entonces", "sino", "tambien", "ademas", "luego", "eso", "esa", "ese", "asi",
-                  "o", "ni", "aunque", "mientras", "que", "como", "cuando", "donde", "quien", "cual"}
+                  "o", "ni", "aunque", "mientras", "que", "como", "cuando", "donde", "quien", "cual",
+                  "cuyo", "cuya", "cuyos", "cuyas", "cuyo", "cuya", "cuyos", "cuyas", "cuyo", "cuya"}
 # Ganchos genéricos que no dicen nada: se cambian por algo del propio clip.
 GENERIC = {"mira esto", "mira", "mira lo que paso", "nadie lo esperaba", "momento clave", "no lo vas a creer", "increible",
            "wow", "mira lo que hizo", "esto es una locura", "no lo vas a creer", "tienes que ver esto", "momento viral",
            "no te lo pierdas", "esto es increible", "mira esto que paso", "no vas a creer", "esto es brutal",
-           "klk", "vaina", "tremendo", "brutal", "loco", "insano", "salvaje", "fuerte", "duro"}
+           "klk", "vaina", "tremendo", "brutal", "loco", "insano", "salvaje", "fuerte", "duro",
+           "esto es tremendo", "esto es brutal", "esto es una locura", "no te lo pierdas", "mira esto que paso"}
 TAIL_STOP = {"de", "la", "el", "los", "las", "un", "una", "que", "y", "o", "a", "en", "con", "por", "para", "su", "se", "lo", "al", "del",
              "del", "al", "por", "para", "con", "sin", "sobre", "entre", "hasta", "desde", "hacia", "según", "durante"}
 
@@ -132,7 +135,7 @@ def is_generic(h):
 
 
 def _sentence_text(ws, a, b):
-    return " ".join(str(x["w"]) for x in ws[a:b]).strip()
+    return " ".join(str(x["w"]) for x in ws[a:b]).strip().capitalize()
 
 
 def derive_hook(words, start, end, horizon=14.0):

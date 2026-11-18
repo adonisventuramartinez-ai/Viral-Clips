@@ -41,7 +41,7 @@ WrapStyle: 0
 
 [V4+ Styles]
 Format: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding
-Style: Cap,Montserrat,{st['size']},&H00{_hex(st['text'])},&H00{_hex(st['text'])},&H00{_hex(st['outline'], '000000')},&H96000000,-1,0,0,0,100,100,0,0,1,{st['outline_w']},5,2,120,120,{margin},1
+Style: Cap,Montserrat,{st['size']},&H00{_hex(st['text'])},&H00{_hex(st['text'])},&H00{_hex(st['outline'], '000000')},&H96000000,-1,0,0,0,100,100,0,0,1,{st['outline_w']},6,2,120,120,{margin},1
 Style: Hook,DejaVu Sans,{config.CLIP_HOOK_SIZE},&H00000000,&H00000000,&H00FFFFFF,&H00FFFFFF,-1,0,0,0,100,100,0,0,3,18,0,8,90,90,290,1
 
 [Events]
@@ -61,7 +61,7 @@ def _esc(text: str, upper: bool) -> str:
     return text.replace("{", "(").replace("}", ")").replace("\\", "/")
 
 
-HOOK_POP = "{\\fad(50,180)\\fscx75\\fscy75\\t(0,150,\\fscx100\\fscy100)\\t(0,150,\\fry0.8)\\blur0.5}"   # el gancho aparece ya en el primer cuadro, con golpe de escala, giro y leve blur
+HOOK_POP = "{\\fad(40,160)\\fscx70\\fscy70\\t(0,140,\\fscx100\\fscy100)\\t(0,140,\\fry1.0)\\blur0.8\\bord2}"   # el gancho aparece ya en el primer cuadro, con golpe de escala, giro, blur y borde
 # La palabra que se está diciendo entra grande y SE QUEDA grande hasta que pasa a la siguiente.
 WORD_HOLD = "{\\fscx100\\fscy100\\t(0,50,\\fscx125\\fscy125)\\fad(30,0)\\blur0.3}"   # entrada más rápida, fade-in y leve blur
 LINE_CHARS = 16   # una sola línea: no se parte en dos y no choca con los botones del Reel
@@ -298,8 +298,8 @@ def _logo_graph(graph: str, brand: dict, src: str = "v") -> str:
 
 def _bar_graph(graph: str, dur: float, src_in: str = "vA", src_out: str = "vB") -> str:
     d = max(0.5, dur)
-    return (f"{graph};color=c=white:s=1080x14:r=30:d={d:.2f}[bar];"
-            f"[{src_in}][bar]overlay=x='-w+w*t/{d:.2f}':y=H-h-10:shortest=1[{src_out}]")
+    return (f"{graph};color=c=white:s=1080x16:r=30:d={d:.2f}[bar];"
+            f"[{src_in}][bar]overlay=x='-w+w*t/{d:.2f}':y=H-h-12:shortest=1[{src_out}]")
 
 
 def _flag(opt, default):
