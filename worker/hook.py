@@ -175,7 +175,7 @@ def derive_hook(words, start, end, horizon=16.0):
         txt = _sentence_text(ws, a, b)
         if len(txt.split()) < 3 or viral.risks_in(txt):
             continue
-        s = viral.hook_score(txt) + (6 if "!" in txt else 0) - (8 * (norm(ws[a]["w"]) in DEPENDENT_OPEN or norm(ws[a]["w"]) in FILLER_OPEN))
+        s = viral.hook_score(txt) + (6 if "!" in txt else 0) + (4 if "?" in txt else 0) - (8 * (norm(ws[a]["w"]) in DEPENDENT_OPEN or norm(ws[a]["w"]) in FILLER_OPEN))
         if s > best_s:
             best, best_s = txt, s
     return clean_hook(best)

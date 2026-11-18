@@ -172,6 +172,13 @@ def list_candidates(feed, limit=8):
             base = "https://www.instagram.com/" + base.lstrip("@/") + "/"
         urls = [base]
         fallback_url = lambda vid: f"https://www.instagram.com/reel/{vid}/"
+    elif feed.get("kind") == "tiktok":
+        # yt-dlp lee los videos de un perfil de TikTok (requiere login/cookies)
+        base = target.rstrip("/")
+        if not base.startswith("http"):
+            base = "https://www.tiktok.com/@" + base.lstrip("@/") + "/"
+        urls = [base]
+        fallback_url = lambda vid: f"https://www.tiktok.com/@user/video/{vid}"
     elif feed.get("kind") == "search":
         urls = [f"ytsearchdate{limit}:{target}"]
         fallback_url = lambda vid: f"https://www.youtube.com/watch?v={vid}"

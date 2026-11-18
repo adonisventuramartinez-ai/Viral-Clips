@@ -66,6 +66,12 @@ def title_score(title):
     # Bonus por emojis (más engagement)
     if re.search(r"[\U0001F300-\U0001F9FF]", t):
         s += 5
+    # Bonus por signos de exclamación (más emoción)
+    if "!" in t:
+        s += 4
+    # Bonus por mayúsculas parciales (énfasis)
+    if any(c.isupper() for c in t) and not t.isupper():
+        s += 3
     # Bonus por números al inicio (listas funcionan bien)
     if re.match(r"^\d", t):
         s += 6

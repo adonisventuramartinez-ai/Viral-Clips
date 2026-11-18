@@ -510,3 +510,56 @@
 23:06:08 [download e44c5f]   Encuadre pedido: crop | recuadro manual: no (automático)
 23:06:08 [download e44c5f] ▶ descarga
 23:09:12 [download e44c5f] Recibí la señal de apagado (15): salgo. Lo que estaba en proceso se retoma al volver a encender.
+18:36:21 Groq: 7 cuenta(s) configurada(s).
+18:36:22 Probando las llaves de IA (una petición mínima a cada una)…
+18:36:29   ✓ groq: openai/gpt-oss-120b
+18:36:29   ✓ groq_cuenta2: openai/gpt-oss-120b
+18:36:29   ✓ groq_cuenta3: openai/gpt-oss-120b
+18:36:29   ✓ groq_cuenta4: openai/gpt-oss-120b
+18:36:29   ✓ groq_cuenta5: openai/gpt-oss-120b
+18:36:29   ✓ groq_cuenta6: openai/gpt-oss-120b
+18:36:29   ✓ groq_cuenta7: openai/gpt-oss-120b
+18:36:29   ✓ groq_8b: openai/gpt-oss-20b
+18:36:29   ✓ groq_cuenta2_8b: openai/gpt-oss-20b
+18:36:29   ✓ groq_cuenta3_8b: openai/gpt-oss-20b
+18:36:29   ✓ groq_cuenta4_8b: openai/gpt-oss-20b
+18:36:29   ✓ groq_cuenta5_8b: openai/gpt-oss-20b
+18:36:29   ✓ groq_cuenta6_8b: openai/gpt-oss-20b
+18:36:29   ✓ groq_cuenta7_8b: openai/gpt-oss-20b
+18:36:29   ✓ gemini: gemini-3.5-flash-lite
+18:36:29 ✓ Revisión inicial correcta (Supabase, bucket, ffmpeg, IA).
+18:36:29 IA en orden de uso: groq → groq_cuenta2 → groq_cuenta3 → groq_cuenta4 → groq_cuenta5 → groq_cuenta6 → groq_cuenta7 → groq_8b → groq_cuenta2_8b → groq_cuenta3_8b → groq_cuenta4_8b → groq_cuenta5_8b → groq_cuenta6_8b → groq_cuenta7_8b → gemini
+18:36:29 Worker listo (encuadres: vertical, dividido, dos personas, difuminado; directos con reconexión y chat), esperando trabajos…
+18:36:30 [clip 9ace4d] Trabajo 9ace4d61-1f0a-4272-9eaa-18c0a4af9a25 → fuente 1e0ba7d6-e428-4a42-90ef-5a1f879a998b · prioridad 8 · intento 1
+18:36:31 [clip 9ace4d]   Vista previa: https://youtu.be/_NQteMeABCs?si=KmpzBt4DWBqyWm8l en 60 s, encuadre crop
+18:36:54 [clip 9ace4d]   Logo: lo pongo en br (24% del ancho)
+18:37:00 [clip 9ace4d]   Volumen: -27.4 LUFS -> -14 LUFS
+18:37:13 [clip 9ace4d]   Vista previa lista
+18:37:14 [clip 9ace4d] Fin del trabajo (43 s)
+18:37:22 Fuente 'ElDotolNastra' → clips de: Liguita: «Mujeres con hijos, yo no quiero verlas cerca de mí» | El Dotol Nastra
+18:37:29 Fuente 'RDjavi' → clips de: Completamos La Primera Mision De GTA 6
+18:37:34 [download f36559] Trabajo f3655979-806b-4963-85e7-b1f8090b2848 → fuente 7b98a1ed-fccb-48d0-abb7-1e899303e3b6 · prioridad 0 · intento 1
+18:37:34 [download f36559]   Tipo de contenido: Entrevista · clips de ~75 s
+18:37:34 [download f36559]   Encuadre pedido: crop | recuadro manual: no (automático)
+18:37:34 [download f36559] ▶ descarga
+18:38:31 [download f36559] ▶ transcripción
+18:39:06 [download f36559]   Voces: 6 persona(s) distintas
+18:39:06 [download f36559] ▶ análisis
+18:39:13 [download f36559]   Pistas: 13 s con volumen alto, 0 s de acción en pantalla, 9 frase(s) marcada(s)
+18:39:19 [download f36559]   IA: usando groq (openai/gpt-oss-120b)
+18:39:24 [download f36559]   IA: usando groq_cuenta2 (openai/gpt-oss-120b)
+18:39:30 [download f36559]   IA: usando groq_cuenta3 (openai/gpt-oss-120b)
+18:39:33 [download f36559]   IA: usando groq_cuenta4 (openai/gpt-oss-120b)
+18:39:33 [download f36559]   Segunda pasada: re-puntué 12 de 12 candidatos
+18:39:33 [download f36559] ▶ clips
+18:39:34 [download f36559]   Logo: lo pongo en br (24% del ancho)
+18:39:46 [download f36559]   Ritmo: quité 8.1 s de silencios/muletillas (6 corte(s), 0 muletilla(s))
+18:40:36 [download f36559]   Volumen: -19.6 LUFS -> -14 LUFS
+18:40:36 [download f36559]   Subtítulos: 3 personas, un color para cada una
+18:42:16 [download f36559]   IA: usando groq_cuenta5 (openai/gpt-oss-120b)
+18:42:19 [download f36559]   IA: usando groq_cuenta6 (openai/gpt-oss-120b)
+18:42:19 [download f36559]   Viral: 70 pts → review
+18:42:39 [download f36559]   IA: usando groq_cuenta7 (openai/gpt-oss-120b)
+18:43:37 [download f36559]   clip listo: 5 cosas que todo padre con hijos sufre y nadie menciona (69%)
+18:43:57 [download f36559]   Ritmo: quité 1.8 s de silencios/muletillas (2 corte(s), 0 muletilla(s))
+18:45:17 [download f36559]   Volumen: -21.8 LUFS -> -14 LUFS

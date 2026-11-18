@@ -58,11 +58,11 @@ def _raw_boxes(gray, min_frac=0.05):
         return [(r["c"], r["r"], r["width"], r["height"]) for r in raw]
     import cv2
     g = np.ascontiguousarray(gray)
-    g = cv2.createCLAHE(clipLimit=8.0, tileGridSize=(8, 8)).apply(g)   # escenas oscuras (estudios de podcast): realza sin quemar (ultra)
-    g = cv2.GaussianBlur(g, (3, 3), 0)   # suaviza para reducir ruido en detección
-    g = cv2.equalizeHist(g)   # ecualización de histograma para mejor contraste
-    g = cv2.medianBlur(g, 3)   # filtro mediana para eliminar ruido salt-and-pepper
-    ms = (max(8, int(w * min_frac * 0.7)),) * 2   # caras aún más pequeñas también cuentan (entrevistas lejos, planos abiertos)
+    g = cv2.createCLAHE(clipLimit=8.0, tileGridSize=(8, 8)).apply(g)
+    g = cv2.GaussianBlur(g, (3, 3), 0)
+    g = cv2.equalizeHist(g)
+    g = cv2.medianBlur(g, 3)
+    ms = (max(8, int(w * min_frac * 0.7)),) * 2
 
     def run(neigh):
         out = [tuple(r) for r in a.detectMultiScale(g, 1.1, neigh, minSize=ms)]
@@ -75,6 +75,8 @@ def _raw_boxes(gray, min_frac=0.05):
         out = run(3)   # si no vio nada, un segundo intento menos exigente (poca luz)
     if not out:
         out = run(2)   # tercer intento aún más permisivo (caras muy pequeñas o poca luz extrema)
+    if not out:
+        out = run(1)   # cuarto intento ultra permisivo (caras diminutas o poca luz extrema)
     return out
 
 
