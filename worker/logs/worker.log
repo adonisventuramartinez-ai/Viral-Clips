@@ -563,3 +563,347 @@
 18:43:37 [download f36559]   clip listo: 5 cosas que todo padre con hijos sufre y nadie menciona (69%)
 18:43:57 [download f36559]   Ritmo: quité 1.8 s de silencios/muletillas (2 corte(s), 0 muletilla(s))
 18:45:17 [download f36559]   Volumen: -21.8 LUFS -> -14 LUFS
+18:47:57 [download f36559]   IA: usando groq (openai/gpt-oss-120b)
+18:48:01 [download f36559]   IA: usando groq_cuenta2 (openai/gpt-oss-120b)
+18:48:01 [download f36559]   Viral: 61 pts → review · riesgos: uso de término insultante 'pariguayo'
+18:48:18 [download f36559]   IA: usando groq_cuenta3 (openai/gpt-oss-120b)
+18:49:29 [download f36559]   clip listo: Cancelan a las madres: la polémica (69%)
+18:49:44 [download f36559]   Ritmo: quité 3.0 s de silencios/muletillas (2 corte(s), 0 muletilla(s))
+18:50:48 [download f36559]   Volumen: -21.9 LUFS -> -14 LUFS
+18:50:48 [download f36559]   Subtítulos: 2 personas, un color para cada una
+18:51:15 [download f36559] Recibí la señal de apagado (15): salgo. Lo que estaba en proceso se retoma al volver a encender.
+00:00:52 Groq: 7 cuenta(s) configurada(s).
+00:00:53 Probando las llaves de IA (una petición mínima a cada una)…
+00:01:01   ✓ groq: openai/gpt-oss-120b
+00:01:01   ✓ groq_cuenta2: openai/gpt-oss-120b
+00:01:01   ✓ groq_cuenta3: openai/gpt-oss-120b
+00:01:01   ✓ groq_cuenta4: openai/gpt-oss-120b
+00:01:01   ✓ groq_cuenta5: openai/gpt-oss-120b
+00:01:01   ✓ groq_cuenta6: openai/gpt-oss-120b
+00:01:01   ✓ groq_cuenta7: openai/gpt-oss-120b
+00:01:01   ✓ groq_8b: openai/gpt-oss-20b
+00:01:01   ✓ groq_cuenta2_8b: openai/gpt-oss-20b
+00:01:01   ✓ groq_cuenta3_8b: openai/gpt-oss-20b
+00:01:01   ✓ groq_cuenta4_8b: openai/gpt-oss-20b
+00:01:01   ✓ groq_cuenta5_8b: openai/gpt-oss-20b
+00:01:01   ✓ groq_cuenta6_8b: openai/gpt-oss-20b
+00:01:01   ✓ groq_cuenta7_8b: openai/gpt-oss-20b
+00:01:01   ✓ gemini: gemini-3.5-flash-lite
+00:01:01 ✓ Revisión inicial correcta (Supabase, bucket, ffmpeg, IA).
+00:01:01 IA en orden de uso: groq → groq_cuenta2 → groq_cuenta3 → groq_cuenta4 → groq_cuenta5 → groq_cuenta6 → groq_cuenta7 → groq_8b → groq_cuenta2_8b → groq_cuenta3_8b → groq_cuenta4_8b → groq_cuenta5_8b → groq_cuenta6_8b → groq_cuenta7_8b → gemini
+00:01:01 Worker listo (encuadres: vertical, dividido, dos personas, difuminado; directos con reconexión y chat), esperando trabajos…
+00:01:02 [record 7eae3d] Trabajo 7eae3d83-004a-469d-adaf-ad7398a9ea78 → fuente 038c5525-64ec-4e2a-97fc-0ad6849c27d7 · prioridad 10 · intento 2
+00:01:02 [record 7eae3d]   Tipo de contenido: GTA 6 · acción · juego: GTA 6 · máx. 3 clips por revisión · puntaje mínimo 55
+00:01:03 [record 7eae3d]   Logo: lo pongo en br (24% del ancho)
+00:01:07 [record 7eae3d] Fin del trabajo (5 s)
+00:03:14 [download d3dc2f] Trabajo d3dc2fd5-1555-4ffc-94c9-da3eb6d1e78f → fuente 51d3cb85-926e-4a29-84f4-9207c0807948 · prioridad 0 · intento 1
+00:03:14 [download d3dc2f]   Tipo de contenido: GTA 6 · acción · juego: GTA 6 · clips de ~75 s
+00:03:14 [download d3dc2f]   Encuadre pedido: split_eq | recuadro manual: sí
+00:03:14 [download d3dc2f] ▶ descarga
+00:22:30 [download d3dc2f] ▶ transcripción
+00:23:47 [download d3dc2f] ▶ análisis
+00:32:32 [download d3dc2f]   Audio: 1449 s de tiroteo, 1389 s con explosión
+00:32:32 [download d3dc2f]   Pistas: 0 s con volumen alto, 262 s de acción en pantalla, 575 frase(s) marcada(s)
+00:32:39 [download d3dc2f]   IA: groq → petición rechazada (400): {"error":{"message":"Failed to validate JSON. Please adjust your prompt. See 'failed_generation' for more details.","typ (vuelvo a probarlo en 15 min). Paso al siguiente.
+00:32:46 [download d3dc2f]   IA: groq_cuenta2 → petición rechazada (400): {"error":{"message":"Failed to validate JSON. Please adjust your prompt. See 'failed_generation' for more details.","typ (vuelvo a probarlo en 15 min). Paso al siguiente.
+00:32:53 [download d3dc2f]   IA: groq_cuenta3 → petición rechazada (400): {"error":{"message":"Failed to validate JSON. Please adjust your prompt. See 'failed_generation' for more details.","typ (vuelvo a probarlo en 15 min). Paso al siguiente.
+00:33:00 [download d3dc2f]   IA: usando groq_cuenta4 (openai/gpt-oss-120b)
+00:33:05 [download d3dc2f]   IA: usando groq_cuenta5 (openai/gpt-oss-120b)
+00:33:12 [download d3dc2f]   IA: usando groq_cuenta6 (openai/gpt-oss-120b)
+00:33:18 [download d3dc2f]   IA: usando groq_cuenta7 (openai/gpt-oss-120b)
+00:33:23 [download d3dc2f]   IA: usando groq_cuenta4 (openai/gpt-oss-120b)
+00:33:29 [download d3dc2f]   IA: usando groq_cuenta5 (openai/gpt-oss-120b)
+00:33:29 [download d3dc2f]   IA: groq_cuenta6 → límite por minuto (vuelvo a probarlo en 2 s). Paso al siguiente.
+00:33:30 [download d3dc2f]   IA: groq_cuenta7 → límite por minuto (vuelvo a probarlo en 5 s). Paso al siguiente.
+00:33:30 [download d3dc2f]   IA: groq_cuenta4 → límite por minuto (vuelvo a probarlo en 24 s). Paso al siguiente.
+00:33:30 [download d3dc2f]   IA: groq_cuenta5 → límite por minuto (vuelvo a probarlo en 30 s). Paso al siguiente.
+00:33:34 [download d3dc2f]   IA: groq_8b → petición rechazada (400): {"error":{"message":"Failed to validate JSON. Please adjust your prompt. See 'failed_generation' for more details.","typ (vuelvo a probarlo en 15 min). Paso al siguiente.
+00:33:37 [download d3dc2f]   IA: usando groq_cuenta2_8b (openai/gpt-oss-20b)
+00:33:42 [download d3dc2f]   IA: usando groq_cuenta6 (openai/gpt-oss-120b)
+00:33:42 [download d3dc2f]   IA: groq_cuenta7 → límite por minuto (vuelvo a probarlo en 4 s). Paso al siguiente.
+00:33:43 [download d3dc2f]   IA: groq_cuenta6 → límite por minuto (vuelvo a probarlo en 25 s). Paso al siguiente.
+00:33:45 [download d3dc2f]   IA: usando groq_cuenta3_8b (openai/gpt-oss-20b)
+00:33:45 [download d3dc2f]   Segunda pasada: re-puntué 41 de 41 candidatos
+00:33:47 [download d3dc2f]   IA: groq:vision → modelo no disponible (404): cámbialo en worker/.env: {"error":{"message":"The model `qwen/qwen3.6-27b` does not exist or you do not have access to it."," (vuelvo a probarlo en 360 min). Paso al siguiente.
+00:33:47 [download d3dc2f]   IA: groq_cuenta2:vision → modelo no disponible (404): cámbialo en worker/.env: {"error":{"message":"The model `qwen/qwen3.6-27b` does not exist or you do not have access to it."," (vuelvo a probarlo en 360 min). Paso al siguiente.
+00:33:48 [download d3dc2f]   IA: groq_cuenta3:vision → modelo no disponible (404): cámbialo en worker/.env: {"error":{"message":"The model `qwen/qwen3.6-27b` does not exist or you do not have access to it."," (vuelvo a probarlo en 360 min). Paso al siguiente.
+00:33:48 [download d3dc2f]   IA: groq_cuenta4:vision → modelo no disponible (404): cámbialo en worker/.env: {"error":{"message":"The model `qwen/qwen3.6-27b` does not exist or you do not have access to it."," (vuelvo a probarlo en 360 min). Paso al siguiente.
+00:33:49 [download d3dc2f]   IA: groq_cuenta5:vision → modelo no disponible (404): cámbialo en worker/.env: {"error":{"message":"The model `qwen/qwen3.6-27b` does not exist or you do not have access to it."," (vuelvo a probarlo en 360 min). Paso al siguiente.
+00:33:50 [download d3dc2f]   IA: groq_cuenta6:vision → modelo no disponible (404): cámbialo en worker/.env: {"error":{"message":"The model `qwen/qwen3.6-27b` does not exist or you do not have access to it."," (vuelvo a probarlo en 360 min). Paso al siguiente.
+00:33:51 [download d3dc2f]   IA: groq_cuenta7:vision → modelo no disponible (404): cámbialo en worker/.env: {"error":{"message":"The model `qwen/qwen3.6-27b` does not exist or you do not have access to it."," (vuelvo a probarlo en 360 min). Paso al siguiente.
+00:34:28 [download d3dc2f]   Verificación con imágenes: revisé 12 candidato(s), 10 bajaron de puntaje
+00:34:28 [download d3dc2f] ▶ clips
+00:34:29 [download d3dc2f]   Logo: lo pongo en br (24% del ancho)
+00:34:32 [download d3dc2f]   Volumen: -23.3 LUFS -> -14 LUFS
+00:34:33 [download d3dc2f]   Efectos: zoom en 2.7 s, cámara lenta en 2.7 s
+00:35:53 [download d3dc2f]   IA: usando groq_cuenta7 (openai/gpt-oss-120b)
+00:35:56 [download d3dc2f]   IA: usando groq_cuenta4 (openai/gpt-oss-120b)
+00:35:56 [download d3dc2f]   Viral: 57 pts → review · riesgos: disparo
+00:36:12 [download d3dc2f]   IA: usando groq_cuenta5 (openai/gpt-oss-120b)
+00:37:11 [download d3dc2f]   clip listo: La vaina que dejó a todos con la boca abierta en segundos (52%)
+00:37:11 [download d3dc2f]   Pitido: 1 grosería(s) tapada(s)
+00:37:14 [download d3dc2f]   Volumen: -17.6 LUFS -> -14 LUFS
+00:37:15 [download d3dc2f]   Efectos: zoom en 2.5 s, cámara lenta en 2.5 s
+00:39:00 [download d3dc2f]   IA: usando groq_cuenta6 (openai/gpt-oss-120b)
+00:39:04 [download d3dc2f]   IA: usando groq_cuenta7 (openai/gpt-oss-120b)
+00:39:04 [download d3dc2f]   Viral: 68 pts → review · riesgos: insulto, mierda, sangre
+00:39:21 [download d3dc2f]   IA: usando groq_cuenta4 (openai/gpt-oss-120b)
+00:40:28 [download d3dc2f]   clip listo: ¿Qué oculta el cielo cuando el avión se vuelve una locura? (73%)
+00:40:31 [download d3dc2f]   Volumen: -22.2 LUFS -> -14 LUFS
+00:40:31 [download d3dc2f]   Efectos: zoom en 11.9 s, cámara lenta en 11.9 s
+00:41:45 [download d3dc2f]   IA: usando groq_cuenta5 (openai/gpt-oss-120b)
+00:41:46 [download d3dc2f]   IA: usando groq_cuenta6 (openai/gpt-oss-120b)
+00:41:46 [download d3dc2f]   Viral: 69 pts → review
+00:42:03 [download d3dc2f]   IA: usando groq_cuenta7 (openai/gpt-oss-120b)
+00:42:55 [download d3dc2f]   clip listo: La verdad polémica detrás del loot secreto de la discolara (73%)
+00:42:55 [download d3dc2f]   Gancho: arranque movido +4.9s (53→65 pts)
+00:42:57 [download d3dc2f]   Volumen: -21.1 LUFS -> -14 LUFS
+00:42:57 [download d3dc2f]   Efectos: zoom en 3.5 s, cámara lenta en 3.5 s
+00:44:07 [download d3dc2f]   IA: usando groq_cuenta4 (openai/gpt-oss-120b)
+00:44:10 [download d3dc2f]   IA: usando groq_cuenta5 (openai/gpt-oss-120b)
+00:44:10 [download d3dc2f]   Viral: 61 pts → review
+00:44:25 [download d3dc2f]   IA: usando groq_cuenta6 (openai/gpt-oss-120b)
+00:45:14 [download d3dc2f]   clip listo: ¿Qué oculta esa calidad brutal que nadie te cuenta? (35%)
+00:45:18 [download d3dc2f]   Volumen: -18.2 LUFS -> -14 LUFS
+00:45:18 [download d3dc2f]   Efectos: zoom en 7.9 s, cámara lenta en 7.9 s
+00:47:00 [download d3dc2f]   IA: usando groq_cuenta7 (openai/gpt-oss-120b)
+00:47:03 [download d3dc2f]   IA: usando groq_cuenta4 (openai/gpt-oss-120b)
+00:47:03 [download d3dc2f]   Viral: 69 pts → review · riesgos: disparo
+00:47:19 [download d3dc2f]   IA: usando groq_cuenta5 (openai/gpt-oss-120b)
+00:48:24 [download d3dc2f]   clip listo: ¿Qué le pasó al gordo antes de la explosión? (70%)
+00:48:28 [download d3dc2f]   Volumen: -20.1 LUFS -> -14 LUFS
+00:48:28 [download d3dc2f]   Efectos: zoom en 13.7 s, cámara lenta en 13.7 s
+00:50:05 [download d3dc2f]   IA: usando groq_cuenta2 (openai/gpt-oss-120b)
+00:50:08 [download d3dc2f]   IA: usando groq_cuenta3 (openai/gpt-oss-120b)
+00:50:08 [download d3dc2f]   Viral: 49 pts → review · riesgos: arma
+00:50:24 [download d3dc2f]   IA: usando groq_cuenta4 (openai/gpt-oss-120b)
+00:51:25 [download d3dc2f]   clip listo: El león que desató el caos: ¿Quién lo soltó? (35%)
+00:51:28 [download d3dc2f]   Volumen: -23.3 LUFS -> -14 LUFS
+00:51:28 [download d3dc2f]   Efectos: zoom en 42.8 s, cámara lenta en 42.8 s
+00:52:47 [download d3dc2f]   IA: usando groq_cuenta5 (openai/gpt-oss-120b)
+00:52:49 [download d3dc2f]   IA: usando groq_cuenta6 (openai/gpt-oss-120b)
+00:52:49 [download d3dc2f]   Viral: 66 pts → review · riesgos: violencia
+00:53:02 [download d3dc2f]   IA: usando groq_cuenta7 (openai/gpt-oss-120b)
+00:54:02 [download d3dc2f]   clip listo: El secreto que los tígueres no quieren que veas (74%)
+00:54:04 [download d3dc2f]   Volumen: -21.3 LUFS -> -14 LUFS
+00:54:05 [download d3dc2f]   Efectos: zoom en 5.0 s, cámara lenta en 5.0 s
+00:55:38 [download d3dc2f]   IA: usando groq (openai/gpt-oss-120b)
+00:55:41 [download d3dc2f]   IA: usando groq_cuenta2 (openai/gpt-oss-120b)
+00:55:41 [download d3dc2f]   Viral: 68 pts → review
+00:55:58 [download d3dc2f]   IA: usando groq_cuenta3 (openai/gpt-oss-120b)
+00:56:59 [download d3dc2f]   clip listo: ¿Qué misteriosa vaina aparece de la nada en la calle? (73%)
+00:57:02 [download d3dc2f]   Volumen: -19.3 LUFS -> -14 LUFS
+00:57:02 [download d3dc2f]   Efectos: zoom en 6.2 s, cámara lenta en 6.2 s
+00:58:31 [download d3dc2f]   IA: usando groq_cuenta4 (openai/gpt-oss-120b)
+00:58:34 [download d3dc2f]   IA: usando groq_cuenta5 (openai/gpt-oss-120b)
+00:58:34 [download d3dc2f]   Viral: 75 pts → review · riesgos: mata
+00:58:49 [download d3dc2f]   IA: usando groq_cuenta6 (openai/gpt-oss-120b)
+00:59:54 [download d3dc2f]   clip listo: ¿Será este el secreto que Michael Jackson nunca reveló? (72%)
+00:59:54 [download d3dc2f]   Gancho: arranque movido +4.9s (50→64 pts)
+00:59:57 [download d3dc2f]   Volumen: -20.0 LUFS -> -14 LUFS
+00:59:57 [download d3dc2f]   Efectos: zoom en 2.3 s, cámara lenta en 2.3 s
+01:01:31 [download d3dc2f]   IA: usando groq_cuenta7 (openai/gpt-oss-120b)
+01:01:35 [download d3dc2f]   IA: usando groq (openai/gpt-oss-120b)
+01:01:35 [download d3dc2f]   Viral: 68 pts → review
+01:01:51 [download d3dc2f]   IA: usando groq_cuenta2 (openai/gpt-oss-120b)
+01:02:52 [download d3dc2f]   clip listo: ¡Mira la locura del sombrero gigante que arrasó con todo! (66%)
+01:02:53 [download d3dc2f]   Pitido: 2 grosería(s) tapada(s)
+01:02:56 [download d3dc2f]   Volumen: -23.4 LUFS -> -14 LUFS
+01:02:56 [download d3dc2f]   Efectos: zoom en 17.9 s, cámara lenta en 17.9 s
+01:04:32 [download d3dc2f]   IA: usando groq_cuenta3 (openai/gpt-oss-120b)
+01:04:35 [download d3dc2f]   IA: usando groq_cuenta4 (openai/gpt-oss-120b)
+01:04:35 [download d3dc2f]   Viral: 66 pts → review · riesgos: arma, cabrón, uso de lenguaje ofensivo (cabrón)
+01:04:53 [download d3dc2f]   IA: usando groq_cuenta5 (openai/gpt-oss-120b)
+01:05:55 [download d3dc2f]   clip listo: La vaina más jevi de GTA 6: ¡Flores que disparan caos total! (65%)
+01:05:56 [download d3dc2f]   Pitido: 1 grosería(s) tapada(s)
+01:05:58 [download d3dc2f]   Volumen: -17.2 LUFS -> -14 LUFS
+01:05:59 [download d3dc2f]   Efectos: zoom en 9.0 s, cámara lenta en 9.0 s
+01:07:27 [download d3dc2f]   IA: groq_cuenta6 → petición rechazada (400): {"error":{"message":"Failed to validate JSON. Please adjust your prompt. See 'failed_generation' for more details.","typ (vuelvo a probarlo en 15 min). Paso al siguiente.
+01:07:30 [download d3dc2f]   IA: usando groq_cuenta7 (openai/gpt-oss-120b)
+01:07:32 [download d3dc2f]   Viral: 67 pts → review · riesgos: abuso, cabrón, uso de lenguaje vulgar (cabrón)
+01:07:48 [download d3dc2f]   IA: usando groq (openai/gpt-oss-120b)
+01:08:48 [download d3dc2f]   clip listo: El secreto del 'honglass' que nadie quiere admitir (73%)
+01:08:48 [download d3dc2f]   Gancho: arranque movido +4.9s (50→64 pts)
+01:08:51 [download d3dc2f]   Volumen: -21.5 LUFS -> -14 LUFS
+01:08:51 [download d3dc2f]   Efectos: zoom en 15.7 s, cámara lenta en 15.7 s
+01:10:11 [download d3dc2f]   IA: usando groq_cuenta2 (openai/gpt-oss-120b)
+01:10:14 [download d3dc2f]   IA: usando groq_cuenta3 (openai/gpt-oss-120b)
+01:10:14 [download d3dc2f]   Viral: 72 pts → review
+01:10:29 [download d3dc2f]   IA: usando groq_cuenta4 (openai/gpt-oss-120b)
+01:11:23 [download d3dc2f]   clip listo: El escándalo del 'Bono de vida' que nadie vio venir (76%)
+01:11:23 [download d3dc2f]   Pitido: 1 grosería(s) tapada(s)
+01:11:25 [download d3dc2f]   Volumen: -16.4 LUFS -> -14 LUFS
+01:11:26 [download d3dc2f]   Efectos: zoom en 12.0 s, cámara lenta en 12.0 s
+01:12:45 [download d3dc2f]   IA: usando groq_cuenta5 (openai/gpt-oss-120b)
+01:12:47 [download d3dc2f]   IA: usando groq_cuenta7 (openai/gpt-oss-120b)
+01:12:47 [download d3dc2f]   Viral: 73 pts → review · riesgos: cabrón, insulto
+01:13:02 [download d3dc2f]   IA: usando groq (openai/gpt-oss-120b)
+01:13:58 [download d3dc2f]   clip listo: Teléfono misterioso y caos en la calle (65%)
+01:14:01 [download d3dc2f]   Volumen: -18.8 LUFS -> -14 LUFS
+01:14:01 [download d3dc2f]   Efectos: zoom en 4.2 s, cámara lenta en 4.2 s
+01:15:08 [download d3dc2f]   IA: usando groq_cuenta2 (openai/gpt-oss-120b)
+01:15:11 [download d3dc2f]   IA: usando groq_cuenta3 (openai/gpt-oss-120b)
+01:15:11 [download d3dc2f]   Viral: 73 pts → review
+01:15:27 [download d3dc2f]   IA: usando groq_cuenta4 (openai/gpt-oss-120b)
+01:16:14 [download d3dc2f]   clip listo: ¿Qué misterio esconde la luz de la platanera de noche? (76%)
+01:16:17 [download d3dc2f]   Volumen: -20.0 LUFS -> -14 LUFS
+01:16:17 [download d3dc2f]   Efectos: zoom en 10.3 s, cámara lenta en 10.3 s
+01:17:56 [download d3dc2f]   IA: usando groq_cuenta5 (openai/gpt-oss-120b)
+01:17:59 [download d3dc2f]   IA: usando groq_cuenta7 (openai/gpt-oss-120b)
+01:17:59 [download d3dc2f]   Viral: 61 pts → review
+01:18:14 [download d3dc2f]   IA: usando groq (openai/gpt-oss-120b)
+01:19:10 [download d3dc2f]   clip listo: El secreto que la Saima oculta en la pista resbalosa (62%)
+01:19:13 [download d3dc2f]   Volumen: -22.8 LUFS -> -14 LUFS
+01:19:13 [download d3dc2f]   Efectos: zoom en 16.6 s, cámara lenta en 16.6 s
+01:20:53 [download d3dc2f]   IA: usando groq_cuenta2 (openai/gpt-oss-120b)
+01:20:57 [download d3dc2f]   IA: usando groq_cuenta3 (openai/gpt-oss-120b)
+01:20:57 [download d3dc2f]   Viral: 67 pts → review · riesgos: basura
+01:21:13 [download d3dc2f]   IA: usando groq_cuenta4 (openai/gpt-oss-120b)
+01:22:14 [download d3dc2f]   clip listo: El secreto sucio detrás de los barcos que nadie quiere admitir (70%)
+01:22:14 [download d3dc2f]   Gancho: quité 1 muletilla(s) del arranque
+01:22:16 [download d3dc2f]   Volumen: -22.7 LUFS -> -14 LUFS
+01:22:17 [download d3dc2f]   Efectos: zoom en 7.4 s, cámara lenta en 7.4 s
+01:23:24 [download d3dc2f]   IA: usando groq_cuenta3 (openai/gpt-oss-120b)
+01:23:29 [download d3dc2f]   IA: usando groq_cuenta4 (openai/gpt-oss-120b)
+01:23:29 [download d3dc2f]   Viral: 68 pts → review
+01:23:46 [download d3dc2f]   IA: usando groq_cuenta5 (openai/gpt-oss-120b)
+01:24:36 [download d3dc2f]   clip listo: El sucio secreto del juego de millones: ¿Quién lo financia? (74%)
+01:24:39 [download d3dc2f]   Volumen: -20.7 LUFS -> -14 LUFS
+01:24:40 [download d3dc2f]   Efectos: zoom en 10.7 s, cámara lenta en 10.7 s
+01:26:08 [download d3dc2f]   IA: usando groq_cuenta6 (openai/gpt-oss-120b)
+01:26:12 [download d3dc2f]   IA: usando groq_cuenta7 (openai/gpt-oss-120b)
+01:26:12 [download d3dc2f]   Viral: 65 pts → review · riesgos: golpe
+01:26:26 [download d3dc2f]   IA: usando groq (openai/gpt-oss-120b)
+01:27:24 [download d3dc2f]   clip listo: Sabías que el freno de mano duplica la tensión del motor? (69%)
+01:27:26 [download d3dc2f]   Volumen: -23.9 LUFS -> -14 LUFS
+01:27:27 [download d3dc2f]   Efectos: zoom en 14.0 s, cámara lenta en 14.0 s
+10:45:00 Groq: 7 cuenta(s) configurada(s).
+10:45:01 Probando las llaves de IA (una petición mínima a cada una)…
+10:45:11   ✓ groq: openai/gpt-oss-120b
+10:45:11   ✓ groq_cuenta2: openai/gpt-oss-120b
+10:45:11   ✓ groq_cuenta3: openai/gpt-oss-120b
+10:45:11   ✓ groq_cuenta4: openai/gpt-oss-120b
+10:45:11   ✓ groq_cuenta5: openai/gpt-oss-120b
+10:45:11   ✓ groq_cuenta6: openai/gpt-oss-120b
+10:45:11   ✓ groq_cuenta7: openai/gpt-oss-120b
+10:45:11   ✓ groq_8b: openai/gpt-oss-20b
+10:45:11   ✓ groq_cuenta2_8b: openai/gpt-oss-20b
+10:45:11   ✓ groq_cuenta3_8b: openai/gpt-oss-20b
+10:45:11   ✓ groq_cuenta4_8b: openai/gpt-oss-20b
+10:45:11   ✓ groq_cuenta5_8b: openai/gpt-oss-20b
+10:45:11   ✓ groq_cuenta6_8b: openai/gpt-oss-20b
+10:45:11   ✓ groq_cuenta7_8b: openai/gpt-oss-20b
+10:45:11   ✓ gemini: gemini-3.5-flash-lite
+10:45:11 ✓ Revisión inicial correcta (Supabase, bucket, ffmpeg, IA).
+10:45:11 IA en orden de uso: groq → groq_cuenta2 → groq_cuenta3 → groq_cuenta4 → groq_cuenta5 → groq_cuenta6 → groq_cuenta7 → groq_8b → groq_cuenta2_8b → groq_cuenta3_8b → groq_cuenta4_8b → groq_cuenta5_8b → groq_cuenta6_8b → groq_cuenta7_8b → gemini
+10:45:11 Worker listo (encuadres: vertical, dividido, dos personas, difuminado; directos con reconexión y chat), esperando trabajos…
+10:45:12 Recuperación: 1 trabajo(s) que quedaron a medias vuelven a la cola.
+10:45:15 [download d3dc2f] Trabajo d3dc2fd5-1555-4ffc-94c9-da3eb6d1e78f → fuente 51d3cb85-926e-4a29-84f4-9207c0807948 · prioridad 0 · intento 2
+10:45:16 [download d3dc2f]   Tipo de contenido: GTA 6 · acción · juego: GTA 6 · clips de ~75 s
+10:45:16 [download d3dc2f]   Encuadre pedido: split_eq | recuadro manual: sí
+10:45:21 [download d3dc2f]   Reintento: limpié 19 clip(s) a medias del intento anterior
+10:45:21 [download d3dc2f] ▶ descarga
+11:07:44 [download d3dc2f] ▶ transcripción
+11:09:05 [download d3dc2f] ▶ análisis
+11:21:02 [download d3dc2f]   Audio: 1449 s de tiroteo, 1389 s con explosión
+11:21:02 [download d3dc2f]   Pistas: 0 s con volumen alto, 262 s de acción en pantalla, 599 frase(s) marcada(s)
+11:21:09 [download d3dc2f]   IA: groq → petición rechazada (400): {"error":{"message":"Failed to generate JSON. Please adjust your prompt. See 'failed_generation' for more details.","typ (vuelvo a probarlo en 15 min). Paso al siguiente.
+11:21:16 [download d3dc2f]   IA: usando groq_cuenta2 (openai/gpt-oss-120b)
+11:21:23 [download d3dc2f]   IA: usando groq_cuenta3 (openai/gpt-oss-120b)
+11:21:29 [download d3dc2f]   IA: usando groq_cuenta4 (openai/gpt-oss-120b)
+11:21:36 [download d3dc2f]   IA: usando groq_cuenta5 (openai/gpt-oss-120b)
+11:21:42 [download d3dc2f]   IA: usando groq_cuenta6 (openai/gpt-oss-120b)
+11:21:48 [download d3dc2f]   IA: usando groq_cuenta7 (openai/gpt-oss-120b)
+11:21:55 [download d3dc2f]   IA: usando groq_cuenta2 (openai/gpt-oss-120b)
+11:21:59 [download d3dc2f]   IA: usando groq_cuenta3 (openai/gpt-oss-120b)
+11:21:59 [download d3dc2f]   IA: groq_cuenta4 → límite por minuto (vuelvo a probarlo en 16 s). Paso al siguiente.
+11:21:59 [download d3dc2f]   IA: groq_cuenta5 → límite por minuto (vuelvo a probarlo en 5 s). Paso al siguiente.
+11:22:03 [download d3dc2f]   IA: usando groq_cuenta6 (openai/gpt-oss-120b)
+11:22:03 [download d3dc2f]   Segunda pasada: re-puntué 38 de 38 candidatos
+11:22:05 [download d3dc2f]   IA: groq:vision → modelo no disponible (404): cámbialo en worker/.env: {"error":{"message":"The model `qwen/qwen3.6-27b` does not exist or you do not have access to it."," (vuelvo a probarlo en 360 min). Paso al siguiente.
+11:22:06 [download d3dc2f]   IA: groq_cuenta2:vision → modelo no disponible (404): cámbialo en worker/.env: {"error":{"message":"The model `qwen/qwen3.6-27b` does not exist or you do not have access to it."," (vuelvo a probarlo en 360 min). Paso al siguiente.
+11:22:06 [download d3dc2f]   IA: groq_cuenta3:vision → modelo no disponible (404): cámbialo en worker/.env: {"error":{"message":"The model `qwen/qwen3.6-27b` does not exist or you do not have access to it."," (vuelvo a probarlo en 360 min). Paso al siguiente.
+11:22:06 [download d3dc2f]   IA: groq_cuenta4:vision → modelo no disponible (404): cámbialo en worker/.env: {"error":{"message":"The model `qwen/qwen3.6-27b` does not exist or you do not have access to it."," (vuelvo a probarlo en 360 min). Paso al siguiente.
+11:22:07 [download d3dc2f]   IA: groq_cuenta5:vision → modelo no disponible (404): cámbialo en worker/.env: {"error":{"message":"The model `qwen/qwen3.6-27b` does not exist or you do not have access to it."," (vuelvo a probarlo en 360 min). Paso al siguiente.
+11:22:07 [download d3dc2f]   IA: groq_cuenta6:vision → modelo no disponible (404): cámbialo en worker/.env: {"error":{"message":"The model `qwen/qwen3.6-27b` does not exist or you do not have access to it."," (vuelvo a probarlo en 360 min). Paso al siguiente.
+11:22:07 [download d3dc2f]   IA: groq_cuenta7:vision → modelo no disponible (404): cámbialo en worker/.env: {"error":{"message":"The model `qwen/qwen3.6-27b` does not exist or you do not have access to it."," (vuelvo a probarlo en 360 min). Paso al siguiente.
+11:23:43 [download d3dc2f]   IA: gemini:vision → error 503 (vuelvo a probarlo en 2 min). Paso al siguiente.
+11:23:43 [download d3dc2f]   Verificación con imágenes: paro aquí (Ningún proveedor con visión pudo responder.). Los demás quedan como estaban.
+11:23:43 [download d3dc2f]   Verificación con imágenes: revisé 1 candidato(s), 0 bajaron de puntaje
+11:23:43 [download d3dc2f] ▶ clips
+11:23:45 [download d3dc2f]   Logo: lo pongo en br (24% del ancho)
+11:23:46 [download d3dc2f]   Pitido: 2 grosería(s) tapada(s)
+11:23:51 [download d3dc2f]   Volumen: -18.2 LUFS -> -14 LUFS
+11:23:52 [download d3dc2f]   Efectos: zoom en 10.0 s, cámara lenta en 10.0 s
+11:24:00 [download d3dc2f] Recibí la señal de apagado (15): salgo. Lo que estaba en proceso se retoma al volver a encender.
+17:48:26 Groq: 7 cuenta(s) configurada(s).
+17:48:32 Probando las llaves de IA (una petición mínima a cada una)…
+17:48:38   ✓ groq: openai/gpt-oss-120b
+17:48:38   ✓ groq_cuenta2: openai/gpt-oss-120b
+17:48:38   ✓ groq_cuenta3: openai/gpt-oss-120b
+17:48:38   ✓ groq_cuenta4: openai/gpt-oss-120b
+17:48:38   ✓ groq_cuenta5: openai/gpt-oss-120b
+17:48:38   ✓ groq_cuenta6: openai/gpt-oss-120b
+17:48:38   ✓ groq_cuenta7: openai/gpt-oss-120b
+17:48:38   ✓ groq_8b: openai/gpt-oss-20b
+17:48:38   ✓ groq_cuenta2_8b: openai/gpt-oss-20b
+17:48:38   ✓ groq_cuenta3_8b: openai/gpt-oss-20b
+17:48:38   ✓ groq_cuenta4_8b: openai/gpt-oss-20b
+17:48:38   ✓ groq_cuenta5_8b: openai/gpt-oss-20b
+17:48:38   ✓ groq_cuenta6_8b: openai/gpt-oss-20b
+17:48:38   ✓ groq_cuenta7_8b: openai/gpt-oss-20b
+17:48:38   ✓ gemini: gemini-3.5-flash-lite
+17:48:38 ✓ Revisión inicial correcta (Supabase, bucket, ffmpeg, IA).
+17:48:38 IA en orden de uso: groq → groq_cuenta2 → groq_cuenta3 → groq_cuenta4 → groq_cuenta5 → groq_cuenta6 → groq_cuenta7 → groq_8b → groq_cuenta2_8b → groq_cuenta3_8b → groq_cuenta4_8b → groq_cuenta5_8b → groq_cuenta6_8b → groq_cuenta7_8b → gemini
+17:48:38 Worker listo (encuadres: vertical, dividido, dos personas, difuminado; directos con reconexión y chat), esperando trabajos…
+17:48:40 [clip 266e68] Trabajo 266e68ee-f7a1-4a8c-a1ae-e4e573eb0833 → fuente 51d3cb85-926e-4a29-84f4-9207c0807948 · prioridad 5 · intento 1
+17:48:40 [clip 266e68]   Re-render del clip 4526c579-64ad-4fcd-bf4c-628badda154c: 1728.0-1801.0s, encuadre split_eq
+17:50:15 [clip 266e68]   Logo: lo pongo en br (24% del ancho)
+17:50:18 [clip 266e68]   Volumen: -21.9 LUFS -> -14 LUFS
+17:50:19 [clip 266e68]   Efectos: zoom en 16.4 s, cámara lenta en 16.4 s
+17:51:50 [clip 266e68]   IA: usando groq (openai/gpt-oss-120b)
+17:52:48 [clip 266e68]   Re-render: versión narrada lista
+17:53:03 [clip 266e68]   Re-render listo
+17:53:03 [clip 266e68] Fin del trabajo (4 min 23 s)
+17:53:03 [record 87fce6] Trabajo 87fce67c-6914-45bc-afc5-85a851a3c1e4 → fuente 5d414555-8479-446e-9209-ffc8f2bd3ee6 · prioridad 10 · intento 1
+17:53:03 [record 87fce6]   Tipo de contenido: GTA 6 · acción · juego: GTA 6 · máx. 3 clips por revisión · puntaje mínimo 55
+17:53:04 [record 87fce6]   Logo: lo pongo en br (24% del ancho)
+17:53:06 [record 87fce6]   stream: video y audio por separado (los junto al grabar)
+17:53:06 [record 87fce6]   grabando: 🔴 GTA 6 EN VIVO | CAPITULO 2 | GRAND THEFT AUTO VI 2026-11-19 17:53
+17:53:06   Chat en vivo: conectado, leyendo mensajes.
+17:53:06   Chat en vivo: no pude leerlo (ParsingError: Unable to parse initial video data); reintento.
+17:53:17   Chat en vivo: no pude leerlo (ParsingError: Unable to parse initial video data); reintento.
+17:53:21   Estudio viral: thumbs listo para «¿Qué vaina tomó y le dio vida extra? Descúbrelo»
+17:53:28   Chat en vivo: no pude leerlo (ParsingError: Unable to parse initial video data); reintento.
+17:53:39   Chat en vivo: no pude leerlo (ParsingError: Unable to parse initial video data); reintento.
+17:53:50   Chat en vivo: no pude leerlo (ParsingError: Unable to parse initial video data); reintento.
+17:54:01   Chat en vivo: no pude leerlo (ParsingError: Unable to parse initial video data); reintento.
+17:54:32   Chat en vivo: no pude leerlo (ParsingError: Unable to parse initial video data); reintento.
+17:54:43   Chat en vivo: no pude leerlo (ParsingError: Unable to parse initial video data); reintento.
+17:54:54   Chat en vivo: no pude leerlo (ParsingError: Unable to parse initial video data); reintento.
+17:55:05   Chat en vivo: no pude leerlo (ParsingError: Unable to parse initial video data); reintento.
+17:55:10 [record 87fce6]   trozo s01_seg_00000.ts: 120s, 9 frases
+17:55:10 [record 87fce6]   Pistas: 0 s de volumen alto, 9 s de acción, 0 s de chat, 8 frase(s) marcada(s)
+17:55:13 [record 87fce6]   IA: usando groq_cuenta2 (openai/gpt-oss-120b)
+17:55:15   Chat en vivo: no pude leerlo (ParsingError: Unable to parse initial video data); reintento.
+17:55:17 [record 87fce6]   Volumen: -28.4 LUFS -> -14 LUFS
+17:55:17 [record 87fce6]   Efectos: zoom en 16.1 s, cámara lenta en 16.1 s
+17:55:26   Chat en vivo: no pude leerlo (ParsingError: Unable to parse initial video data); reintento.
+17:55:37   Chat en vivo: no pude leerlo (ParsingError: Unable to parse initial video data); reintento.
+17:55:38 [record 87fce6]   Dividido: encontré el recuadro de la cámara del streamer
+17:55:48   Chat en vivo: no pude leerlo (ParsingError: Unable to parse initial video data); reintento.
+17:55:59   Chat en vivo: no pude leerlo (ParsingError: Unable to parse initial video data); reintento.
+17:56:10   Chat en vivo: no pude leerlo (ParsingError: Unable to parse initial video data); reintento.
+17:56:21   Chat en vivo: no pude leerlo (ParsingError: Unable to parse initial video data); reintento.
+17:56:32   Chat en vivo: no pude leerlo (ParsingError: Unable to parse initial video data); reintento.
+17:56:43   Chat en vivo: no pude leerlo (ParsingError: Unable to parse initial video data); reintento.
+17:56:51 [record 87fce6]   clip listo: ¡Ubicación secreta revelada! (100%)
+17:56:54   Chat en vivo: no pude leerlo (ParsingError: Unable to parse initial video data); reintento.
+17:57:05   Chat en vivo: no pude leerlo (ParsingError: Unable to parse initial video data); reintento.
+17:57:09 [record 87fce6]   trozo s01_seg_00001.ts: 120s, 16 frases
+17:57:09 [record 87fce6]   Pistas: 0 s de volumen alto, 5 s de acción, 0 s de chat, 15 frase(s) marcada(s)
+17:57:15   Chat en vivo: no pude leerlo (ParsingError: Unable to parse initial video data); reintento.
+17:57:16 [record 87fce6]   IA: usando groq_cuenta3 (openai/gpt-oss-120b)
+17:57:21 [record 87fce6]   Volumen: -30.0 LUFS -> -14 LUFS
+17:57:21 [record 87fce6]   Efectos: zoom en 10.5 s, cámara lenta en 10.5 s
+17:57:26   Chat en vivo: no pude leerlo (ParsingError: Unable to parse initial video data); reintento.

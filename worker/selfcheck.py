@@ -43,6 +43,15 @@ def run():
         except ImportError:
             warn.append("Falta chat-downloader: el chat en vivo no se leerá. Reconstruye el worker (INICIAR-WORKER.bat).")
 
+    # Verificar cookies de YouTube si están configuradas
+    if config.COOKIES_FILE:
+        from pathlib import Path
+        cp = Path(config.COOKIES_FILE)
+        if not cp.exists():
+            warn.append(f"El archivo de cookies no existe: {config.COOKIES_FILE}. El worker no podrá descargar videos privados o con restricción de edad.")
+        else:
+            print(f"✓ Archivo de cookies encontrado: {config.COOKIES_FILE}", flush=True)
+
     gkeys = config.groq_keys()
     bad = [k for k in gkeys if not k.startswith("gsk_")]
     if bad:
@@ -53,8 +62,13 @@ def run():
 
     if config.CLIP_LAYOUT == "crop" and config.CLIP_FRAMING == "auto":
         try:
+            import ast
+            ast.parse(open("/app/framing.py" if __import__("os").path.exists("/app/framing.py") else "framing.py").read())
             import framing
             framing._load()
+        except SyntaxError as e:
+            warn.append(f"El encuadre automatico no esta disponible (error de sintaxis en framing.py, linea {e.lineno}): "
+                        "reconstruye el worker (docker build --no-cache) para instalar la version correcta.")
         except Exception as e:  # noqa: BLE001
             warn.append(f"El encuadre automatico no esta disponible ({type(e).__name__}); los clips saldran centrados. "
                         "Reconstruye el worker (docker build) para instalar scikit-image.")

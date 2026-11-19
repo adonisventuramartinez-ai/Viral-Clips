@@ -75,6 +75,11 @@ def download(url: str, workdir: Path, quality: str, range_from, range_to):
         except DownloadError as e:
             last_err = e
             msg = str(e)
+            if "cookies are no longer valid" in msg or "cookies are invalid" in msg.lower():
+                print(f"  yt-dlp: las cookies de YouTube expiraron. Actualiza worker/cookies.txt y COOKIES_FILE en .env.", flush=True)
+                print(f"  Tip: exporta cookies frescas desde tu navegador con la extensión 'Get cookies.txt LOCALLY'.", flush=True)
+                # No reintentar: el problema es las cookies, no el formato
+                raise
             if "format is not available" in msg or "Requested format" in msg or "HTTP Error 403" in msg:
                 print(f"  yt-dlp: {msg[:90]}… pruebo otra forma de pedirlo.", flush=True)
                 continue

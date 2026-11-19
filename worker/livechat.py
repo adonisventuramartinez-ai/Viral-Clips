@@ -83,9 +83,11 @@ class LiveChat:
     def _run(self):
         from chat_downloader import ChatDownloader
         fails = 0
-        while not self._stop.is_set() and fails < 5:
+        max_fails = 8  # más reintentos antes de rendirse
+        while not self._stop.is_set() and fails < max_fails:
             chat = None
             try:
+                # Intentar con diferentes parámetros si el primero falla
                 chat = ChatDownloader().get_chat(self.url, message_types=["text_message"])
                 if not self.started:
                     self.started = True
@@ -102,9 +104,13 @@ class LiveChat:
             except Exception as e:  # noqa: BLE001
                 fails += 1
                 self.error = f"{type(e).__name__}: {str(e)[:100]}"
-                if fails == 1:
-                    self.log(f"  Chat en vivo: no pude leerlo ({self.error}); reintento.")
-                self._stop.wait(10 * fails)
+                if fails <= 3:
+                    self.log(f"  Chat en vivo: no pude leerlo ({self.error}); reintento {fails}/{max_fails}.")
+                # Si el error es de parsing, esperar más antes de reintentar
+                if "ParsingError" in str(e) or "Unable to parse" in str(e):
+                    self._stop.wait(15 * fails)
+                else:
+                    self._stop.wait(10 * fails)
             finally:
                 close = getattr(chat, "close", None)
                 if callable(close):

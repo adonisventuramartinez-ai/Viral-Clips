@@ -289,6 +289,14 @@ def main():
             db.apply_connections()    # llaves guardadas en la web (Conectar cuentas)
         except Exception:  # noqa: BLE001
             pass
+        # Verificar cookies de YouTube cada 10 minutos
+        if time.time() - getattr(main, "_last_cookie_check", 0) > 600:
+            main._last_cookie_check = time.time()
+            if config.COOKIES_FILE:
+                from pathlib import Path
+                cp = Path(config.COOKIES_FILE)
+                if not cp.exists():
+                    print(f"  ⚠ Archivo de cookies no encontrado: {config.COOKIES_FILE}", flush=True)
         db.BASE_INFO = {"auto_queue": db.auto_queue_on(), "discover": db.discover_on(), "switches": True, "networks": autoqueue.networks_available(),
                         "stats": config.STATS, "learn_slots": config.LEARN_SLOTS, "learn_min_posts": config.LEARN_MIN_POSTS}
         db.heartbeat()
