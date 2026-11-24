@@ -31,7 +31,7 @@ def requeue_stale(hours=3):
 _queue_cols_ok = True   # pasa a False si jobs aún no tiene priority/run_after (migración 0008)
 
 
-def claim_job(types=("download", "record", "clip", "transform", "text_to_video")):
+def claim_job(types=("download", "record", "clip", "transform", "text_to_video", "search")):
     """Toma el trabajo más urgente: primero prioridad alta, luego el más antiguo; salta los que esperan un reintento."""
     global _queue_cols_ok
     res = None
@@ -535,6 +535,82 @@ def create_vod_source(feed, info):
     sb.table("jobs").insert({"source_id": src["id"], "type": "download", "payload": payload}).execute()
     remember_video(feed["id"], info, "queued", None, src["id"])
     return src["id"]
+
+
+# ----------------------------------------------------------------------------- Buscador TikTok/Reels (migración 0019)
+def get_search(search_id):
+    res = sb.table("clip_searches").select("*").eq("id", search_id).maybe_single().execute()
+    return (res.data if res else None) or None
+
+
+def update_search(search_id, **fields):
+    """Actualiza una búsqueda sin tumbar el trabajo si la tabla aún no tiene alguna columna."""
+    try:
+        sb.table("clip_searches").update(fields).eq("id", search_id).execute()
+    except Exception as e:  # noqa: BLE001
+        print(f"Buscador: no pude actualizar la búsqueda ({str(e)[:100]})", flush=True)
+
+
+def save_search_results(rows, batch=200):
+    """Guarda (o actualiza) los hallazgos. `rows` = [{search_id, network, video_id, ...}]."""
+    for i in range(0, len(rows), batch):
+        sb.table("clip_search_results").upsert(rows[i : i + batch], on_conflict="search_id,network,video_id").execute()
+
+
+def search_known_urls(urls):
+    urls = [u for u in urls if u]
+    if not urls:
+        return set()
+    found = set()
+    for i in range(0, len(urls), 100):
+        rows = sb.table("sources").select("url").in_("url", urls[i : i + 100]).execute().data or []
+        found |= {r.get("url") for r in rows}
+    return found
+
+
+def get_search_result(result_id):
+    res = sb.table("clip_search_results").select("*").eq("id", result_id).maybe_single().execute()
+    return (res.data if res else None) or None
+
+
+def update_search_result(result_id, **fields):
+    try:
+        sb.table("clip_search_results").update(fields).eq("id", result_id).execute()
+    except Exception as e:  # noqa: BLE001
+        print(f"Buscador: no pude actualizar el resultado ({str(e)[:100]})", flush=True)
+
+
+def create_search_source(info, opts, search_id=None, result_id=None):
+    """Encola el video encontrado como si lo hubieras pegado en Crear clips. Devuelve el id de la fuente."""
+    url = info.get("url") or info.get("webpage_url")
+    if not url:
+        raise RuntimeError("el video encontrado no tiene link")
+    existing = sb.table("sources").select("id").eq("url", url).limit(1).execute().data or []
+    if existing:
+        sid = existing[0]["id"]
+    else:
+        options = {"content_type": opts.get("content_type") or "auto", "game": None, "progress_bar": False}
+        row = {"kind": "vod_url", "url": url, "title": (info.get("title") or "")[:200], "status": "queued",
+               "layout": "crop", "video_id": str(info.get("video_id") or ""), "search_id": search_id}
+        try:
+            sid = sb.table("sources").insert({**row, "options": options}).execute().data[0]["id"]
+        except Exception:  # noqa: BLE001  (columnas nuevas aún no creadas)
+            row.pop("video_id", None)
+            row.pop("search_id", None)
+            try:
+                sid = sb.table("sources").insert({**row, "options": options}).execute().data[0]["id"]
+            except Exception:
+                sid = sb.table("sources").insert(row).execute().data[0]["id"]
+    payload = {"clip_seconds": 0, "clips": int(opts.get("clips") or 4), "quality": opts.get("quality") or "1080p",
+               "content_type": opts.get("content_type") or "auto", "original": True, "publish_fb": bool(opts.get("publish_fb", True))}
+    # Si ya hay un trabajo de descarga para esa fuente, no duplicamos.
+    pending = (sb.table("jobs").select("id").eq("source_id", sid).eq("type", "download")
+               .in_("status", ["queued", "running"]).limit(1).execute().data or [])
+    if not pending:
+        sb.table("jobs").insert({"source_id": sid, "type": "download", "payload": payload, "priority": 0}).execute()
+    if result_id:
+        update_search_result(result_id, status="queued", source_id=sid)
+    return sid
 
 
 # ----------------------------------------------------------------------------- Parte 10: Mi página (migración 0012)

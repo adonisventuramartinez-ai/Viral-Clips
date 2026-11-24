@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 const tabs = [
   ["/crear", "Crear clips"],
   ["/crear-ia", "Crear con IA"],
+  ["/buscador", "Buscador viral"],
   ["/en-vivo", "En vivo"],
   ["/biblioteca", "Biblioteca"],
   ["/ajustes", "Ajustes de IA"],

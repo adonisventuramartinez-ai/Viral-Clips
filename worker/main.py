@@ -472,6 +472,9 @@ def handle(job):
             process_transform(job)
         elif job["type"] == "text_to_video":
             ai_video.process_text_to_video(job)
+        elif job["type"] == "search":
+            import search
+            search.process(job)
         elif job["type"] == "clip":
             if (job.get("payload") or {}).get("preview"):
                 import preview

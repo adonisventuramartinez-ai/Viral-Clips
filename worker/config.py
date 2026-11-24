@@ -388,6 +388,18 @@ DISCOVER_MAX_QUEUED = int(os.environ.get("DISCOVER_MAX_QUEUED") or 2)     # no e
 DISCOVER_INSPECT = int(os.environ.get("DISCOVER_INSPECT") or 6)           # máximo de videos que mira a fondo por revisión
 
 
+# --- Buscador de clips virales (TikTok / Instagram Reels) ---
+# TikTok se lee con yt-dlp desde perfiles públicos (tiktok:user) y links directos.
+# Instagram necesita cookies (COOKIES_FILE) para sus reels; sin ellas se omite sin tumbar la búsqueda.
+SEARCH_ACCOUNTS = int(os.environ.get("SEARCH_ACCOUNTS") or 12)              # máximo de perfiles por búsqueda
+SEARCH_INSPECT = int(os.environ.get("SEARCH_INSPECT") or 8)                 # máximo de videos que se miran a fondo (miniatura/marca)
+SEARCH_MIN_VIEWS = int(os.environ.get("SEARCH_MIN_VIEWS") or 10000)         # vistas mínimas para considerar un clip viral
+SEARCH_MAX_AGE_HOURS = int(os.environ.get("SEARCH_MAX_AGE_HOURS") or 72)    # no buscar videos muy viejos
+SEARCH_MIN_ENGAGEMENT = float(os.environ.get("SEARCH_MIN_ENGAGEMENT") or 1.5)  # likes / vistas en %
+SEARCH_BRAND_FILTER = (os.environ.get("SEARCH_BRAND_FILTER") or "1").strip().lower() in ("1", "true", "yes", "on")
+SEARCH_SEEDS = [s.strip() for s in (os.environ.get("SEARCH_SEEDS") or "").split(",") if s.strip()]  # perfiles por defecto
+
+
 # --- Parte 10: Mi página (estadísticas y mejores horas aprendidas) y Facebook como fuente ---
 STATS = _flag("STATS")                                            # leer los números de lo que publicas (solo en las redes con credenciales)
 STATS_MINUTES = int(os.environ.get("STATS_MINUTES") or 60)           # cada cuánto lee los números de tus publicaciones
