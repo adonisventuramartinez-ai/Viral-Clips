@@ -11,6 +11,7 @@ const items: [string, string, React.ReactNode][] = [
   ["/crear", "Proyecto", I("M4 5h16v14H4zM4 9h16M9 5v14")],
   ["/crear-ia", "Crear con IA", I("M5 19l10-10M15 5l1-3 1 3 3 1-3 1-1 3-1-3-3-1zM4 4l1 3 3 1-3 1-1 3-1-3-3-1 3-1z")],
   ["/viral", "Hacerlo viral", I("M12 3c1 3 5 5 5 10a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-5 1-9z")],
+  ["/buscador", "Buscador viral", I("M11 3a8 8 0 1 0 4.9 14.3l4.4 4.4 1.4-1.4-4.4-4.4A8 8 0 0 0 11 3zm0 2a6 6 0 1 1 0 12 6 6 0 0 1 0-12z")],
   ["/mi-pagina", "Mi página", I("M3 12l4-4 4 4 5-6 5 6M3 20h18")],
   ["/estadisticas", "Retención", I("M4 20V4M4 20h16M8 16v-5M12 16V8M16 16v-3")],
   ["/conectar", "Conectar cuentas", I("M9 7V3M15 7V3M7 7h10v4a5 5 0 0 1-10 0zM12 16v5")],
