@@ -38,7 +38,7 @@ export async function GET() {
     ? await db
         .from("clip_search_results")
         .select("*")
-        .in_("search_id", ids)
+        .in("search_id", ids)
         .order("score", { ascending: false })
         .limit(300)
     : { data: [] };
