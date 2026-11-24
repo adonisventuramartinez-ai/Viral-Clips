@@ -1,0 +1,7 @@
+# Llaves de Groq (una por línea). Las líneas con # se ignoran.
+# Puedes poner aquí tantas llaves como tengas (cuentas de Groq distintas).
+# Cada llave empieza con gsk_...
+# El worker las rota automáticamente cuando una se queda sin cupo.
+tu_primera_llave_aqui
+tu_segunda_llave_aqui
+tu_tercera_llave_aqui

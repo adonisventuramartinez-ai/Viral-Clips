@@ -1,0 +1,15 @@
+node_modules
+.next
+.env
+.env.local
+next-env.d.ts
+*.tsbuildinfo
+*cookies*.txt
+worker/.env
+worker/groq_keys.txt
+groq_keys.txt
+worker/logs/
+.env*
+!.env.example
+*.pem
+cookies*.txt

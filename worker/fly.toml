@@ -1,0 +1,32 @@
+app = "viral-clips-worker-nino"
+primary_region = "iad"
+
+kill_signal = "SIGTERM"
+kill_timeout = 60
+
+[build]
+  dockerfile = "Dockerfile"
+  ignorefile = ".dockerignore"
+  [build.args]
+    YTDLP_BUST = "20261121"
+
+[env]
+  TZ = "America/Santo_Domingo"
+  TRANSFORM_ALWAYS_ORIGINAL = "1"
+  TRANSFORM_MAX_MB = "45"
+  TRANSFORM_MAX_SECONDS = "600"
+  IA_TOTAL_SECONDS = "60"
+
+[mounts]
+  source = "clipforge_cache"
+  destination = "/root/.cache"
+  initial_size = "5gb"
+
+[[vm]]
+  memory = "2gb"
+  cpu_kind = "shared"
+  cpus = 1
+
+[deploy]
+  wait_timeout = "10m"
+  strategy = "rolling"

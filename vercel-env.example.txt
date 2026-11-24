@@ -1,0 +1,47 @@
+# Variables para el NUEVO proyecto de Vercel.
+# Copia este contenido en Vercel > Settings > Environment Variables.
+# NO pegues los valores en el chat. Los leo desde tu panel o desde worker/.env cuando hace falta.
+
+# ---------- SUPABASE (nuevo proyecto) ----------
+# Project Settings > API
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+SUPABASE_SECRET_KEY=
+
+# ---------- APP ----------
+APP_PASSWORD=                 # clave de acceso que pides al entrar /registro
+ADMIN_PASSWORD=               # clave del panel admin de Facebook
+ENCRYPTION_KEY=               # 32 bytes en hex (64 caracteres)
+SESSION_SECRET=
+CRON_SECRET=                  # para /api/fb/cron
+NEXT_PUBLIC_APP_URL=          # https://TU-PROYECTO.vercel.app
+NEXT_PUBLIC_GRAPH_VERSION=v23.0
+NEXT_PUBLIC_DONATE_URL=
+TRENDS_GEO=DO
+
+# ---------- REDES / PUBLICACIÓN ----------
+FB_APP_ID=
+FB_APP_SECRET=
+NEXT_PUBLIC_FB_APP_ID=
+GITHUB_TOKEN=
+GITHUB_REPO=
+GITHUB_WORKFLOW=tiktok.yml
+GITHUB_BRANCH=main
+
+# ---------- COLA Y POSTS ----------
+POST_SLOTS=12:30,19:00,21:30
+POST_TZ_OFFSET=-4
+POST_MIN_GAP_MIN=90
+POST_MAX_PER_DAY=6
+LIMPIEZA_DIAS=2
+LIMPIEZA_STORAGE=on
+LOGIN_MAX_FAILS=5
+LOGIN_WINDOW_MIN=15
+ESCALONAR=on
+VARIAR_TEXTO=on
+
+# ---------- ENTORNO ----------
+NODE_ENV=production

@@ -1,0 +1,87 @@
+"""Re-render de un clip ya creado (botón "Ajustar" en la Biblioteca): otro inicio/fin y/u otro encuadre.
+Como el video original no se guarda, baja solo ese tramo (+4 s de margen), lo transcribe de nuevo y lo corta."""
+import shutil
+import time
+
+import brand
+import config
+import db
+import profiles
+import voices
+from download import download
+from render import render_clip
+from transcribe import transcribe
+
+PAD = 4.0
+
+
+def process_rerender(job):
+    p = job.get("payload") or {}
+    cid = p.get("clip_id")
+    work = config.WORK_DIR / f"re_{cid}"
+    work.mkdir(parents=True, exist_ok=True)
+    try:
+        clip = db.get_clip(cid)
+        if not clip:
+            raise RuntimeError("El clip ya no existe")
+        src = db.get_source(clip["source_id"])
+        if src.get("kind") == "live" or not src.get("url"):
+            raise RuntimeError("Los clips de directos no se pueden re-renderizar (el directo ya no existe)")
+        start, end = float(p["start"]), float(p["end"])
+        if not 5 <= end - start <= 180:
+            raise RuntimeError("El clip debe durar entre 5 y 180 segundos")
+        layout = p.get("layout") or src.get("layout") or config.CLIP_LAYOUT
+        # el recuadro manual solo vale para el encuadre con el que se hizo
+        custom = src.get("custom_crop") if layout == (src.get("layout") or config.CLIP_LAYOUT) else None
+
+        rf = max(0.0, start - PAD)
+        print(f"  Re-render del clip {cid}: {start:.1f}-{end:.1f}s, encuadre {layout}", flush=True)
+        video, _title, offset = download(src["url"], work, p.get("quality", "1080p"), str(rf), str(end + PAD))
+        _segments, words = transcribe(video, work)
+        prof = profiles.get((src.get("options") or {}).get("content_type"), (src.get("options") or {}).get("game"))
+        if prof.get("voices"):
+            voices.label(video, _segments, words)
+
+        out = work / f"{cid}.mp4"
+        render_clip(video, words, start - offset, end - offset, out, work, custom_crop=custom, layout=layout,
+                    brand=brand.load(work, template=(src.get("options") or {}).get("brand_template")), hook=(str(p.get("hook") or "").strip()[:70] or clip.get("title")),
+                    profile=profiles.get((src.get("options") or {}).get("content_type"), (src.get("options") or {}).get("game")), opts=src.get("options"))
+
+        # "Pasar a narrado": envuelve el clip con la voz narradora (Modo Original en modo "card"). Si falla, se sube el clip sin narrar.
+        if p.get("narrate"):
+            try:
+                import original
+                cfg = original.load(work, content_type=(src.get("options") or {}).get("content_type", "podcast"))
+                cfg["narrate"] = True
+                cfg["intro"] = "card"
+                text = " ".join(str(w.get("w") or "") for w in words if w.get("w"))
+                ex = original.extras(text, cfg)
+                narrated = work / f"{cid}_narrated.mp4"
+                original.wrap_clip(out, ex, narrated, work, cfg, score=clip.get("viral_score") or 75)
+                if narrated.exists() and narrated.stat().st_size > 1000:
+                    out = narrated
+                    print("  Re-render: versión narrada lista", flush=True)
+            except Exception as e:  # noqa: BLE001
+                print(f"  Re-render: no pude narrar ({type(e).__name__}: {str(e)[:120]}), subo sin narrar.", flush=True)
+
+        path = f"{clip['source_id']}/{cid}_{int(time.time())}.mp4"
+        db.upload_clip(path, out)
+        in_clip = [{"w": w["w"], "start": w["start"] + offset - start, "end": w["end"] + offset - start}
+                   for w in words if start <= w["start"] + offset <= end]
+        old = clip.get("storage_path")
+        db.update_clip(cid, start_sec=start, end_sec=end, storage_path=path, size_bytes=out.stat().st_size, captions=in_clip)
+        if old and old != path:
+            db.remove_file(old)
+        try:    # el video cambió: la miniatura vieja ya no es de este momento; Hacerlo viral la rehace sola
+            if clip.get("thumb_path") or clip.get("viral"):
+                db.update_clip(cid, viral_req={"action": "thumbs", "a": {}, "auto": True})
+        except Exception:  # noqa: BLE001  (sin la migración 0014 no pasa nada)
+            pass
+        db.finish_job(job["id"], ok=True)
+        print("  Re-render listo", flush=True)
+    except Exception as e:  # noqa: BLE001
+        print(f"  Re-render falló: {type(e).__name__}: {e}", flush=True)
+        import jobq
+        jobq.fail(job, e)
+    finally:
+        shutil.rmtree(work, ignore_errors=True)

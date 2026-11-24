@@ -1,0 +1,14 @@
+work/
+logs/
+.env
+.env.*
+*.log
+__pycache__/
+*.pyc
+.git/
+.idea/
+.vscode/
+keys/
+cookies/
+*.db
+*.sqlite

@@ -1,0 +1,13 @@
+node_modules
+.next
+.env
+.env.local
+next-env.d.ts
+*.tsbuildinfo
+
+work/
+__pycache__/
+*cookies*.txt
+groq_keys.txt
+.env.*
+!.env.example
