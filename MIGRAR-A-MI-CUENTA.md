@@ -46,7 +46,8 @@ En **Project Settings → API** copia (sin mostrarlos en el chat):
 
 1. **Add New → Project** y selecciona el repo nuevo de GitHub.
 2. **Directorio raíz: `./`**. Framework: **Next.js** (deja los valores por defecto).
-   - Si Vercel dice “se detectaron varias aplicaciones” y te ofrece **Importar proyecto multiservicio**, **ignóralo**: es un falso positivo. El worker es Python/Docker y no se despliega en Vercel. No hace falta `vercel.json` con `services`, ni `rewrites`, ni `bindings`: la web y el worker se comunican por las tablas de Supabase, no por HTTP.
+   - Si Vercel dice “se detectaron varias aplicaciones” y te ofrece **Importar proyecto multiservicio**, **ignóralo**: es un falso positivo. El worker es Python/Docker y no se despliega en Vercel. El `vercel.json` de la raíz solo fuerza `framework: nextjs` para que el importador no elija el preset **Services**; **no contiene** `services`, `rewrites` ni `bindings`. La web y el worker se comunican por las tablas de Supabase, no por HTTP.
+   - En **Application Preset** elige **Next.js**, no **Services**.
    - Tampoco agregues la **integración de Supabase** de Vercel si ya creaste el proyecto fuera: puede sobrescribir las variables. Solo pega las variables manualmente.
 3. En **Environment Variables** pega las de `vercel-env.example.txt` con tus valores reales.
    - Las cuatro de SUPABASE son las del paso 2.
