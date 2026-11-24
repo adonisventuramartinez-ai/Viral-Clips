@@ -63,9 +63,14 @@ CLIP_FRAMING = (os.environ.get("CLIP_FRAMING") or "auto").strip().lower()
 CLIP_CRF = int(os.environ.get("CLIP_CRF") or 16)
 CLIP_PRESET = (os.environ.get("CLIP_PRESET") or "medium").strip()   # ultrafast ... veryfast, fast, medium, slow
 try:
-    CLIP_SHARPEN = min(1.5, max(0.0, float(os.environ.get("CLIP_SHARPEN") or 0.6)))
+    # El recorte 9:16 de un directo 1080p se estira ~1.8x: CAS recupera detalle sin el halo del unsharp agresivo.
+    CLIP_CAS = min(1.0, max(0.0, float(os.environ.get("CLIP_CAS") or 0.65)))
 except ValueError:
-    CLIP_SHARPEN = 0.6
+    CLIP_CAS = 0.65
+try:
+    CLIP_SHARPEN = min(1.5, max(0.0, float(os.environ.get("CLIP_SHARPEN") or 0.35)))
+except ValueError:
+    CLIP_SHARPEN = 0.35
 # Encuadre horizontal del recorte: 0 = izquierda, 0.5 = centro, 1 = derecha (útil si la persona no está en el centro)
 try:
     CLIP_FOCUS_X = min(1.0, max(0.0, float(os.environ.get("CLIP_FOCUS_X") or 0.5)))
@@ -130,21 +135,34 @@ try:
 except ValueError:
     CLIP_MIN_DWELL = 3
 try:
-    CLIP_MIN_GAP = min(5.0, max(0.5, float(os.environ.get("CLIP_MIN_GAP") or 1.5)))       # segundos mínimos entre paneos
+    CLIP_MIN_GAP = min(5.0, max(0.5, float(os.environ.get("CLIP_MIN_GAP") or 3.0)))       # segundos mínimos entre paneos
 except ValueError:
-    CLIP_MIN_GAP = 1.5
+    CLIP_MIN_GAP = 3.0
 try:
     CLIP_URGENT_EDGE = min(0.6, max(0.1, float(os.environ.get("CLIP_URGENT_EDGE") or 0.36)))  # si la cara cae en el exterior, reacciona rápido
 except ValueError:
     CLIP_URGENT_EDGE = 0.36
 try:
-    CLIP_RAMP = min(2.0, max(0.2, float(os.environ.get("CLIP_RAMP") or 0.5)))             # duración del paneo
+    CLIP_RAMP = min(2.0, max(0.2, float(os.environ.get("CLIP_RAMP") or 0.55)))            # duración del paneo
 except ValueError:
-    CLIP_RAMP = 0.5
+    CLIP_RAMP = 0.55
 try:
-    CLIP_MIN_COVERAGE = min(0.5, max(0.05, float(os.environ.get("CLIP_MIN_COVERAGE") or 0.2)))  # si hay caras en menos de esta fracción, usa el centro
+    CLIP_MIN_COVERAGE = min(0.5, max(0.05, float(os.environ.get("CLIP_MIN_COVERAGE") or 0.25)))  # si hay caras en menos de esta fracción, usa el centro
 except ValueError:
-    CLIP_MIN_COVERAGE = 0.2
+    CLIP_MIN_COVERAGE = 0.25
+# --- Cámara del en vivo: análisis más fino sin frenar la grabación ---
+try:
+    CLIP_CAM_DET_W = min(1280, max(640, int(os.environ.get("CLIP_CAM_DET_W") or 960)))
+except ValueError:
+    CLIP_CAM_DET_W = 960
+try:
+    CLIP_CAM_FPS = min(6.0, max(2.0, float(os.environ.get("CLIP_CAM_FPS") or 3.5)))
+except ValueError:
+    CLIP_CAM_FPS = 3.5
+try:
+    CLIP_CAM_FACE_MIN = min(0.08, max(0.015, float(os.environ.get("CLIP_CAM_FACE_MIN") or 0.035)))
+except ValueError:
+    CLIP_CAM_FACE_MIN = 0.035
 COOKIES_FILE = os.environ.get("COOKIES_FILE", "")  # cookies.txt de YouTube si te pide "confirmar que no eres un bot"
 
 # --- NUEVO: Ruta del logo para el Brand Kit ---
@@ -157,6 +175,8 @@ WORK_DIR = Path(os.environ.get("WORK_DIR", "./work")).resolve()
 
 # --- Modo En vivo ---
 SEGMENT_SECONDS = int(os.environ.get("SEGMENT_SECONDS", "45"))    # tamaño de cada trozo grabado (más corto = clips más rápido)
+# Grabar el directo a 720p y estirar el recorte 9:16 a 1080 dejaba la cámara borrosa. Piso mínimo de captura:
+LIVE_MIN_HEIGHT = int(os.environ.get("LIVE_MIN_HEIGHT") or 1080)
 REVIEW_MINUTES = int(os.environ.get("REVIEW_MINUTES", "2"))       # cada cuánto revisa la IA (si la web no lo manda)
 LIVE_MIN_SCORE = int(os.environ.get("LIVE_MIN_SCORE", "55"))      # puntaje mínimo para crear un clip en vivo
 

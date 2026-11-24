@@ -12,34 +12,70 @@ Devuelve claves de cámara [(segundo, izquierda)] donde izquierda va de 0 a 1 (0
 """
 import statistics
 import subprocess
+from pathlib import Path
 
-SAMPLE_FPS = 3.0
-DET_W = 720        # ancho al que se reduce el cuadro para buscar caras (más alto = mejor detección, más CPU)
-WIN = 3            # +-1 s de ventana para decidir quién habla
 import config as _cfg
+
+SAMPLE_FPS = _cfg.CLIP_CAM_FPS        # muestras por segundo para seguir la cámara
+DET_W = _cfg.CLIP_CAM_DET_W          # ancho al que se reduce el cuadro para buscar caras
+FACE_MIN = _cfg.CLIP_CAM_FACE_MIN     # cara mínima (fracción del ancho) en la segunda pasada
+WIN = 3                              # +-3 muestras para decidir quién habla
 MIN_DWELL = max(2, _cfg.CLIP_MIN_DWELL - 1)   # reacciona un poco más rápido
 MIN_GAP = _cfg.CLIP_MIN_GAP
 URGENT_EDGE = _cfg.CLIP_URGENT_EDGE
-URGENT_DWELL = 2   # muestras seguidas (~0.7 s) para ese caso
-RAMP = max(0.3, _cfg.CLIP_RAMP - 0.1)   # paneo un poco más rápido por defecto
+URGENT_DWELL = 2                     # muestras seguidas para ese caso
+RAMP = max(0.3, _cfg.CLIP_RAMP - 0.1)   # paneo suave pero rápido
 MIN_COVERAGE = _cfg.CLIP_MIN_COVERAGE
 
 _det = None
 
 
+_MODEL = "face_detection_yunet_2023mar.onnx"
+
+
+def _cascade_dir():
+    """Respaldo para OpenCV anterior a 5.x (que sí trae los .xml de Haar)."""
+    local = Path(__file__).resolve().with_name("cascades")
+    if (local / "haarcascade_frontalface_alt2.xml").exists():
+        return str(local) + "/"
+    try:
+        import cv2
+        d = cv2.data.haarcascades
+        if (Path(d) / "haarcascade_frontalface_alt2.xml").exists():
+            return d
+    except Exception:  # noqa: BLE001
+        pass
+    return ""
+
+
 def _load():
-    """Detectores de OpenCV: cara de frente + de perfil (izq y der). Ven gente con gorra, lentes o de lado.
-    Si no hay OpenCV (o sus archivos .xml no vienen en la instalación), cae al detector de scikit-image."""
+    """Detector YuNet (DNN de ~230 KB): ~50 ms por cuadro y ve caras de frente y de perfil.
+    OpenCV 5.1 ya no expone CascadeClassifier y el respaldo scikit-image tardaba ~2.7 s por cuadro,
+    así que el modelo va incluido en worker/cascades. Nunca lanza error: si falla, usa el respaldo."""
     global _det
     if _det is None:
+        model = Path(__file__).resolve().with_name("cascades") / _MODEL
+        if model.exists():
+            try:
+                import cv2
+                det = cv2.FaceDetectorYN_create(str(model), "", (DET_W, DET_W // 2),
+                                                score_threshold=0.55, nms_threshold=0.3, top_k=5000)
+                if det is not None:
+                    _det = ("yn", det)
+                    return _det
+            except Exception:  # noqa: BLE001
+                pass
         try:
             import cv2
-            d = cv2.data.haarcascades
+            d = _cascade_dir()
+            if not d:
+                raise RuntimeError("faltan los .xml de OpenCV (worker/cascades)")
             a = cv2.CascadeClassifier(d + "haarcascade_frontalface_alt2.xml")
             b = cv2.CascadeClassifier(d + "haarcascade_profileface.xml")
-            if a.empty() or b.empty():
+            c = cv2.CascadeClassifier(d + "haarcascade_frontalface_default.xml")
+            if a.empty() or b.empty() or c.empty():
                 raise RuntimeError("faltan los .xml de OpenCV")
-            _det = ("cv2", a, b)
+            _det = ("cv2", a, b, c)
         except Exception:  # noqa: BLE001
             from skimage.data import lbp_frontal_face_cascade_filename
             from skimage.feature import Cascade
@@ -47,36 +83,70 @@ def _load():
     return _det
 
 
-def _raw_boxes(gray, min_frac=0.05):
+def _dedupe(boxes, overlap=0.45):
+    """Quita cajas casi iguales: tres detectores ven la misma cara tres veces."""
+    out = []
+    for r in sorted(boxes, key=lambda z: -z[2] * z[3]):
+        x, y, bw, bh = r
+        area = max(1, bw * bh)
+        dup = False
+        for ox, oy, ow, oh in out:
+            ix = max(0, min(x + bw, ox + ow) - max(x, ox))
+            iy = max(0, min(y + bh, oy + oh) - max(y, oy))
+            if ix * iy > overlap * min(area, ow * oh):
+                dup = True
+                break
+        if not dup:
+            out.append(r)
+    return out
+
+
+def _raw_boxes(gray, min_frac=None):
     """Lista de (x, y, w, h) en pixeles. min_frac = tamaño mínimo de la cara como fracción del ancho."""
     import numpy as np
+    min_frac = FACE_MIN if min_frac is None else min_frac
     h, w = gray.shape
-    kind, a, b = _load()
-    if kind == "sk":
-        raw = a.detect_multi_scale(gray, scale_factor=1.2, step_ratio=1, min_size=(max(12, int(w * min_frac * 0.9)),) * 2,
-                                   max_size=(int(w * 0.4),) * 2)
+    det = _load()
+    if det[0] == "yn":
+        import cv2
+        detector = det[1]
+        detector.setInputSize((w, h))
+        # YuNet espera BGR; el cuadro se lee en gris para el análisis de boca, lo convertimos aquí no más.
+        bgr = cv2.cvtColor(np.ascontiguousarray(gray), cv2.COLOR_GRAY2BGR)
+        _, faces = detector.detect(bgr)
+        if faces is None:
+            return []
+        return [(float(f[0]), float(f[1]), float(f[2]), float(f[3])) for f in faces if float(f[14]) >= 0.5]
+    if det[0] == "sk":
+        raw = det[1].detect_multi_scale(gray, scale_factor=1.15, step_ratio=1,
+                                        min_size=(max(12, int(w * min_frac * 0.9)),) * 2,
+                                        max_size=(int(w * 0.4),) * 2)
         return [(r["c"], r["r"], r["width"], r["height"]) for r in raw]
     import cv2
+    frontal, profile, frontal2 = det[1], det[2], det[3]
     g = np.ascontiguousarray(gray)
-    g = cv2.createCLAHE(clipLimit=8.0, tileGridSize=(8, 8)).apply(g)
-    g = cv2.GaussianBlur(g, (3, 3), 0)
-    g = cv2.equalizeHist(g)
+    # CLAHE suave: antes se usaba 8.0 y levantaba demasiado ruido en poca luz (falsas caras).
+    g = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8)).apply(g)
     g = cv2.medianBlur(g, 3)
+    g = cv2.GaussianBlur(g, (3, 3), 0)
     ms = (max(8, int(w * min_frac * 0.7)),) * 2
 
-    def run(neigh):
-        out = [tuple(r) for r in a.detectMultiScale(g, 1.1, neigh, minSize=ms)]
-        out += [tuple(r) for r in b.detectMultiScale(g, 1.1, neigh, minSize=ms)]
-        out += [(w - x - bw, y, bw, bh) for x, y, bw, bh in b.detectMultiScale(cv2.flip(g, 1), 1.1, neigh, minSize=ms)]
-        return out
+    def run(cascade, pic, neigh, flip_x=False):
+        boxes = [tuple(r) for r in cascade.detectMultiScale(pic, 1.12, neigh, minSize=ms)]
+        if flip_x:
+            boxes = [(w - x - bw, y, bw, bh) for x, y, bw, bh in boxes]
+        return boxes
 
-    out = run(4)
+    # Un solo detector frontal por cuadro: los otros tres se prueban SOLO si no vimos a nadie.
+    # (Correr los 4 siempre costaba ~10x más y el directo se quedaba sin cámara a tiempo.)
+    out = _dedupe(run(frontal, g, 4))
     if not out:
-        out = run(3)   # si no vio nada, un segundo intento menos exigente (poca luz)
+        out = _dedupe(run(frontal2, g, 3))
     if not out:
-        out = run(2)   # tercer intento aún más permisivo (caras muy pequeñas o poca luz extrema)
+        flip = cv2.flip(g, 1)
+        out = _dedupe(run(profile, g, 3) + run(profile, flip, 3, True))
     if not out:
-        out = run(1)   # cuarto intento ultra permisivo (caras diminutas o poca luz extrema)
+        out = _dedupe(run(frontal, g, 2))
     return out
 
 
@@ -103,39 +173,54 @@ def _read_frames(source, start, dur, src_w, src_h, det_w=DET_W, fps=SAMPLE_FPS):
         p.wait()
 
 
-def _detect(gray, min_frac=0.05):
+def _detect(gray, min_frac=None):
+    min_frac = FACE_MIN if min_frac is None else min_frac
     h, w = gray.shape
     faces = []
     for (x, y, bw, bh) in _raw_boxes(gray, min_frac):
-        if y + bh / 2 > h * 0.75:   # caras muy abajo suelen ser falsos positivos (más estricto)
+        # Antes se descartaba todo lo que estuviera por debajo del 75% de altura: en los directos la gente está
+        # sentada y se quedaba fuera del cuadro. Ahora se tolera hasta abajo del todo, pero se exige forma de cara.
+        if y + bh * 0.5 > h * 0.92:
             continue
-        if bw < w * 0.02:          # caras demasiado pequeñas (ruido)
+        ratio = bw / max(bh, 1)
+        if not (0.55 <= ratio <= 1.6):
             continue
-        if bw > w * 0.5:           # caras demasiado grandes (falsos positivos)
+        if bw < max(10, w * min_frac * 0.55):
             continue
-        if bh < h * 0.02:          # caras demasiado bajas (ruido)
+        if bw > w * 0.5 or bh < h * 0.018:
             continue
         faces.append({"x": (x + bw / 2) / w, "w": bw / w, "y": (y + bh / 2) / h, "box": (y, x, bw, bh)})
-    # quita cajas repetidas (misma cara detectada dos veces)
+    # quita cajas repetidas (misma cara detectada por dos detectores distintos)
     out = []
     for f in sorted(faces, key=lambda f: -f["w"]):
-        if all(abs(f["x"] - o["x"]) > max(f["w"], o["w"]) * 0.6 or abs(f["y"] - o["y"]) > max(f["w"], o["w"]) * 1.2 for o in out):
+        if all(abs(f["x"] - o["x"]) > max(f["w"], o["w"]) * 0.5 or abs(f["y"] - o["y"]) > max(f["w"], o["w"]) * 1.1 for o in out):
             out.append(f)
     return out
 
 
 def _mouth_motion(prev, cur, box):
+    """Movimiento de la BOCA, no de toda la cara: si se mueve la cabeza, se resta la frente de referencia."""
     import numpy as np
 
     r, c, bw, bh = box
-    y0, y1 = int(r + bh * 0.5), int(r + bh)
-    x0, x1 = int(c), int(c + bw)
+    h, w = cur.shape
+    x0, x1 = max(0, int(c + bw * 0.18)), min(w, int(c + bw * 0.82))
+    y0, y1 = max(0, int(r + bh * 0.55)), min(h, int(r + bh * 0.92))
+    f0, f1 = max(0, int(r + bh * 0.05)), min(h, int(r + bh * 0.35))
+    if y1 <= y0 or x1 <= x0:
+        return 0.0
     a = prev[y0:y1, x0:x1].astype(np.int16)
     b = cur[y0:y1, x0:x1].astype(np.int16)
-    return float(np.abs(a - b).mean()) if a.size else 0.0
+    motion = float(np.abs(a - b).mean()) if a.size else 0.0
+    if f1 > f0:
+        aa = prev[f0:f1, x0:x1].astype(np.int16)
+        bb = cur[f0:f1, x0:x1].astype(np.int16)
+        if aa.size:
+            motion = max(0.0, motion - 0.45 * float(np.abs(aa - bb).mean()))
+    return motion
 
 
-def sample_faces(source, start, dur, src_w, src_h, min_frac=0.05):
+def sample_faces(source, start, dur, src_w, src_h, min_frac=None):
     samples, prev = [], None
     for i, gray in enumerate(_read_frames(source, start, dur, src_w, src_h)):
         faces = _detect(gray, min_frac)
@@ -168,16 +253,18 @@ def _targets(samples, crop_frac):
         if len(faces) == 1 or hi - lo <= crop_frac * 0.92:
             out.append((lo + hi) / 2)
             continue
-        # varias caras lejos entre sí: gana la zona con más movimiento de boca en +-1 s
+        # varias caras lejos entre sí: gana quien mueve más la boca, dando más peso a los cuadros cercanos
         bins = {}
-        for w in samples[max(0, i - WIN): i + WIN + 1]:
-            for f in w["faces"]:
-                b = bins.setdefault(round(f["x"] / 0.1), {"m": 0.0, "xs": [], "size": 0.0})
-                b["m"] += f["m"]
-                b["xs"].append(f["x"])
-                b["size"] += f["w"]
+        for j in range(max(0, i - WIN), min(len(samples), i + WIN + 1)):
+            wt = 1.0 / (1.0 + 0.5 * abs(j - i))
+            for f in samples[j]["faces"]:
+                b = bins.setdefault(round(f["x"] / 0.06), {"m": 0.0, "sx": 0.0, "wt": 0.0, "size": 0.0})
+                b["m"] += f["m"] * wt
+                b["sx"] += f["x"] * wt
+                b["wt"] += wt
+                b["size"] += f["w"] * wt
         best = max(bins.values(), key=lambda b: (b["m"], b["size"]))
-        out.append(sum(best["xs"]) / len(best["xs"]))
+        out.append(best["sx"] / best["wt"] if best["wt"] else out[-1])
     return out
 
 
@@ -198,10 +285,14 @@ def plan(samples, crop_frac):
         else:
             last = t
 
-    # mediana de 3 muestras: un cuadro suelto con ruido no mueve la cámara
+    # mediana de 3 muestras + suavizado ligero: un cuadro suelto no mueve la cámara, pero tampoco va a saltos
     tg = [statistics.median(tg[max(0, i - 1): i + 2]) for i in range(len(tg))]
+    sm = list(tg)
+    for i in range(1, len(sm)):
+        sm[i] = 0.65 * sm[i] + 0.35 * sm[i - 1]
+    tg = sm
 
-    dead = 0.10 * crop_frac   # zona muerta más pequeña para más precisión
+    dead = 0.07 * crop_frac   # zona muerta pequeña: sigue de cerca sin vibrar
     edge = URGENT_EDGE * crop_frac
     cur = statistics.median(tg[: max(3, int(SAMPLE_FPS * 2))])
     keys = [(0.0, _left(cur, crop_frac))]
@@ -213,13 +304,15 @@ def plan(samples, crop_frac):
         go = pending >= MIN_DWELL or urgent >= URGENT_DWELL
         if go and now - since_move >= MIN_GAP:
             n = max(pending, urgent)
-            new = statistics.median(tg[i - n + 1: i + 1])
-            t0 = max(samples[i - n + 1]["t"], keys[-1][0] + 0.1)   # el paneo empieza cuando empezó el cambio
+            new = statistics.median(tg[max(0, i - n + 1): i + 1])
+            t0 = max(samples[max(0, i - n + 1)]["t"], keys[-1][0] + 0.05)
             keys.append((t0, keys[-1][1]))
             keys.append((t0 + RAMP, _left(new, crop_frac)))
             cur, pending, urgent, since_move = new, 0, 0, now
     if len(keys) == 1:   # nadie cambió: se queda quieto en la posición típica de todo el clip
         return [(0.0, _left(statistics.median(tg), crop_frac))]
+    # sostené el último encuadre hasta el final para que no se corte a mitad de paneo
+    keys.append((max(samples[-1]["t"] + 0.3, keys[-1][0] + 0.05), keys[-1][1]))
     return keys
 
 
@@ -232,7 +325,7 @@ def camera_keys(source, start, dur, src_w, src_h, crop_frac):
         keys = plan(samples, crop_frac)
         if keys is None:
             # Segunda pasada: caras más chicas (entrevista lejos, gorra, poca luz).
-            samples = sample_faces(source, start, dur, src_w, src_h, min_frac=0.03)
+            samples = sample_faces(source, start, dur, src_w, src_h, min_frac=max(0.02, FACE_MIN * 0.75))
             keys = plan(samples, crop_frac)
             if keys:
                 print("  Encuadre: la cara era pequeña, igual la seguí", flush=True)
@@ -249,9 +342,12 @@ def x_expression(keys):
     def f(v):
         return f"{v:.4f}"
 
-    expr = f(keys[-1][1])
+    def clamp(v):
+        return f(min(1.0, max(0.0, v)))
+
+    expr = clamp(keys[-1][1])
     for (t0, a), (t1, b) in reversed(list(zip(keys, keys[1:]))):
-        seg = f(a) if abs(a - b) < 1e-6 else f"{f(a)}+({f(b - a)})*(t-{t0:.3f})/{max(t1 - t0, 0.05):.3f}"
+        seg = clamp(a) if abs(a - b) < 1e-6 else f"{clamp(a)}+({clamp(b - a)})*(t-{t0:.3f})/{max(t1 - t0, 0.05):.3f}"
         expr = f"if(lt(t,{t1:.3f}),{seg},{expr})"
     return f"(iw-ow)*({expr})"
 

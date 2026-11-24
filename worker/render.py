@@ -233,13 +233,29 @@ def _ass_for(words, start, end, workdir: Path, stem: str, layout: str, brand: di
     return ass
 
 
+def _polish() -> str:
+    """Nitidez final: CAS (pensado para recortes ampliados) + un toque de unsharp. Devuelve '' si está apagado."""
+    parts = []
+    cas = getattr(config, "CLIP_CAS", 0.0)
+    if cas > 0:
+        parts.append(f"cas=strength={cas:.2f}")
+    if config.CLIP_SHARPEN > 0:
+        parts.append(f"unsharp=5:5:{config.CLIP_SHARPEN:.2f}:5:5:0.0")
+    return ",".join(parts)
+
+
+def _finish(tail: str) -> str:
+    p = _polish()
+    return tail + ("," + p if p else "")
+
+
 def layout_graph(layout: str, source: Path, start: float, dur: float, custom_crop: dict = None, keys=None) -> str:
     if layout == "blur":
         return (
             "[0:v]split=2[bg][fg];"
             "[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=30:5,eq=brightness=-0.12[b];"
             "[fg]scale=1080:-2:flags=lanczos[f];"
-            "[b][f]overlay=(W-w)/2:(H-h)/2,setsar=1"
+            "[b][f]overlay=(W-w)/2:(H-h)/2," + _finish("setsar=1")
         )
     if layout == "duo":
         sw, sh = _probe(source)
@@ -249,7 +265,7 @@ def layout_graph(layout: str, source: Path, start: float, dur: float, custom_cro
             "[0:v]split=2[a][b];"
             f"[a]{a},scale=1080:{DUO_H}:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:{DUO_H},setsar=1[t];"
             f"[b]{b},scale=1080:{DUO_H}:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:{DUO_H},setsar=1[g];"
-            "[t][g]vstack=inputs=2"
+            "[t][g]vstack=inputs=2," + _finish("setsar=1")
         )
     if layout in SPLIT_TOPS:
         top_h = SPLIT_TOPS[layout]
@@ -265,13 +281,12 @@ def layout_graph(layout: str, source: Path, start: float, dur: float, custom_cro
             "[0:v]split=2[a][b];"
             f"[a]{cam},scale=1080:{top_h}:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:{top_h},setsar=1[t];"
             f"[b]{game},setsar=1[g];"
-            "[t][g]vstack=inputs=2"
+            "[t][g]vstack=inputs=2," + _finish("setsar=1")
         )
-    sharpen = f"unsharp=5:5:{config.CLIP_SHARPEN:.2f}:5:5:0.0," if config.CLIP_SHARPEN > 0 else ""
     return (
         "[0:v]" + _crop_filter(source, start, dur, custom_crop, keys)
         + ",scale=1080:1920:flags=lanczos+accurate_rnd+full_chroma_int,"
-        + sharpen + "setsar=1"
+        + _finish("setsar=1")
     )
 
 

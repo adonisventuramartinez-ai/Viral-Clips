@@ -56,10 +56,14 @@ def _resolve(url, quality):
     """Pide a yt-dlp el stream del directo. Devuelve (entradas, mapas_ffmpeg, título). Lanza NotLive si ya terminó."""
     import yt_dlp
 
+    # Grabar en 720p y recortar a 9:16 dejaba la cámara borrosa: piso de 1080p (es -c copy, no cuesta CPU).
+    floor = int(getattr(config, "LIVE_MIN_HEIGHT", 1080) or 1080)
     digits = "".join(ch for ch in str(quality) if ch.isdigit())   # "2160p" -> 2160 (4K)
-    height = int(digits) if digits else 720
+    best = str(quality).strip().lower() in ("best", "max", "source", "original")
+    height = max(floor, int(digits) if digits else floor)
+    fmt = "bv*+ba/b/b" if best else f"bv*[height<={height}]+ba/b[height<={height}]/bv*+ba/b/b"
     opts = {"quiet": True, "noplaylist": True,
-            "format": f"bv*[height<={height}]+ba/b[height<={height}]/bv*+ba/b/b",
+            "format": fmt,
             "remote_components": ["ejs:github"]}
     if config.COOKIES_FILE:
         opts["cookiefile"] = config.COOKIES_FILE
@@ -76,6 +80,9 @@ def _resolve(url, quality):
     fmts = [f for f in (info.get("requested_formats") or [info]) if f.get("url")]
     if not fmts:
         raise RuntimeError("No pude obtener el stream del directo")
+    got_h = next((f.get("height") for f in fmts if _has(f, "v")), None)
+    if got_h:
+        print(f"  stream: directo capturado a {got_h}p", flush=True)
     inputs = [(f["url"], f.get("http_headers") or info.get("http_headers") or {}) for f in fmts]
 
     if len(fmts) >= 2:
