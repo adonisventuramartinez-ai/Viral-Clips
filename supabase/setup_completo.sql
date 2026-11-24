@@ -22,6 +22,20 @@ alter table public.sources drop constraint if exists sources_status_check;
 alter table public.sources add constraint sources_status_check
   check (status in ('queued','downloading','recording','transcribing','analyzing','clipping','done','error','stopped'));
 
+-- ===== 0003 en vivo (progreso y estado del worker) =====
+-- La web lee sources.progress en /en-vivo y /api/preview, y /api/health revisa stop_requested.
+alter table public.sources add column if not exists stop_requested boolean not null default false;
+alter table public.sources add column if not exists progress jsonb not null default '{}'::jsonb;
+
+create table if not exists public.worker_status (
+  id      int primary key default 1,
+  seen_at timestamptz not null default now(),
+  info    jsonb not null default '{}'::jsonb,
+  constraint worker_status_single check (id = 1)
+);
+alter table public.worker_status enable row level security;
+insert into public.worker_status (id) values (1) on conflict do nothing;
+
 create table if not exists public.clips (
   id           uuid primary key default gen_random_uuid(),
   source_id    uuid not null references public.sources(id) on delete cascade,
