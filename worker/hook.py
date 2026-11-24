@@ -10,6 +10,7 @@ elige dónde entra el clip y qué texto lo anuncia. Si no está seguro, no toca 
 import re
 import unicodedata
 
+import config
 import viral
 
 # Muletillas y saludos: nunca deberían ser lo primero que se oye.
@@ -88,9 +89,12 @@ def _cut_point(ws, i):
     return max(w - 0.12, (ws[i - 1]["end"] + w) / 2)
 
 
-def refine_start(words, start, end, max_shift=8.0, min_len=12.0, min_gain=10):
+def refine_start(words, start, end, max_shift=None, min_len=12.0, min_gain=None):
     """Devuelve (inicio, nota). Si hay una frase más fuerte en los primeros `max_shift` s (y el clip sigue durando
-    al menos `min_len`), el clip entra ahí. Si no, quita solo muletillas sueltas del arranque. `nota` es None si no cambió nada."""
+    al menos `min_len`), el clip entra ahí. Si no, quita solo muletillas sueltas del arranque. `nota` es None si no cambió nada.
+    Los topes vienen de .env (HOOK_MAX_SHIFT / HOOK_MIN_GAIN), antes estaban fijos en el código."""
+    max_shift = config.HOOK_MAX_SHIFT if max_shift is None else max_shift
+    min_gain = config.HOOK_MIN_GAIN if min_gain is None else min_gain
     ws = _in_clip(words or [], start, end)
     if len(ws) < 8:
         return start, None
@@ -108,9 +112,12 @@ def refine_start(words, start, end, max_shift=8.0, min_len=12.0, min_gain=10):
     if best_i and best - base >= min_gain:
         ns = _cut_point(ws, best_i)
         return ns, f"arranque movido +{ns - start:.1f}s ({base}→{best} pts)"
-    # no hay una frase mejor: al menos quitar muletillas sueltas al principio ("bueno, eh, ...")
+    # no hay una frase mejor: al menos quitar muletillas sueltas al principio ("bueno, eh, ...").
+    # Ojo: "¿Sabes lo que pasó?" NO es muletilla, es un gancho; no lo recortamos.
+    opening = " ".join(str(x["w"]) for x in ws[:14])
     k = 0
-    while k < 2 and k + 5 < len(ws) and norm(ws[k]["w"]) in FILLER_OPEN and ws[k + 1]["start"] - ws[k]["end"] < GAP_SENTENCE \
+    while k < 2 and k + 5 < len(ws) and "?" not in opening and norm(ws[k]["w"]) in FILLER_OPEN \
+            and ws[k + 1]["start"] - ws[k]["end"] < GAP_SENTENCE \
             and not SENT_END.search(str(ws[k]["w"]).strip()):
         k += 1
     if k and end - ws[k]["start"] >= min_len:
@@ -120,7 +127,7 @@ def refine_start(words, start, end, max_shift=8.0, min_len=12.0, min_gain=10):
 
 
 # ----------------------------------------------------------------------------- texto del gancho
-def clean_hook(h, max_words=9, max_chars=52):
+def clean_hook(h, max_words=8, max_chars=46):
     """Limpia el gancho: sin comillas ni emojis, corto (cabe en 2 líneas arriba del clip) y sin terminar en 'de la…'."""
     h = "".join(ch for ch in str(h or "") if ord(ch) < 0x2190)
     h = re.sub(r"[\"“”«»]", "", h)
@@ -164,6 +171,48 @@ def _sentence_text(ws, a, b):
     return " ".join(str(x["w"]) for x in ws[a:b]).strip().capitalize()
 
 
+def first_sentence(words, start, horizon=12.0, max_chars=100):
+    """Primera frase completa del clip (para el texto de contexto cuando la IA no dio uno bueno)."""
+    ws = _in_clip(words or [], start, start + horizon)
+    if not ws:
+        return ""
+    starts = sentence_starts(ws) + [len(ws)]
+    for a, b in zip(starts, starts[1:]):
+        txt = _sentence_text(ws, a, b)
+        if len(txt.split()) >= 5 and not viral.risks_in(txt):
+            return clean_hook(txt, max_words=20, max_chars=max_chars)
+    return ""
+
+
+def sharpen(h):
+    """Convierte un gancho plano en una duda abierta. No inventa hechos: solo le da forma de pregunta.
+    Si el gancho ya tiene fuerza (pregunta, exclamación o palabra de impacto) lo deja como está."""
+    h = clean_hook(h)
+    if not h or is_generic(h) or viral.risks_in(h) or "?" in h or "!" in h:
+        return h
+    low = norm(h)
+    if any(p in low for p in viral.POWER) or viral.hook_score(h) >= 66 or len(h.split()) > 9:
+        return h
+    core = h.rstrip(" .;:,")
+    q = "¿" + (core[:1].upper() + core[1:]) + "?"
+    return clean_hook(q) or h
+
+
+def opening_context(ex, words=None, start=0.0, max_chars=95):
+    """Texto que se lee debajo del gancho al arrancar. Nunca 'Momento clave de…' ni frases vacías."""
+    ctx = clean_hook((ex or {}).get("context") or "", max_words=20, max_chars=max_chars)
+    low = norm(ctx)
+    if ctx and len(low.split()) >= 4 and low not in ("momento clave", "antes de esto") \
+            and not low.startswith("momento clave de ") and not is_generic(ctx):
+        return ctx
+    s = first_sentence(words or [], start, max_chars=max_chars)
+    if not s:
+        return ""
+    s = s.rstrip(" .;:,.")
+    low = norm(s)
+    return s if low.startswith(("antes de esto", "antes de que", "cuando", "mientras")) else f"Antes de esto, {s.lower()}"
+
+
 def derive_hook(words, start, end, horizon=16.0):
     """Saca un gancho del propio clip: la frase con más gancho de los primeros `horizon` s. '' si no hay nada decente."""
     ws = _in_clip(words or [], start, min(end, start + horizon))
@@ -181,13 +230,16 @@ def derive_hook(words, start, end, horizon=16.0):
     return clean_hook(best)
 
 
-def best_hook(ai_hook, title, words, start, end):
-    """El gancho que se pone arriba del clip: el de la IA si dice algo; si es genérico, uno sacado del clip; si no, el título."""
+def best_hook(ai_hook, title, words, start, end, context=""):
+    """Gancho que se pone ARRIBA desde el primer cuadro: el de la IA si dice algo concreto (le damos forma de duda
+    si estaba plano); si es genérico, uno sacado del propio clip; si no, el título. `context` se acepta para que
+    transformar pueda pasar el contexto sin alterar el gancho."""
     h = clean_hook(ai_hook)
     if h and not is_generic(h) and not viral.risks_in(h):
-        return h
+        return sharpen(h) or h
     d = derive_hook(words, start, end)
+    d = sharpen(d)
     if d and not is_generic(d):
         return d
-    t = clean_hook(title)
+    t = clean_hook(title)   # el título se deja intacto: es el último recurso, no un gancho de IA
     return t or "MIRA ESTO"

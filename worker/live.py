@@ -16,6 +16,7 @@ import uuid
 import brand
 import config
 import db
+import hook as hooks
 import detect
 import energy
 import voices
@@ -307,9 +308,13 @@ def process_live(job):
                      for w in all_words if w["end"] >= base and w["start"] <= wend]
 
         out = work / f"{cid}.mp4"
+        try:   # que el texto de arriba enganche también en los clips del directo
+            live_hook = hooks.best_hook(m.get("hook"), m["title"], rel_words, mstart - base, end - base)
+        except Exception:  # noqa: BLE001
+            live_hook = m.get("hook") or m["title"]
         render_clip(win, rel_words, mstart - base, end - base, out, work,
                     custom_crop=src.get("custom_crop"), layout=src.get("layout"), brand=st.get("brand"),
-                    hook=m.get("hook") or m["title"], profile=prof, opts=opts)
+                    hook=live_hook, profile=prof, opts=opts)
         path = f"{sid}/{cid}.mp4"
         db.upload_clip(path, out)
         m["abs_start"], m["abs_end"] = mstart, end

@@ -42,7 +42,7 @@ WrapStyle: 0
 [V4+ Styles]
 Format: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding
 Style: Cap,Montserrat,{st['size']},&H00{_hex(st['text'])},&H00{_hex(st['text'])},&H00{_hex(st['outline'], '000000')},&H96000000,-1,0,0,0,100,100,0,0,1,{st['outline_w']},6,2,120,120,{margin},1
-Style: Hook,DejaVu Sans,{config.CLIP_HOOK_SIZE},&H00000000,&H00000000,&H00FFFFFF,&H00FFFFFF,-1,0,0,0,100,100,0,0,3,18,0,8,90,90,290,1
+Style: Hook,DejaVu Sans,{config.CLIP_HOOK_SIZE},&H0000E0FF,&H0000E0FF,&H00000000,&HC8000000,-1,0,0,0,100,100,0,0,3,10,0,8,80,80,270,1
 
 [Events]
 Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text

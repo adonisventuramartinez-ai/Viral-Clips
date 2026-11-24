@@ -231,6 +231,12 @@ def process_transform(job):
         ocfg["meter"] = True
         ocfg["poll"] = True
         ex = original.extras(text, ocfg)
+        # Apertura en frío: el gancho sale arriba en el cuadro 0 (sin tarjeta previa) y la voz se oye sobre el video.
+        vdur = _probe_duration(norm)
+        ex["context"] = hooks.opening_context(ex, words, 0.0)
+        opener = hooks.best_hook(ex.get("hook") or payload.get("hook"),
+                                 payload.get("title") or src.get("title") or "", words, 0.0, vdur,
+                                 ex.get("context") or "")
 
         cid = str(uuid.uuid4())
         out = work / f"{cid}.mp4"
@@ -239,7 +245,8 @@ def process_transform(job):
         except (TypeError, ValueError):
             score = config.TRANSFORM_DEFAULT_SCORE
         try:
-            original.wrap_clip(norm, ex, out, work, ocfg, score=score)
+            original.wrap_clip(norm, ex, out, work, ocfg, score=score,
+                               hook=opener if ocfg["intro"] == "cold" else None)
         except Exception as e:  # noqa: BLE001  (si falla la envoltura, se sube el video normalizado)
             print(f"  Modo Original: no pude envolver ({type(e).__name__}: {str(e)[:140]}); subo el video normalizado.", flush=True)
             shutil.copy(norm, out)
@@ -351,15 +358,16 @@ def process(job):
             cid = str(uuid.uuid4())
             out = work / f"{cid}.mp4"
 
-            if config.SMART_START and ocfg.get("smart_start", True):
-                try:   # que el clip entre en la primera frase fuerte y que el texto de arriba diga algo concreto (la gente decide en 2 s)
-                    new_start, note = hooks.refine_start(words, m["start"], m["end"])
+            try:   # el gancho de arriba SIEMPRE se afila; mover el inicio depende de SMART_START
+                if config.SMART_START and ocfg.get("smart_start", True):
+                    new_start, note = hooks.refine_start(words, m["start"], m["end"],
+                                                         max_shift=config.HOOK_MAX_SHIFT, min_gain=config.HOOK_MIN_GAIN)
                     if note:
                         print(f"  Gancho: {note}", flush=True)
                         m["start"] = new_start
-                    m["hook"] = hooks.best_hook(m.get("hook"), m["title"], words, m["start"], m["end"])
-                except Exception as e:  # noqa: BLE001  (es un extra: si falla, el clip sale como lo eligió la IA)
-                    print(f"  Gancho: no pude mejorarlo ({type(e).__name__}: {str(e)[:100]})", flush=True)
+                m["hook"] = hooks.best_hook(m.get("hook"), m["title"], words, m["start"], m["end"])
+            except Exception as e:  # noqa: BLE001  (es un extra: si falla, el clip sale como lo eligió la IA)
+                print(f"  Gancho: no pude mejorarlo ({type(e).__name__}: {str(e)[:100]})", flush=True)
             render_clip(video, words, m["start"], m["end"], out, work, custom_crop=custom_crop, layout=clip_layout, brand=logo,
                         hook=m.get("hook") or m["title"], profile=prof, opts=opts)
 

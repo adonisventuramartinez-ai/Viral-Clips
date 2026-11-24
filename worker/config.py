@@ -282,10 +282,11 @@ try:
 except ValueError:
     TRANSFORM_DEFAULT_SCORE = 78
 TRANSFORM_ALWAYS_ORIGINAL = (os.environ.get("TRANSFORM_ALWAYS_ORIGINAL") or "1").strip().lower() not in ("0", "false", "no", "off")
-# En transformar conviene una tarjeta narrada ANTES del video: así la voz propia se oye desde el primer segundo.
-TRANSFORM_INTRO = (os.environ.get("TRANSFORM_INTRO") or "card").strip().lower()
+# Transformar arranca en frío: video + gancho en el cuadro 0, voz propia mezclada SOBRE el video.
+# La tarjeta anterior ("card") regalaba 2 s en los que la gente se iba; queda solo como opción manual.
+TRANSFORM_INTRO = (os.environ.get("TRANSFORM_INTRO") or "cold").strip().lower()
 if TRANSFORM_INTRO not in ("cold", "card"):
-    TRANSFORM_INTRO = "card"
+    TRANSFORM_INTRO = "cold"
 # --- Crear con IA (texto -> video, 60 s vertical) ---
 HF_TOKEN = (os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_TOKEN") or os.environ.get("HF_API_KEY") or "").strip()
 HF_MODEL = os.environ.get("HF_MODEL") or "damo-vilab/text-to-video-ms-1.7b"

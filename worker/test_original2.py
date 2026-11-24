@@ -25,9 +25,9 @@ check("load() devuelve intro válido", original.load(tmp)["intro"] in ("cold", "
 # ---- dramómetro animado
 original._meter_ass(88, tmp / "m.ass", intro="Antes de esto, algo pasó", show_meter=True)
 a = (tmp / "m.ass").read_text(encoding="utf-8")
-check("el dramómetro muestra el nivel", "DRAMÓMETRO 88% · EXPLOSIVO" in a)
+check("el dramómetro muestra el nivel", "DRAMÓMETRO 88% · NIVEL MÁXIMO EXPLOSIVO" in a)
 check("la barra se llena con animación (\\clip)", "\\t(0,1100,\\clip(" in a)
-check("la barra termina en el % correcto", f"\\clip({250},{200},{250 + 580 * 88 // 100},{246})" in a)
+check("la barra termina en el % correcto", f"\\clip({220},{190},{220 + 640 * 88 // 100},{250})" in a)
 check("el contexto sale después del gancho (0.9 s)", "0:00:00.90" in a and ",Intro," in a)
 check("niveles del dramómetro", original._meter_level(40) == "CALENTITO" and original._meter_level(60) == "TENSO" and original._meter_level(90) == "EXPLOSIVO")
 original._meter_ass(50, tmp / "m2.ass", intro=None, show_meter=False)

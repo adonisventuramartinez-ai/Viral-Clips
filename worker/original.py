@@ -19,10 +19,11 @@ DEFAULTS = {
 PROMPT = """Eres el editor de una página de clips de "{show}" para Facebook. Español dominicano natural, sin groserías, sin insultos. Piensa como un editor que quiere que la gente NO pueda dejar de ver el clip. Usa jerga dominicana cuando encaje (klk, vaina, tíguere, chercha, jevi, pariguayo, colmadito, manin). Sé creativo, original y atrevido. Los titulos deben generar curiosidad extrema. El contexto debe ser intrigante y no revelar el final. La encuesta debe dividir opiniones. El caption debe invitar a comentar. El dramómetro debe ser emocionante. Los bandos deben ser claros y opuestos. Sé creativo y original.
 Del fragmento saca texto ORIGINAL (no copies frases largas textuales). Devuelve:
 - context: 1 frase (máx 90 caracteres) que ponga en situación a quien no vio el programa SIN contar el final ("Antes de esto, ..."), legible en voz alta. Debe generar curiosidad, no revelar el desenlace. Usa palabras de drama/emoción cuando el clip las tiene.
+- hook: 4 a 8 palabras (máx. 48 caracteres) para poner ARRIBA del video desde el PRIMER CUADRO: una pregunta o duda concreta sobre lo que está por pasar. Nada de "MIRA ESTO" ni "INCREÍBLE": tiene que nombrar algo real del fragmento y dejar la respuesta en suspenso.
 - outro: 1 pregunta corta (máx 60 caracteres) que divida opiniones y dé ganas de comentar. Evita frases vacías ("¿Qué te parece?"). Que sea polémica pero sin insultos.
 - poll: {{"q":"pregunta de 'quién tiene la razón' (máx 50 car.)","a":"bando A (máx 22 car.)","b":"bando B (máx 22 car.)"}}. Los dos bandos deben ser claros, opuestos y defendibles (nombres de personas o posturas), sin insultos.
 - caption: descripción del post, 2 frases con punto de vista propio, sin spoilear el final, que cierre invitando a comentar.
-Responde SOLO JSON: {{"context":"...","outro":"...","poll":{{"q":"...","a":"...","b":"..."}},"caption":"..."}}
+Responde SOLO JSON: {{"context":"...","hook":"...","outro":"...","poll":{{"q":"...","a":"...","b":"..."}},"caption":"..."}}
 
 Fragmento:
 {text}"""
@@ -52,12 +53,12 @@ def _parse(txt):
     return d if isinstance(d, dict) and d.get("context") else None
 
 def extras(text, cfg):
-    base = {"context": f"Momento clave de {cfg['show']}", "outro": "¿Tú qué piensas? Comenta.",
+    base = {"context": f"Momento clave de {cfg['show']}", "hook": "", "outro": "¿Tú qué piensas? Comenta.",
             "poll": None, "caption": ""}
     try:
         import llm
         d = llm.ask(PROMPT.format(show=cfg["show"], text=text[:2500]), check=_parse)
-        for k in ("context", "outro", "caption"):
+        for k in ("context", "hook", "outro", "caption"):
             if str(d.get(k, "")).strip():
                 base[k] = str(d[k]).strip()
         p = d.get("poll")
@@ -66,6 +67,12 @@ def extras(text, cfg):
     except Exception as e:
         print(f"  Original: la IA no respondió ({type(e).__name__}); uso frases genéricas.", flush=True)
     base["context"], base["outro"] = base["context"][:100], base["outro"][:70]
+    try:   # el gancho de la IA se valida: si es vago, main.py lo cambia por uno del clip
+        import hook as hooks
+        h = hooks.clean_hook(base.get("hook") or "")
+        base["hook"] = h if h and not hooks.is_generic(h) and not hooks.viral.risks_in(h) else ""
+    except Exception:  # noqa: BLE001
+        base["hook"] = ""
     return base
 
 def tts(text, out, voice):
@@ -149,12 +156,15 @@ Style: Letter,Montserrat,150,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,
 Style: Opt,Montserrat,64,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,6,0,4,0,0,0,1
 Style: Cta,Montserrat,70,&H0000E0FF,&H0000E0FF,&H00000000,&H00000000,-1,0,0,0,100,100,2,0,1,6,2,8,60,60,1290,1
 Style: Page,Montserrat,48,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,-1,0,0,0,100,100,2,0,1,5,0,8,60,60,1420,1
+Style: Open,DejaVu Sans,72,&H0000E0FF,&H0000E0FF,&H00000000,&HC8000000,-1,0,0,0,100,100,0,0,3,10,0,8,70,70,250,1
 
 [Events]
 Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
 """
 
 POP = "{\\fad(180,160)\\fscx75\\fscy75\\t(0,260,\\fscx100\\fscy100)\\blur0.6\\bord1}"
+# Gancho de apertura: entra YA en el primer cuadro, amarillo sobre caja oscura, con golpe de escala.
+OPEN_POP = "{\\fad(20,220)\\fscx62\\fscy62\\t(0,150,\\fscx100\\fscy100)\\bord3}"
 
 
 def grab_frame(clip, at, out):
@@ -252,8 +262,9 @@ def _meter_level(pct):
     return "CALENTITO" if pct < 50 else ("TENSO" if pct < 75 else "EXPLOSIVO")
 
 
-def _meter_ass(pct, path, intro=None, show_meter=True):
-    """Dramómetro (la barra se llena en ~1 s) y, en apertura directa (INTRO_MODE=cold), el texto de contexto debajo del gancho."""
+def _meter_ass(pct, path, intro=None, show_meter=True, hook=None, hook_sec=3.6):
+    """Dramómetro y, en apertura directa, el gancho ARRIBA desde el cuadro 0 y el contexto debajo.
+    `hook` se usa en Transformar (donde no hay un render previo que ya quemó el gancho)."""
     pct = int(min(99, max(35, pct)))
     x0, x1, y0, y1 = 220, 860, 190, 250          # 640 x 60 px, más ancha y alta, más visible en móvil
     xf = x0 + (x1 - x0) * pct // 100
@@ -261,6 +272,9 @@ def _meter_ass(pct, path, intro=None, show_meter=True):
     t = "0:00:00.30"
     e = "0:00:05.00"
     ev = ""
+    if hook:   # apertura en frío: lo primero que se ve es el gancho, sin tarjeta ni espera
+        he = f"0:00:{min(5.0, max(1.0, float(hook_sec))):05.2f}"
+        ev += f"Dialogue: 4,0:00:00.00,{he},Open,,0,0,0,,{OPEN_POP}{_esc(str(hook).upper())}\n"
     if show_meter:
         grow = f"\\clip({x0},{y0},{x0},{y1})\\t(0,1100,\\clip({x0},{y0},{xf},{y1}))"
         fill = (f"{{\\an7\\pos(0,0)\\p1\\c&H{_meter_color(pct)}&\\bord0\\shad0{grow}}}"
@@ -278,15 +292,29 @@ def size_cap(total_sec):
     return int(min(10_000_000, max(1_000_000, config.CLIP_MAX_MB * 1_000_000 * 8 / max(total_sec, 1.0) - 192_000)))
 
 
-def concat(parts, out, workdir, vf_extra=None):
+def concat(parts, out, workdir, vf_extra=None, audio_extra=None):
+    """Une las partes. `audio_extra` = {índice_de_parte: archivo_de_voz}: mezcla la voz sobre esa parte SIN tarjeta previa."""
     vf_extra = vf_extra or {}
+    audio_extra = audio_extra or {}
     ins, fl = [], []
-    for i, p in enumerate(parts):
-        ins += ["-i", str(Path(p).resolve())]
-        extra = (vf_extra[i] + ",") if i in vf_extra else ""
-        fl.append(f"[{i}:v]fps={FPS},scale={W}:{H}:force_original_aspect_ratio=increase:flags=lanczos,crop={W}:{H},setsar=1,{extra}format=yuv420p[v{i}];"
-                  f"[{i}:a]aresample=48000,aformat=channel_layouts=stereo[a{i}]")
     n = len(parts)
+    for p in parts:
+        ins += ["-i", str(Path(p).resolve())]
+    voice_in = {}
+    for i in sorted(audio_extra):
+        v = audio_extra[i]
+        if v and Path(v).exists():
+            voice_in[i] = len(ins) // 2
+            ins += ["-i", str(Path(v).resolve())]
+    for i, p in enumerate(parts):
+        extra = (vf_extra[i] + ",") if i in vf_extra else ""
+        if i in voice_in:
+            audio = (f"[{i}:a][{voice_in[i]}:a]amix=inputs=2:duration=first:normalize=0,volume=0.85,"
+                     f"aresample=48000,aformat=channel_layouts=stereo[a{i}]")
+        else:
+            audio = f"[{i}:a]aresample=48000,aformat=channel_layouts=stereo[a{i}]"
+        fl.append(f"[{i}:v]fps={FPS},scale={W}:{H}:force_original_aspect_ratio=increase:flags=lanczos,crop={W}:{H},setsar=1,{extra}format=yuv420p[v{i}];"
+                  + audio)
     graph = ";".join(fl) + ";" + "".join(f"[v{i}][a{i}]" for i in range(n)) + f"concat=n={n}:v=1:a=1[v][a]"
     # Tope de tamaño: el resultado final NUNCA pasa de CLIP_MAX_MB (Supabase rechaza archivos de 50 MB o más).
     cap = size_cap(sum(_dur(p) for p in parts) or 60.0)
@@ -299,20 +327,25 @@ def concat(parts, out, workdir, vf_extra=None):
     return Path(out)
 
 
-def wrap_clip(clip, ex, out, workdir, cfg, score=75):
-    """Envuelve el clip. intro="cold" (por defecto): el clip arranca en el primer cuadro con el gancho encima y, un instante después,
-    el contexto debajo; no hay nada antes del video (la gente decide en 2 s). intro="card": tarjeta narrada antes del clip.
+def wrap_clip(clip, ex, out, workdir, cfg, score=75, hook=None):
+    """Envuelve el clip. intro="cold" (por defecto): el clip arranca EN EL PRIMER CUADRO con el gancho arriba y el
+    contexto debajo; la voz se mezcla SOBRE el video (sin tarjeta que frene). `hook` se quema aquí solo en Transformar,
+    porque en el flujo normal render.py ya lo quemó antes de llegar. intro="card": tarjeta narrada antes (legado).
     Al final: encuesta A/B con paneles de color (o la pregunta de cierre), narrada."""
     workdir, stem = Path(workdir), Path(out).stem
     cold = (cfg.get("intro") or config.INTRO_MODE) == "cold"
     voice = (lambda txt, tag: tts(txt, workdir / f"{stem}_{tag}.mp3", cfg["voice"])) if cfg["narrate"] else (lambda *a: None)
     temp = []
     try:
-        parts, extra = [], {}
+        parts, extra, audio_extra = [], {}, {}
         bg_out = grab_frame(clip, "last", workdir / f"{stem}_bg_out.png")
         temp.append(bg_out)
         if cold:
             parts.append(clip)
+            v1 = voice(ex["context"], "v1") if ex.get("context") else None
+            if v1:                       # voz propia desde el primer segundo, SIN pantalla de espera
+                audio_extra[0] = v1
+                temp.append(v1)
         else:
             v1 = voice(ex["context"], "v1")
             bg_in = grab_frame(clip, "first", workdir / f"{stem}_bg_in.png")
@@ -329,12 +362,13 @@ def wrap_clip(clip, ex, out, workdir, cfg, score=75):
             b = make_card(ex["outro"], cfg["page"], 2.8, workdir / f"{stem}_out.mp4", workdir, v2, bg=bg_out)
         temp += [b, v2]
         parts.append(b)
-        if cfg["meter"] or cold:
+        if cfg["meter"] or cold or (cold and hook):
             mass = workdir / f"{stem}_meter.ass"
-            _meter_ass(score, mass, intro=ex["context"] if cold else None, show_meter=bool(cfg["meter"]))
+            _meter_ass(score, mass, intro=ex["context"] if cold else None, show_meter=bool(cfg["meter"]),
+                       hook=hook if cold else None)
             extra[0 if cold else 1] = f"subtitles={mass.name}"
             temp.append(mass)
-        concat(parts, out, workdir, extra)
+        concat(parts, out, workdir, extra, audio_extra)
     finally:
         for p in temp:
             if p:
