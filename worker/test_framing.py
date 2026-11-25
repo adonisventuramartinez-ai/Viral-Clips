@@ -35,7 +35,10 @@ assert abs(k[0][1] - (0.2 - CROP / 2) / (1 - CROP)) < 0.07, k
 assert abs(k[-1][1] - (0.8 - CROP / 2) / (1 - CROP)) < 0.07, k
 pan_start = k[1][0]
 assert 8.0 < pan_start < 11.0, k
-assert len(k) == 3, k   # mantiene, empieza paneo, llega
+# con CLIP_RAMP cada paneo guarda 2 claves (inicio y fin de la rampa): mantiene, [rampa]*, llega
+assert len(k) >= 3 and len(k) % 2 == 0, k
+rampas = [(a, b) for a, b in zip(k, k[1:]) if abs(a[1] - b[1]) > 1e-6]
+assert rampas and all(0 < b[0] - a[0] <= framing.RAMP + 0.1 for a, b in rampas), k
 
 # 4) un solo "falso" ruido de un cuadro no mueve la cámara
 def blip(i):
