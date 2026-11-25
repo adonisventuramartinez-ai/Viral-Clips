@@ -65,6 +65,20 @@ def start_watchdog(every=30):
     return t
 
 
+def start_web_heartbeat(db, every=20):
+    """Hilo aparte: la web ve al worker vivo aunque el bucle esté atrapado en un render o una revisión larga."""
+    def loop():
+        while not _stop.is_set():
+            try:
+                db.heartbeat()
+            except Exception:  # noqa: BLE001  (un fallo de red no debe tumbar el hilo)
+                pass
+            _stop.wait(every)
+    t = threading.Thread(target=loop, name="web-heartbeat", daemon=True)
+    t.start()
+    return t
+
+
 def install_signals():
     """docker stop manda SIGTERM. Como PID 1 Python lo ignora si no hay manejador: sin esto Docker espera 10 s y corta a la fuerza."""
     def bye(signum, _frame):

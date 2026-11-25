@@ -505,6 +505,7 @@ def main():
             print(f"Recuperación al arrancar: no pude ({type(e).__name__}: {str(e)[:100]})", flush=True)
     poster.start_thread()   # publica a su hora aunque el worker esté grabando un directo
     studio.start_thread()   # atiende Hacerlo viral (miniaturas, re-análisis) sin esperar a que termine un render
+    lifecycle.start_web_heartbeat(db)   # la web sigue viendo "worker activo" durante renders largos
     last_clean = 0.0
     while True:
         try:

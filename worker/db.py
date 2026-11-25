@@ -1,3 +1,4 @@
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -291,7 +292,7 @@ def remove_file(path):
         pass
 
 
-_hb_warned = False
+_hb_warned = 0.0
 
 
 BASE_INFO = {}   # datos fijos que siempre van en el latido (redes configuradas, cola automática)
@@ -303,9 +304,10 @@ def heartbeat(info=None):
     try:
         sb.table("worker_status").upsert({"id": 1, "seen_at": now(), "info": {**BASE_INFO, **(info or {})}}).execute()
     except Exception as e:  # noqa: BLE001
-        if not _hb_warned:
+        global _hb_warned
+        if time.time() - _hb_warned > 300:   # avisar cada 5 min, no solo la primera vez
             print(f"Aviso: no pude escribir worker_status ({e}). ¿Corriste 0003_live.sql?", flush=True)
-            _hb_warned = True
+            _hb_warned = time.time()
 
 
 def touch_job(job_id):
