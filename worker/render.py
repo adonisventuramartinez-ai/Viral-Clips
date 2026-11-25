@@ -15,6 +15,29 @@ DUO_H = 960
 SUB_MARGIN = {"crop": 600, "blur": 600, "duo": 890}
 
 
+def sync_words_for_clip(words, start, end, sync=None):
+    """Palabras que se OYEN en [start,end), con tiempos ya relativos al clip y acotados.
+
+    Con SMART_START el directo puede arrancar a mitad de frase: incluir la palabra
+    que empezó justo antes del corte evita que el primer segundo salga sin subtítulo.
+    El desfase de Whisper (SUB_SYNC_OFFSET) se aplica aquí una sola vez.
+    """
+    sync = config.SUB_SYNC_OFFSET if sync is None else sync
+    dur = max(0.0, end - start)
+    out = []
+    for w in words or []:
+        if w.get("end", 0) <= start or w.get("start", 0) >= end:
+            continue
+        a = max(0.0, min(dur, w["start"] - start + sync))
+        b = max(0.0, min(dur, w["end"] - start + sync))
+        if b <= a:
+            b = min(dur, a + 0.08)
+        if b <= a:
+            continue
+        out.append({**w, "start": a, "end": b})
+    return out
+
+
 def _hex(c: str, default: str = "FFFFFF") -> str:
     c = str(c or "").lstrip("#")
     if not re.fullmatch(r"[0-9a-fA-F]{6}", c):
@@ -91,7 +114,8 @@ def _lines(ws, max_words):
 def build_ass(words, start, end, group=3, layout="crop", style=None, hook=None, hook_sec=3.5, tmap=None, n_speakers=0):
     tmap = tmap or (lambda t: t)
     st = _subs(style)
-    ws = [w for w in words if w["start"] >= start - 0.05 and w["end"] <= end + 0.3]
+    # Solapar, no recortar por el inicio: con SMART_START la frase puede venir de antes del corte.
+    ws = [w for w in words if w["start"] < end and w["end"] > start]
     lines = [_header(layout, st)]
 
     white = "{\\c&H" + _hex(st["text"]) + "&}"
@@ -111,14 +135,14 @@ def build_ass(words, start, end, group=3, layout="crop", style=None, hook=None, 
         lines.append(f"Dialogue: 1,{_t(0.0)},{_t(max(1.0, min(hook_sec, end - start - 0.2)))},Hook,,0,0,0,,{HOOK_POP}{h}\n")
 
     sync = config.SUB_SYNC_OFFSET
+    limit = max(0.1, tmap(max(0.0, end - start)))
     for g in _lines(ws, group):
-        for j, w in enumerate(g):
-            t0 = tmap(w["start"] - start + sync)
-            t1 = tmap((g[j + 1]["start"] if j + 1 < len(g) else w["end"]) - start + sync)
-            if t1 <= t0:
-                t1 = t0 + 0.1
+        g2 = sync_words_for_clip(g, start, end, sync)
+        for j, w in enumerate(g2):
+            t0 = max(0.0, min(limit, tmap(w["start"])))
+            t1 = max(t0 + 0.1, min(limit, tmap(g2[j + 1]["start"] if j + 1 < len(g2) else w["end"])))
             partes = []
-            for k, x in enumerate(g):
+            for k, x in enumerate(g2):
                 partes.append((f"{active_for(x)}{pop}" if k == j else white) + _esc(x["w"], st["upper"]))
             lines.append(f"Dialogue: 0,{_t(t0)},{_t(t1)},Cap,,0,0,0,,{' '.join(partes)}\n")
     return "".join(lines)

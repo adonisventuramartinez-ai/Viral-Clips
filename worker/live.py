@@ -24,7 +24,7 @@ import profiles
 import snap
 from analyze import review_window, title_for
 from livechat import LiveChat
-from render import render_clip
+from render import render_clip, sync_words_for_clip
 from transcribe import transcribe
 
 NOT_LIVE_RECHECK = 10   # segundos entre las dos comprobaciones de "¿ya terminó el directo?"
@@ -318,9 +318,9 @@ def process_live(job):
         path = f"{sid}/{cid}.mp4"
         db.upload_clip(path, out)
         m["abs_start"], m["abs_end"] = mstart, end
-        sync = config.SUB_SYNC_OFFSET
-        in_clip = [{"w": w["w"], "start": w["start"] - mstart + sync, "end": w["end"] - mstart + sync}
-                   for w in all_words if mstart <= w["start"] <= end]
+        # La misma ventana que se quemó en el video: incluye la palabra que venía
+        # de antes del corte (SMART_START) y deja los tiempos dentro del clip.
+        in_clip = sync_words_for_clip(all_words, mstart, end)
         db.save_clip(sid, src.get("user_id"), m, path, out.stat().st_size, in_clip)
 
         for p in (lst, win_ts, win, out):   # borramos todos los temporales
