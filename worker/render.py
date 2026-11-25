@@ -163,7 +163,7 @@ def _probe(path: Path):
 # --- ARREGLO DEFINITIVO: Bitrate calculado para no pasar de 35 MB en Supabase ---
 def _bitrate(dur: float) -> int:
     """Bitrate de video para que el clip pese como máximo CLIP_MAX_MB (Supabase rechaza 50 MB o más).
-    Clips cortos: tope de calidad de 10 Mbps. Clips largos: baja solo lo necesario, hasta un piso de 1.2 Mbps."""
+    Clips cortos: tope de calidad de 12 Mbps. Clips largos: baja solo lo necesario, hasta un piso de 1.5 Mbps."""
     total = config.CLIP_MAX_MB * 1_000_000 * 8 / max(dur, 1.0)
     return int(min(12_000_000, max(1_500_000, total - 192_000)))
 # --------------------------------------------------------------------------------
