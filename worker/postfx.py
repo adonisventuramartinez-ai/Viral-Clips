@@ -218,7 +218,10 @@ def zoom_chain(zooms, w=1080, h=1920):
     if not zooms:
         return ""
     z = "+".join(f"{amt:.3f}*clip(min((t-{t0:.3f})/0.15,({t1:.3f}-t)/0.3),0,1)" for t0, t1, amt in zooms)
-    return (f"scale=w='trunc({w}*(1+{z})/2)*2':h='trunc({h}*(1+{z})/2)*2':eval=frame:flags=bicubic,"
+    # bilinear en vez de bicubic: el zoom se evalúa en CADA cuadro y bicubic a 1080x1920
+    # era el otro cuello de botella del directo (minutos por clip). La nitidez final ya
+    # la dan CAS + unsharp al terminar el encuadre.
+    return (f"scale=w='trunc({w}*(1+{z})/2)*2':h='trunc({h}*(1+{z})/2)*2':eval=frame:flags=bilinear,"
             f"crop={w}:{h},setsar=1,")
 
 

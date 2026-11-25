@@ -1,12 +1,14 @@
 """Pruebas del encuadre inteligente y del render nítido. Ejecuta: python test_framing.py"""
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 
 import numpy as np
 
 import config
 import framing
+import postfx
 import render
 
 CROP = 0.3158  # 9/16 de un video 16:9
@@ -86,6 +88,27 @@ a, b = frame(0.5), frame(4.5)
 assert np.abs(a - b).mean() > 10, "la cámara no se movió"
 print("OK: render 4K -> 1080x1920 con paneo (", round(out.stat().st_size / 1e6, 1), "MB )")
 framing.camera_keys = orig
+
+# ---------------- modo blur + zoom del directo: tiene que ser RÁPIDO ----------------
+# Antes boxblur=30 a 1080x1920 + zoom bicubic por cuadro tardaba ~20 min por clip de 1 min.
+g_blur = render.layout_graph("blur", src, 0.0, 5.0)
+assert "scale=270:480" in g_blur and "boxblur=8:2" in g_blur, g_blur
+assert "flags=bilinear" in postfx.zoom_chain([(2.0, 3.0, 0.06)])
+
+plan_real = postfx.plan_fx
+postfx.plan_fx = lambda *a, **k: {"zoom": [(2.0, 3.0, 0.06)], "slow": None}
+try:
+    t0 = time.time()
+    blur_out = tmp / "blur.mp4"
+    render.render_clip(src, [{"w": "hola", "start": 0.2, "end": 0.8}], 0.0, 5.0, blur_out, tmp, layout="blur")
+    blur_elapsed = time.time() - t0
+finally:
+    postfx.plan_fx = plan_real
+info = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height",
+                       "-of", "csv=p=0", str(blur_out)], capture_output=True, text=True).stdout.strip()
+assert info == "1080,1920", info
+assert blur_elapsed < 60, f"el modo blur sigue siendo lento: {blur_elapsed:.1f} s"
+print(f"OK: blur+zoom rapidos ({blur_elapsed:.1f} s, {round(blur_out.stat().st_size / 1e6, 1)} MB)")
 
 # tope de tamaño: nunca más de CLIP_MAX_MB (44 por defecto; Supabase rechaza 50 MB), tope de calidad 12 Mbps y piso 1.5 Mbps
 assert render._bitrate(20) == 12_000_000                      # clip corto: tope de calidad

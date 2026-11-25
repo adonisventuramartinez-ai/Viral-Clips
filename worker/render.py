@@ -275,9 +275,13 @@ def _finish(tail: str) -> str:
 
 def layout_graph(layout: str, source: Path, start: float, dur: float, custom_crop: dict = None, keys=None) -> str:
     if layout == "blur":
+        # Difuminar a resolución completa costaba ~20 min por clip de 1 min en la VM de 3 CPU.
+        # Se desdifumina a 1/4 (mismo radio aparente), se procesa ahí y se vuelve a subir: el
+        # resultado se ve igual y el render baja a segundos.
         return (
             "[0:v]split=2[bg][fg];"
-            "[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=30:5,eq=brightness=-0.12[b];"
+            "[bg]scale=270:480:force_original_aspect_ratio=increase:flags=bilinear,crop=270:480,"
+            "boxblur=8:2,eq=brightness=-0.12,scale=1080:1920:flags=bilinear[b];"
             "[fg]scale=1080:-2:flags=lanczos[f];"
             "[b][f]overlay=(W-w)/2:(H-h)/2," + _finish("setsar=1")
         )
