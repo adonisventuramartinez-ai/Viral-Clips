@@ -91,7 +91,7 @@ framing.camera_keys = orig
 
 # ---------------- modo blur + zoom del directo: tiene que ser RÁPIDO ----------------
 # Antes boxblur=30 a 1080x1920 + zoom bicubic por cuadro tardaba ~20 min por clip de 1 min.
-g_blur = render.layout_graph("blur", src, 0.0, 5.0)
+g_blur = render.layout_graph("blur", src, 0.0, 5.0, polish=False)
 assert "scale=270:480" in g_blur and "boxblur=8:2" in g_blur, g_blur
 assert "flags=bilinear" in postfx.zoom_chain([(2.0, 3.0, 0.06)])
 
@@ -107,8 +107,13 @@ finally:
 info = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height",
                        "-of", "csv=p=0", str(blur_out)], capture_output=True, text=True).stdout.strip()
 assert info == "1080,1920", info
+fps = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=avg_frame_rate",
+                      "-of", "csv=p=0", str(blur_out)], capture_output=True, text=True).stdout.strip()
+assert fps.startswith(f"{config.CLIP_OUTPUT_FPS}/"), fps
+assert "cas=strength" not in g_blur, "la nitidez no puede ir antes del zoom"
+assert config.CLIP_OUTPUT_FPS <= 30, config.CLIP_OUTPUT_FPS
 assert blur_elapsed < 60, f"el modo blur sigue siendo lento: {blur_elapsed:.1f} s"
-print(f"OK: blur+zoom rapidos ({blur_elapsed:.1f} s, {round(blur_out.stat().st_size / 1e6, 1)} MB)")
+print(f"OK: blur+zoom rapidos y nitidos ({blur_elapsed:.1f} s, {fps}, {round(blur_out.stat().st_size / 1e6, 1)} MB)")
 
 # tope de tamaño: nunca más de CLIP_MAX_MB (44 por defecto; Supabase rechaza 50 MB), tope de calidad 12 Mbps y piso 1.5 Mbps
 assert render._bitrate(20) == 12_000_000                      # clip corto: tope de calidad

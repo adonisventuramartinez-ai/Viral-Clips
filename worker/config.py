@@ -62,6 +62,12 @@ CLIP_FRAMING = (os.environ.get("CLIP_FRAMING") or "auto").strip().lower()
 # Calidad: CRF más bajo = más nítido y más pesado (17-20 va bien); nitidez 0 = apagada, 0.5 suave, 1.0 fuerte
 CLIP_CRF = int(os.environ.get("CLIP_CRF") or 16)
 CLIP_PRESET = (os.environ.get("CLIP_PRESET") or "medium").strip()   # ultrafast ... veryfast, fast, medium, slow
+# 60 fps a 1080x1920 reparte el presupuesto de bits entre el doble de cuadros y se ve peor.
+# El contenido de directos/realities se ve igual a 30 fps y cada cuadro recibe el doble de bits.
+try:
+    CLIP_OUTPUT_FPS = min(60, max(24, int(float(os.environ.get("CLIP_OUTPUT_FPS") or 30))))
+except ValueError:
+    CLIP_OUTPUT_FPS = 30
 try:
     # El recorte 9:16 de un directo 1080p se estira ~1.8x: CAS recupera detalle sin el halo del unsharp agresivo.
     CLIP_CAS = min(1.0, max(0.0, float(os.environ.get("CLIP_CAS") or 0.65)))

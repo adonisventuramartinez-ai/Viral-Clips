@@ -273,7 +273,10 @@ def _finish(tail: str) -> str:
     return tail + ("," + p if p else "")
 
 
-def layout_graph(layout: str, source: Path, start: float, dur: float, custom_crop: dict = None, keys=None) -> str:
+def layout_graph(layout: str, source: Path, start: float, dur: float, custom_crop: dict = None, keys=None,
+                 polish: bool = True) -> str:
+    # `polish=False` lo usa _render_core: la nitidez se aplica DESPUÉS del zoom para que no se pierda.
+    fin = _finish if polish else (lambda tail: tail)
     if layout == "blur":
         # Difuminar a resolución completa costaba ~20 min por clip de 1 min en la VM de 3 CPU.
         # Se desdifumina a 1/4 (mismo radio aparente), se procesa ahí y se vuelve a subir: el
@@ -281,9 +284,9 @@ def layout_graph(layout: str, source: Path, start: float, dur: float, custom_cro
         return (
             "[0:v]split=2[bg][fg];"
             "[bg]scale=270:480:force_original_aspect_ratio=increase:flags=bilinear,crop=270:480,"
-            "boxblur=8:2,eq=brightness=-0.12,scale=1080:1920:flags=bilinear[b];"
+            "boxblur=8:2,eq=brightness=-0.12,scale=1080:1920:flags=bicubic[b];"
             "[fg]scale=1080:-2:flags=lanczos[f];"
-            "[b][f]overlay=(W-w)/2:(H-h)/2," + _finish("setsar=1")
+            "[b][f]overlay=(W-w)/2:(H-h)/2," + fin("setsar=1")
         )
     if layout == "duo":
         sw, sh = _probe(source)
@@ -293,7 +296,7 @@ def layout_graph(layout: str, source: Path, start: float, dur: float, custom_cro
             "[0:v]split=2[a][b];"
             f"[a]{a},scale=1080:{DUO_H}:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:{DUO_H},setsar=1[t];"
             f"[b]{b},scale=1080:{DUO_H}:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:{DUO_H},setsar=1[g];"
-            "[t][g]vstack=inputs=2," + _finish("setsar=1")
+            "[t][g]vstack=inputs=2," + fin("setsar=1")
         )
     if layout in SPLIT_TOPS:
         top_h = SPLIT_TOPS[layout]
@@ -309,12 +312,12 @@ def layout_graph(layout: str, source: Path, start: float, dur: float, custom_cro
             "[0:v]split=2[a][b];"
             f"[a]{cam},scale=1080:{top_h}:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:{top_h},setsar=1[t];"
             f"[b]{game},setsar=1[g];"
-            "[t][g]vstack=inputs=2," + _finish("setsar=1")
+            "[t][g]vstack=inputs=2," + fin("setsar=1")
         )
     return (
         "[0:v]" + _crop_filter(source, start, dur, custom_crop, keys)
         + ",scale=1080:1920:flags=lanczos+accurate_rnd+full_chroma_int,"
-        + _finish("setsar=1")
+        + fin("setsar=1")
     )
 
 
@@ -455,7 +458,7 @@ def _render_core(source: Path, words, start: float, end: float, out: Path, workd
             n_spk = 0
     ass = _ass_for(words, start, end, workdir, out.stem, layout, brand, hook, tmap=postfx.make_tmap(slow), n_speakers=n_spk)
 
-    graph = layout_graph(layout, source, start, dur, custom_crop, keys) + "[vL]"
+    graph = layout_graph(layout, source, start, dur, custom_crop, keys, polish=False) + "[vL]"
     cur = "vL"
     if zooms:
         graph += f";[{cur}]{postfx.zoom_chain(zooms)[:-1]}[vZ]"
@@ -463,6 +466,11 @@ def _render_core(source: Path, words, start: float, end: float, out: Path, workd
     if slow:
         graph += ";" + postfx.slow_video(cur, "vS", slow)
         cur = "vS"
+    # CAS + unsharp al FINAL: si se aplican antes del zoom, el reescalado se come el filo.
+    p = _polish()
+    if p:
+        graph += f";[{cur}]{p}[vP]"
+        cur = "vP"
     graph += f";[{cur}]subtitles={ass.name}[vA]"
     cur = "vA"
     if brand and brand.get("progress_bar"):
@@ -484,6 +492,6 @@ def _render_core(source: Path, words, start: float, end: float, out: Path, workd
 
     vb = _bitrate(dur_out)
     head = ["ffmpeg", "-y", "-ss", f"{start:.2f}", "-t", f"{dur:.2f}"] + inputs + ["-filter_complex", graph, "-map", "[out]"] + amap
-    tail = ["-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(out.resolve())]
+    tail = ["-r", str(config.CLIP_OUTPUT_FPS), "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(out.resolve())]
     _encode(head, tail, vb, workdir)
     return out
