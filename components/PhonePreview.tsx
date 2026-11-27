@@ -30,7 +30,7 @@ export default function PhonePreview({ layout, embed, cropBox, camBox, brand, lo
       {isSplit(layout) && (<>
         {zone({ top: 0, height: `${topPct}%` }, grad.cam, "Cara", <Region e={embed} box={cam} />)}
         {layout === "casa"
-          ? zone({ top: `${topPct}%`, bottom: 0, filter: "blur(10px) brightness(.7)" }, grad.game, "La Casa (difuminado)", <Region e={embed} box={{ ...DEFAULT_CROP }} still />)
+          ? zone({ top: `${topPct}%`, bottom: 0, filter: "blur(10px) brightness(.7)" }, grad.game, "Contexto difuminado", <Region e={embed} box={{ ...DEFAULT_CROP }} still />)
           : zone({ top: `${topPct}%`, bottom: 0 }, grad.game, fullGame ? "Juego completo" : "Juego", fullGame ? <Media e={embed} /> : <Region e={embed} box={centerBox(aspectGame(layout))} />)}
       </>)}
 

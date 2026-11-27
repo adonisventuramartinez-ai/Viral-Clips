@@ -324,7 +324,7 @@ export default function Ajustes() {
     ["Modelo de Groq", "GROQ_MODEL", "openai/gpt-oss-120b"],
     ["Idioma del video", "LANGUAGE", "es"],
     ["Formato vertical", "CLIP_LAYOUT", "crop, casa (La Casa), split (cara + juego), duo o blur"],
-    ["Formato de La Casa", "CLIP_REALITY_LAYOUT", "casa (cara grande + fondo difuminado); pon crop para desactivarlo"],
+    ["Formato de La Casa", "CLIP_REALITY_LAYOUT", "auto (cara grande, o dúo si hay dos personas), casa o crop"],
     ["Seguir a quien habla", "CLIP_FRAMING", "auto (sigue la cara) o center (fijo)"],
     ["Calidad del video", "CLIP_CRF", "18 (más bajo = más nítido y pesado)"],
     ["Encuadre del recorte", "CLIP_FOCUS_X", "0 = izquierda, 0.5 = centro, 1 = derecha"],

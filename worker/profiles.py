@@ -224,7 +224,7 @@ def layout_for(prof, requested, custom_crop=None):
     """
     layout = (requested or config.CLIP_LAYOUT or "crop").strip().lower()
     if not custom_crop and prof.get("name") == "reality" and layout == "crop":
-        preferido = getattr(config, "CLIP_REALITY_LAYOUT", "casa").strip().lower()
+        preferido = getattr(config, "CLIP_REALITY_LAYOUT", "auto").strip().lower()
         if preferido and preferido != "crop":
-            return preferido
+            return "casa" if preferido == "auto" else preferido
     return layout

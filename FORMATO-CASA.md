@@ -1,31 +1,44 @@
-# 🏠 Formato "La Casa" (el que usaría un editor profesional)
+# 🏠 Formato "La Casa" — investigación y decisión
 
-## ¿Cuál es el mejor y por qué?
+## Lo que hace la competencia (buscado y verificado)
 
-Para **La Casa de Alofoke** el formato correcto es **vertical 9:16 con la cara grande arriba y el mismo momento difuminado abajo** (`casa`), no el fondo difuminado puro ni el recorte vertical lleno.
-
-| Formato | Qué pasa en un reality | Veredicto |
+| Herramienta / fuente | Cómo reencuadra | Qué dice para momentos con varias personas |
 |---|---|---|
-| `crop` (vertical lleno) | La IA sigue una cara, pero en una pelea con 3-4 personas se pierde quien responde y se corta el contexto del cuarto. | Bien para hablar solo, **no para drama**. |
-| `blur` (video chico con fondo borroso) | Se ve la escena completa, pero la cara queda diminuta en el celular. El drama está en la mirada y el tono, no en el cuarto. | Bonito, **pero vende menos**. |
-| `split` / `duo` | Pensados para cámara + gameplay o dos streamers. En la casa rompe la lectura. | No aplica. |
-| **`casa`** | **Cara grande arriba (la IA sigue a quien habla) + el mismo tramo abajo con fondo oscuro y difuminado.** Se entiende quién dice qué, se ve la reacción y se mantiene el contexto. | **El formato de la casa.** |
+| **OpusClip** (docs oficiales) | `Fill` = recorta al que habla y llena 9:16 (es el **default**). También `Fit`, `Split`, `Three`, `Four`, `Screenshare` y `Gameplay` (30% cara / 70% juego). La IA elige el layout que conviene a cada clip y se puede corregir por segmento. | `Split` solo sirve si los dos salen juntos en el cuadro original. Si hay desacuerdo o reacción, un solo crop se queda corto. |
+| **CapCut** | Auto Reframe + relleno de fondo (difuminado, color o imagen). Es la técnica más copiada para pasar 16:9 a 9:16 sin barras negras. | No elige por persona: el editor decide. |
+| **Cut.Pro** (guía 2026) | Cuatro layouts: **primer plano del que habla**, **split**, **cuadro completo con fondo difuminado** y **corte a la reacción**. Frase clave: *“el error más común no es elegir el layout equivocado, es elegir uno y usarlo para todo el clip”*. | Full screen para monólogo; split para ida y vuelta; difuminado **solo 2-3 s** para el grupo; corte al que escucha cuando la reacción es el gancho. |
+| **Vyroclips** (guía de multi-speaker, con sesgo de competidor) | Si el clip depende de **discusión, risa, sorpresa o timing**, usa split/multi-cara; si es una respuesta limpia, funciona el crop al hablante. | Advertencia real: el crop que sigue solo la voz se come la reacción que vende el clip. |
+| **AspectShift** (pruebas propias, también vendor) | 1080x1920 manda; el **relleno difuminado** se vio más intencional/profesional que el center crop o las barras negras, y conserva más cuadro. | Pero no es para todo el clip: caras pequeñas = la gente no se detiene. |
 
-Es el mismo criterio que usan los editores de realities: en 9:16 el primer plano manda; el cuarto se deja como textura, no como protagonista.
+Fuentes: [Opus Clip layout docs](https://help.opus.pro/docs/article/layout-and-reframing), [Cut.Pro vertical framing 2026](https://cut.pro/en/blog/vertical-framing-multi-person-podcast-2026), [Vyroclips multi-speaker guide](https://vyroclips.com/opus-clip-face-tracking-glitch-multi-speaker-interviews), [AspectShift tested aspect ratios](https://aspectshift-htov.com/blog/best-aspect-ratio-for-youtube-shorts-tiktok-and-instagram-reels-tested-and-explained).
 
-## Cómo quedó implementado
+## Veredicto
 
-- **Perfil `reality`** (ya existente): drama, peleas, celos, nominaciones, español dominicano, `preroll` 3 s y `tail` 1.5 s para entrar antes del conflicto y cerrar en la reacción. `max_new` del directo **sigue en 3**.
-- **Layout `casa` nuevo** en `worker/render.py`: panel superior de 1250 px con detección de cara (reutiliza `framing.py`) y panel inferior de 670 px con `boxblur`, brillo bajo y saturación baja. Todo en 1080x1920, 30 fps, CAS + nitidez y subtítulos por palabra.
-- **Automático**: cuando el tipo de contenido es `reality` y no hay recuadro manual, el worker cambia `crop` → `casa`. No afecta a juegos, podcasts ni entrevistas.
-- **Manual**: ya aparece como **"La Casa (reality)"** en `/crear`, **"La Casa de Alofoke..."** en `/en-vivo`, y **"🏠 La Casa"** en `/editor/[id]`. La vista previa del teléfono lo muestra igual.
-- **Escape hatch**: pon `CLIP_REALITY_LAYOUT=crop` en `worker/.env` si quieres volver al vertical puro.
+**No gana un formato fijo. Gana el cambio por momento.** El default más usado es `Fill` (cara llena), pero en un reality el drama está en el cruce de miradas: ahí los profesionales pasan a `split`. El fondo difuminado es contexto, no protagonista.
+
+Por eso el formato de ClipForge quedó así:
+
+1. **Una persona habla / confiesa** → `casa`: cara grande arriba (1500 de 1920 px, ojos en el tercio superior) + franja de 420 px abajo con el mismo momento difuminado y oscurecido. Es `Fill` con contexto, sin caer en "video reciclado de horizontal".
+2. **Dos personas claras en el tramo** → el worker detecta las dos caras y cambia solo a `duo` (una arriba, otra abajo). Es el `Split` que recomiendan Opus y Cut.Pro para peleas y remates.
+3. **Recuadro manual** → manda el usuario, el piloto no lo pisa.
+4. **Juegos, GTA, podcast, entrevistas** → conservan su layout; esto solo aplica al perfil `reality`.
+
+`CLIP_REALITY_LAYOUT` en `worker/.env`:
+
+- `auto` (default): cara grande + dúo automático.
+- `casa`: siempre cara grande con contexto.
+- `crop`: vuelve al vertical puro.
+
+## Ajustes respecto a la versión anterior
+
+- Panel de cara: **1250 → 1500 px** (más cerca de lo que recomiendan para mobile).
+- Franja difuminada: **670 → 420 px** (contexto, no media pantalla).
+- Subtítulos: `MarginV` **700 → 450** para que caigan en la costura entre la cara y el contexto, lejos de la UI de Reels (Meta pide 14% arriba, 35% abajo, 6% lados).
 
 ## Pruebas
 
-- `test_formato_casa.py`: 8/8 (selección por perfil, respeto del recuadro manual, apagado por variable y grafo de ffmpeg con cara + difuminado).
-- `test_autopiloto.py`: 14/14 (no se rompió el piloto).
-- `test_parte13.py`: 14/14.
-- `tsc --noEmit`: OK.
+- `test_formato_casa.py`: **11/11** (default, respeto del recuadro manual, apagado por variable, grafo ffmpeg, dos caras → dúo, podcast → casa).
+- `test_autopiloto.py`: **14/14**.
+- `test_parte13.py`: **14/14**.
 
-**Honestidad:** probé el grafo y la lógica, **no vi el render final con el video real de Alofoke**. Cuando prendas el directo, mira el primer clip: si la cara sale muy arriba o el difuminado muy oscuro, se ajustan dos números (`CASA_H` y `brightness`) sin tocar nada más.
+**Honestidad:** esto es investigación + lógica probada en código, no un test A/B con tus métricas reales de Facebook/Reels. Cuando prendas el vivo, comparamos el primer clip de confesión (debe salir cara grande) contra el primero de pelea (debe salir dúo). Si el dúo se ve muy pequeño, subimos `DUO_H` y listo.

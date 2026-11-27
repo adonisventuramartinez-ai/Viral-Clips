@@ -42,7 +42,7 @@ export function parseEmbed(url: string, startSec = 0): Embed {
 
 /** Lo que el worker calcula igual (render.py): mantén estas medidas en sincronía. */
 // Dividido: alto (px) del panel de arriba (tu cara). Mismos valores que SPLIT_TOPS en worker/render.py
-export const SPLIT_TOPS: Record<string, number> = { split: 1312, split_eq: 1000, split_game: 780, casa: 1250 };
+export const SPLIT_TOPS: Record<string, number> = { split: 1312, split_eq: 1000, split_game: 780, casa: 1500 };
 export const isSplit = (layout: string) => layout in SPLIT_TOPS;
 export const splitTop = (layout: string) => SPLIT_TOPS[layout] ?? SPLIT_TOPS.split;
 export const aspectCam = (layout: string) => 1080 / splitTop(layout); // panel de arriba (cámara)

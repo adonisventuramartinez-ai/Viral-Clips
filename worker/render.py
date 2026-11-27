@@ -12,9 +12,11 @@ DEFAULT_SUBS = {"text": "FFFFFF", "active": "FFE000", "outline": "000000", "size
 SPLIT_TOPS = {"split": 1312, "split_eq": 1000, "split_game": 780}
 DUO_H = 960
 # Formato "La Casa": cara grande arriba, mismo momento abajo con fondo oscuro/difuminado.
-CASA_H = 1250
+# La franja inferior es solo contexto (22%); el protagonista es el primer plano, como en Reels.
+CASA_H = 1500
+CASA_BOTTOM = 1920 - CASA_H
 
-SUB_MARGIN = {"crop": 600, "blur": 600, "duo": 890, "casa": 700}
+SUB_MARGIN = {"crop": 600, "blur": 600, "duo": 890, "casa": 450}
 
 
 def sync_words_for_clip(words, start, end, sync=None):
@@ -248,6 +250,27 @@ def _duo_boxes(source: Path, start: float, dur: float, sw: int, sh: int):
     return ({"x": 0.0, "y": (100 - h) / 2, "w": 50.0, "h": h}, {"x": 50.0, "y": (100 - h) / 2, "w": 50.0, "h": h})
 
 
+def reality_layout(layout: str, source: Path, start: float, dur: float, profile: dict,
+                   sw: int, sh: int, custom_crop: dict = None) -> str:
+    """La Casa: si hay dos caras claras en el tramo, usa dúo; si no, cara grande con contexto.
+
+    Viene de lo que hacen OpusClip/Cut.Pro: 'split' para el back-and-forth, primer plano
+    para el monólogo. El fondo difuminado queda como contexto, no como protagonista.
+    """
+    if layout != "casa" or custom_crop or (profile or {}).get("name") != "reality":
+        return layout
+    if config.CLIP_FRAMING != "auto":
+        return layout
+    try:
+        import framing
+        if framing.duo_boxes(source, start, dur, sw, sh, 1080 / DUO_H):
+            print("  La Casa: dos caras claras -> dúo (pelea/reacción)", flush=True)
+            return "duo"
+    except Exception:
+        pass
+    return layout
+
+
 def _ass_for(words, start, end, workdir: Path, stem: str, layout: str, brand: dict = None, hook: str = None,
              tmap=None, n_speakers: int = 0) -> Path:
     ass = workdir / f"{stem}.ass"
@@ -288,8 +311,8 @@ def layout_graph(layout: str, source: Path, start: float, dur: float, custom_cro
         return (
             "[0:v]split=2[a][b];"
             f"[a]{cam},scale=1080:{CASA_H}:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:{CASA_H},setsar=1[t];"
-            f"[b]{_crop_filter(source, start, dur, custom_crop, keys)},scale=1080:670:force_original_aspect_ratio=increase:flags=lanczos,"
-            "crop=1080:670,boxblur=12:3,eq=brightness=-0.18:saturation=0.85,setsar=1[g];"
+            f"[b]{_crop_filter(source, start, dur, custom_crop, keys)},scale=1080:{CASA_BOTTOM}:force_original_aspect_ratio=increase:flags=lanczos,"
+            f"crop=1080:{CASA_BOTTOM},boxblur=12:3,eq=brightness=-0.18:saturation=0.85,setsar=1[g];"
             "[t][g]vstack=inputs=2," + fin("setsar=1")
         )
     if layout == "blur":
@@ -421,7 +444,8 @@ def _render_core(source: Path, words, start: float, end: float, out: Path, workd
     keys = None
     if layout in ("crop", "casa") and not custom_crop and config.CLIP_FRAMING == "auto":
         sw, sh = _probe(source)
-        if sw / sh > 9 / 16:
+        layout = reality_layout(layout, source, start, dur, profile, sw, sh, custom_crop)
+        if layout == "crop" and sw / sh > 9 / 16:
             import framing
             found = framing.camera_keys(source, start, dur, sw, sh, int(sh * 9 / 16) // 2 * 2 / sw)
             # Lista vacía = ya busqué y no hay cara: el recorte se queda al centro y no vuelve a detectar.
