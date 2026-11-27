@@ -1,0 +1,356 @@
+"use client";
+import { useEffect, useState } from "react";
+import { SUB_PRESETS, logoStyle, toHash, useBrand, type Brand, type Subs } from "@/lib/useBrand";
+
+const POSITIONS: [string, string][] = [["auto", "Automática (zona segura)"], ["bc", "Abajo al centro"], ["bl", "Abajo a la izquierda"], ["br", "Abajo a la derecha"], ["tc", "Arriba al centro"], ["tl", "Arriba a la izquierda"], ["tr", "Arriba a la derecha"]];
+
+function LogoSection() {
+  const { brand, logoUrl, reload } = useBrand();
+  const [form, setForm] = useState<Brand>({ enabled: true, pos: "bc", size: 24, opacity: 100 });
+  const [file, setFile] = useState<File | null>(null);
+  const [local, setLocal] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => { if (brand) setForm(brand); }, [brand]);
+  useEffect(() => {
+    if (!file) return setLocal(null);
+    const u = URL.createObjectURL(file);
+    setLocal(u);
+    return () => URL.revokeObjectURL(u);
+  }, [file]);
+
+  async function save() {
+    setBusy(true); setMsg(null);
+    const f = new FormData();
+    f.set("enabled", String(form.enabled)); f.set("pos", form.pos); f.set("size", String(form.size)); f.set("opacity", String(form.opacity));
+    if (file) f.set("file", file);
+    const r = await fetch("/api/brand", { method: "POST", body: f }).catch(() => null);
+    const j = await r?.json().catch(() => ({}));
+    setMsg(r?.ok ? { ok: true, text: "Guardado. El worker lo usa en los próximos clips." } : { ok: false, text: j?.error ?? "No se pudo guardar" });
+    if (r?.ok) { setFile(null); reload(); }
+    setBusy(false);
+  }
+  async function remove() {
+    if (!confirm("¿Quitar tu logo?")) return;
+    await fetch("/api/brand", { method: "DELETE" });
+    setFile(null); reload(); setMsg({ ok: true, text: "Logo quitado." });
+  }
+
+  const shown = local ?? logoUrl;
+  const set = (p: Partial<Brand>) => setForm((x) => ({ ...x, ...p }));
+  return (
+    <div className="card neon" style={{ maxWidth: 720, marginBottom: 18 }}>
+      <h3 style={{ marginBottom: 6 }}>🏷️ Tu logo / marca</h3>
+      <p className="sub" style={{ marginBottom: 14, fontSize: 13 }}>Se pega en todos los clips (vertical, dividido, dos personas y difuminado). Lo mejor es un PNG con fondo transparente.</p>
+      <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
+        <div style={{ flex: "1 1 280px", minWidth: 0 }}>
+          <label>Imagen del logo (PNG, JPG o WEBP · máx. 3 MB)</label>
+          <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          <label style={{ marginTop: 12 }}>Posición</label>
+          <select value={form.pos} onChange={(e) => set({ pos: e.target.value })}>{POSITIONS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
+          <label style={{ marginTop: 12 }}>Tamaño: {form.size}% del ancho</label>
+          <input type="range" min={5} max={60} value={form.size} onChange={(e) => set({ size: Number(e.target.value) })} />
+          <label style={{ marginTop: 12 }}>Opacidad: {form.opacity}%</label>
+          <input type="range" min={10} max={100} value={form.opacity} onChange={(e) => set({ opacity: Number(e.target.value) })} />
+          <label style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center", textTransform: "none", fontSize: 14, color: "var(--text)" }}>
+            <input type="checkbox" checked={form.enabled} onChange={(e) => set({ enabled: e.target.checked })} style={{ width: "auto" }} /> Poner el logo en los clips
+          </label>
+          <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+            <button className="btn sm" onClick={save} disabled={busy || (!file && !logoUrl)}>{busy ? "Guardando…" : "Guardar"}</button>
+            {logoUrl && <button className="btn sm ghost" onClick={remove}>Quitar logo</button>}
+          </div>
+          {msg && <div className={`banner ${msg.ok ? "ok" : ""}`} style={{ marginTop: 12, marginBottom: 0 }}>{msg.text}</div>}
+        </div>
+        <div style={{ flex: "0 0 150px" }}>
+          <div style={{ position: "relative", width: 150, aspectRatio: "9 / 16", background: "linear-gradient(180deg,#2a2f5a,#12142b)", borderRadius: 14, overflow: "hidden", border: "1px solid var(--line)" }}>
+            {shown && form.enabled && <img src={shown} alt="" style={logoStyle(form)} />}
+          </div>
+          <small style={{ color: "var(--muted)", display: "block", textAlign: "center", marginTop: 6 }}>Así quedará</small>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WatermarkSection() {
+  const { brand, reload } = useBrand();
+  const [wm, setWm] = useState({ text: "", pos: "br", size: 18, opacity: 60, enabled: false });
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (brand?.watermark) setWm({ ...wm, ...brand.watermark, enabled: brand.watermark.enabled !== false });
+  }, [brand]);
+
+  const set = (p: Partial<typeof wm>) => setWm((x) => ({ ...x, ...p }));
+  async function save() {
+    setBusy(true); setMsg(null);
+    const f = new FormData();
+    f.set("watermark", JSON.stringify(wm));
+    const r = await fetch("/api/brand", { method: "POST", body: f }).catch(() => null);
+    const j = await r?.json().catch(() => ({}));
+    setMsg(r?.ok ? { ok: true, text: "Guardado. Se usa en los próximos clips." } : { ok: false, text: j?.error ?? "No se pudo guardar" });
+    if (r?.ok) reload();
+    setBusy(false);
+  }
+  async function remove() {
+    if (!confirm("¿Quitar la marca de agua?")) return;
+    setBusy(true);
+    const f = new FormData();
+    f.set("watermark", JSON.stringify({ text: "", enabled: false }));
+    const r = await fetch("/api/brand", { method: "POST", body: f }).catch(() => null);
+    const j = await r?.json().catch(() => ({}));
+    setMsg(r?.ok ? { ok: true, text: "Marca de agua quitada." } : { ok: false, text: j?.error ?? "No se pudo" });
+    if (r?.ok) { setWm({ text: "", pos: "br", size: 18, opacity: 60, enabled: false }); reload(); }
+    setBusy(false);
+  }
+
+  const POS: [string, string][] = [["tl", "Arriba izquierda"], ["tr", "Arriba derecha"], ["bl", "Abajo izquierda"], ["br", "Abajo derecha"], ["center", "Centro"]];
+
+  return (
+    <div className="card neon" style={{ maxWidth: 720, marginBottom: 18 }}>
+      <h3 style={{ marginBottom: 6 }}>💧 Marca de agua (texto)</h3>
+      <p className="sub" style={{ marginBottom: 14, fontSize: 13 }}>Pone un texto (ej: @tu_usuario) en todos los clips. Ideal para proteger tu contenido.</p>
+      <label style={{ display: "flex", gap: 8, alignItems: "center", textTransform: "none", fontSize: 14, color: "var(--text)", margin: "0 0 12px" }}>
+        <input type="checkbox" checked={wm.enabled} onChange={(e) => set({ enabled: e.target.checked })} style={{ width: "auto" }} /> Poner marca de agua en los clips
+      </label>
+      {wm.enabled && (
+        <>
+          <label>Texto</label>
+          <input value={wm.text} onChange={(e) => set({ text: e.target.value })} maxLength={40} placeholder="@tu_usuario" />
+          <label style={{ marginTop: 12 }}>Posición</label>
+          <select value={wm.pos} onChange={(e) => set({ pos: e.target.value })}>{POS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
+          <label style={{ marginTop: 12 }}>Tamaño: {wm.size}</label>
+          <input type="range" min={12} max={60} value={wm.size} onChange={(e) => set({ size: Number(e.target.value) })} />
+          <label style={{ marginTop: 12 }}>Opacidad: {wm.opacity}%</label>
+          <input type="range" min={10} max={100} value={wm.opacity} onChange={(e) => set({ opacity: Number(e.target.value) })} />
+        </>
+      )}
+      <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+        <button className="btn sm" onClick={save} disabled={busy}>{busy ? "Guardando…" : "Guardar"}</button>
+        <button className="btn sm ghost" onClick={remove} disabled={busy}>Quitar</button>
+      </div>
+      {msg && <div className={`banner ${msg.ok ? "ok" : ""}`} style={{ marginTop: 12, marginBottom: 0 }}>{msg.text}</div>}
+    </div>
+  );
+}
+
+function SubsSection() {
+  const { brand, reload } = useBrand();
+  const [subs, setSubs] = useState<Subs>(SUB_PRESETS.classic.v);
+  const [hook, setHook] = useState(true);
+  const [hookSec, setHookSec] = useState(3.5);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!brand) return;
+    if (brand.subs) setSubs(brand.subs);
+    if (brand.hook !== undefined) setHook(brand.hook);
+    if (brand.hook_sec) setHookSec(brand.hook_sec);
+  }, [brand]);
+
+  const set = (p: Partial<Subs>) => setSubs((x) => ({ ...x, ...p }));
+  async function save() {
+    setBusy(true); setMsg(null);
+    const f = new FormData();
+    f.set("subs", JSON.stringify(subs)); f.set("hook", String(hook)); f.set("hook_sec", String(hookSec));
+    const r = await fetch("/api/brand", { method: "POST", body: f }).catch(() => null);
+    const j = await r?.json().catch(() => ({}));
+    setMsg(r?.ok ? { ok: true, text: "Guardado. Se usa en los próximos clips." } : { ok: false, text: j?.error ?? "No se pudo guardar" });
+    if (r?.ok) reload();
+    setBusy(false);
+  }
+
+  const sample = ["ESTO", "ES", "UN", "CLIP"].map((w, i) => (
+    <span key={w} style={{ color: i === 1 ? toHash(subs.active) : toHash(subs.text), marginRight: 10, display: "inline-block", transform: i === 1 && subs.pop ? "scale(1.18)" : undefined, textShadow: "0 3px 0 #000", WebkitTextStroke: `${Math.max(1, subs.outline_w / 3)}px ${toHash(subs.outline)}`, paintOrder: "stroke fill" }}>{subs.upper ? w : w.toLowerCase()}</span>
+  ));
+  return (
+    <div className="card neon" style={{ maxWidth: 720, marginBottom: 18 }}>
+      <h3 style={{ marginBottom: 6 }}>💬 Subtítulos y texto gancho</h3>
+      <p className="sub" style={{ marginBottom: 14, fontSize: 13 }}>Elige cómo se ven los subtítulos de tus clips. El texto gancho es una frase corta que la IA pone arriba al empezar el clip.</p>
+      <label>Estilo listo</label>
+      <select value="" onChange={(e) => e.target.value && setSubs(SUB_PRESETS[e.target.value].v)}>
+        <option value="">Elegir un estilo…</option>
+        {Object.entries(SUB_PRESETS).map(([k, p]) => <option key={k} value={k}>{p.label}</option>)}
+      </select>
+      <div style={{ background: "#1b1e3a", borderRadius: 12, padding: "22px 12px", textAlign: "center", fontWeight: 800, fontSize: Math.max(18, subs.size / 3), margin: "14px 0" }}>{sample}</div>
+      <div className="row" style={{ gridTemplateColumns: "repeat(3,1fr)" }}>
+        <div><label>Color del texto</label><input type="color" value={toHash(subs.text)} onChange={(e) => set({ text: e.target.value })} style={{ height: 42, padding: 3 }} /></div>
+        <div><label>Palabra activa</label><input type="color" value={toHash(subs.active)} onChange={(e) => set({ active: e.target.value })} style={{ height: 42, padding: 3 }} /></div>
+        <div><label>Borde</label><input type="color" value={toHash(subs.outline)} onChange={(e) => set({ outline: e.target.value })} style={{ height: 42, padding: 3 }} /></div>
+      </div>
+      <label style={{ marginTop: 12 }}>Tamaño: {subs.size}</label>
+      <input type="range" min={50} max={130} value={subs.size} onChange={(e) => set({ size: Number(e.target.value) })} />
+      <label style={{ marginTop: 12 }}>Grosor del borde: {subs.outline_w}</label>
+      <input type="range" min={0} max={14} value={subs.outline_w} onChange={(e) => set({ outline_w: Number(e.target.value) })} />
+      <label style={{ marginTop: 12 }}>Altura: {subs.offset === 0 ? "la de siempre" : subs.offset > 0 ? `${subs.offset} px más arriba` : `${-subs.offset} px más abajo`}</label>
+      <input type="range" min={-300} max={400} step={10} value={subs.offset} onChange={(e) => set({ offset: Number(e.target.value) })} />
+      <div style={{ display: "flex", gap: 22, flexWrap: "wrap", marginTop: 12 }}>
+        <label style={{ display: "flex", gap: 8, alignItems: "center", textTransform: "none", fontSize: 14, color: "var(--text)" }}><input type="checkbox" checked={subs.upper} onChange={(e) => set({ upper: e.target.checked })} style={{ width: "auto" }} /> MAYÚSCULAS</label>
+        <label style={{ display: "flex", gap: 8, alignItems: "center", textTransform: "none", fontSize: 14, color: "var(--text)" }}><input type="checkbox" checked={subs.pop} onChange={(e) => set({ pop: e.target.checked })} style={{ width: "auto" }} /> Efecto “pop” en cada palabra</label>
+      </div>
+      <hr style={{ border: 0, borderTop: "1px solid var(--line)", margin: "16px 0" }} />
+      <label style={{ display: "flex", gap: 8, alignItems: "center", textTransform: "none", fontSize: 14, color: "var(--text)" }}><input type="checkbox" checked={hook} onChange={(e) => setHook(e.target.checked)} style={{ width: "auto" }} /> Poner texto gancho arriba al empezar el clip</label>
+      {hook && <><label style={{ marginTop: 10 }}>Se ve durante {hookSec.toFixed(1)} s</label><input type="range" min={1.5} max={6} step={0.5} value={hookSec} onChange={(e) => setHookSec(Number(e.target.value))} /></>}
+      <div style={{ marginTop: 14 }}><button className="btn sm" onClick={save} disabled={busy}>{busy ? "Guardando…" : "Guardar estilo"}</button></div>
+      {msg && <div className={`banner ${msg.ok ? "ok" : ""}`} style={{ marginTop: 12, marginBottom: 0 }}>{msg.text}</div>}
+    </div>
+  );
+}
+
+
+type Orig = { enabled: boolean; show: string; page: string; credit: string; narrate: boolean; voice: string; meter: boolean; poll: boolean; top: boolean; top_n: number; intro: "cold" | "card"; smart_start: boolean };
+const ORIG_DEFAULT: Orig = { enabled: true, show: "La Casa de Alofoke 3", page: "", credit: "", narrate: true, voice: "es-DO-EmilioNeural", meter: true, poll: true, top: true, top_n: 5, intro: "cold", smart_start: true };
+const VOICE_LABELS: Record<string, string> = {
+  "es-DO-EmilioNeural": "Dominicano (hombre)", "es-DO-RamonaNeural": "Dominicana (mujer)", "es-MX-JorgeNeural": "México (hombre)",
+  "es-MX-DaliaNeural": "México (mujer)", "es-US-AlonsoNeural": "Latino EE. UU. (hombre)", "es-ES-AlvaroNeural": "España (hombre)",
+};
+
+function OriginalSection() {
+  const [o, setO] = useState<Orig>(ORIG_DEFAULT);
+  const [voices, setVoices] = useState<string[]>(Object.keys(VOICE_LABELS));
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    fetch("/api/original").then((r) => r.json()).then((j) => { if (j.settings) setO({ ...ORIG_DEFAULT, ...j.settings }); if (j.voices) setVoices(j.voices); }).catch(() => {});
+  }, []);
+  const set = (p: Partial<Orig>) => setO((x) => ({ ...x, ...p }));
+  async function save() {
+    setBusy(true); setMsg(null);
+    const r = await fetch("/api/original", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(o) }).catch(() => null);
+    const j = await r?.json().catch(() => ({}));
+    setMsg(r?.ok ? { ok: true, text: "Guardado. El worker lo usa en los próximos clips." } : { ok: false, text: j?.error ?? "No se pudo guardar" });
+    setBusy(false);
+  }
+  const chk = (label: string, key: keyof Orig, hint: string) => (
+    <label style={{ display: "flex", gap: 10, alignItems: "flex-start", textTransform: "none", fontSize: 14, color: "var(--text)", margin: "10px 0" }}>
+      <input type="checkbox" checked={Boolean(o[key])} onChange={(e) => set({ [key]: e.target.checked } as Partial<Orig>)} style={{ width: "auto", marginTop: 3 }} />
+      <span><b>{label}</b><br /><span style={{ color: "var(--muted)", fontSize: 13 }}>{hint}</span></span>
+    </label>
+  );
+  return (
+    <div className="card neon" style={{ maxWidth: 720, marginBottom: 18 }}>
+      <h3 style={{ marginBottom: 6 }}>🎬 Modo Original (sin mostrar tu cara ni hablar)</h3>
+      <p className="sub" style={{ marginBottom: 10, fontSize: 13 }}>
+        Cada clip sale con aporte propio hecho por la IA: gancho y contexto encima del video, dramómetro animado, encuesta A/B con voz y descripción. Facebook premia lo original; esto ayuda, pero no garantiza la monetización.
+      </p>
+      {chk("Activar Modo Original", "enabled", "Si lo apagas, los clips salen como antes.")}
+      <label style={{ marginTop: 8 }}>Nombre del programa</label>
+      <input value={o.show} onChange={(e) => set({ show: e.target.value })} maxLength={80} />
+      <label style={{ marginTop: 12 }}>Nombre de tu página (sale en la tarjeta final)</label>
+      <input value={o.page} onChange={(e) => set({ page: e.target.value })} maxLength={60} placeholder="Tu página" />
+      <label style={{ marginTop: 12 }}>Línea de crédito/permiso (va en la descripción)</label>
+      <input value={o.credit} onChange={(e) => set({ credit: e.target.value })} maxLength={200} />
+      <hr style={{ border: 0, borderTop: "1px solid var(--line)", margin: "16px 0" }} />
+      <label>Cómo empieza el clip</label>
+      <select value={o.intro} onChange={(e) => set({ intro: e.target.value as Orig["intro"] })}>
+        <option value="cold">Directo al momento, con el gancho encima (recomendado)</option>
+        <option value="card">Con una tarjeta narrada antes (la gente tiende a irse en esos 2 segundos)</option>
+      </select>
+      {chk("Empezar en lo mejor", "smart_start", "Salta saludos y muletillas del arranque (“bueno, eh…”), entra en la primera frase fuerte y cambia ganchos vacíos como “MIRA ESTO” por uno del propio clip.")}
+      {chk("Voz narradora con IA", "narrate", "Lee la encuesta del final (y el contexto si usas la tarjeta de antes). Necesita internet en el PC del worker. Si falla, el clip sale sin voz.")}
+      {o.narrate && (<><label>Voz</label><select value={o.voice} onChange={(e) => set({ voice: e.target.value })}>{voices.map((v) => <option key={v} value={v}>{VOICE_LABELS[v] ?? v}</option>)}</select></>)}
+      {chk("Dramómetro", "meter", "Una barra que se llena con el nivel de drama del momento, arriba, los primeros segundos.")}
+      {chk("Encuesta A/B al final", "poll", "Pregunta de “¿quién tiene la razón?” para que la gente comente A o B.")}
+      {chk("TOP automático", "top", "Después de cada video arma un TOP con los mejores momentos y cuenta regresiva.")}
+      {o.top && (<><label>Cuántos clips lleva el TOP: {o.top_n}</label><input type="range" min={3} max={10} value={o.top_n} onChange={(e) => set({ top_n: Number(e.target.value) })} /></>)}
+      <div style={{ marginTop: 14 }}><button className="btn sm" onClick={save} disabled={busy}>{busy ? "Guardando…" : "Guardar Modo Original"}</button></div>
+      {msg && <div className={`banner ${msg.ok ? "ok" : ""}`} style={{ marginTop: 12, marginBottom: 0 }}>{msg.text}</div>}
+    </div>
+  );
+}
+
+type Tpl = { id: string; name: string; hasLogo: boolean; pos: string; hook: boolean; color: string };
+
+/** Plantillas de marca: guarda la marca de arriba (logo + subtítulos + gancho) con un nombre y úsala en cualquier video. */
+function TemplatesSection() {
+  const { reload } = useBrand();
+  const [items, setItems] = useState<Tpl[]>([]);
+  const [name, setName] = useState("");
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = () => fetch("/api/brand/templates", { cache: "no-store" }).then((r) => r.json()).then((j) => setItems(j.items ?? [])).catch(() => {});
+  useEffect(() => { load(); }, []);
+
+  async function call(method: string, body: object, ok: string) {
+    setBusy(true); setMsg(null);
+    const r = await fetch("/api/brand/templates", { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => null);
+    const j = await r?.json().catch(() => ({}));
+    setMsg(r?.ok ? { ok: true, text: ok } : { ok: false, text: j?.error ?? "No se pudo" });
+    setBusy(false);
+    if (r?.ok) { load(); reload(); }
+    return !!r?.ok;
+  }
+  async function save() {
+    if (await call("POST", { name }, `Plantilla “${name.trim()}” guardada con la marca actual.`)) setName("");
+  }
+
+  return (
+    <div className="card neon" style={{ maxWidth: 720, marginBottom: 18 }}>
+      <h3 style={{ marginBottom: 6 }}>🎨 Plantillas de marca</h3>
+      <p className="sub" style={{ marginBottom: 14, fontSize: 13 }}>
+        Arma tu logo y tus subtítulos arriba, guárdalos con un nombre (por ejemplo “WorldCast” o “Alofoke”) y elige la plantilla al crear los clips.
+        Guarda primero los cambios de arriba y después la plantilla.
+      </p>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <input value={name} onChange={(e) => setName(e.target.value)} maxLength={40} placeholder="Nombre de la plantilla" style={{ flex: "1 1 220px" }} />
+        <button className="btn sm" onClick={save} disabled={busy || !name.trim()}>Guardar marca actual como plantilla</button>
+      </div>
+      {items.length === 0 && <p className="sub" style={{ marginTop: 12, marginBottom: 0, fontSize: 13 }}>Todavía no tienes plantillas. Sin plantilla se usa la marca general.</p>}
+      {items.map((t) => (
+        <div key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "10px 0", borderTop: "1px solid var(--line)", marginTop: 10 }}>
+          <div style={{ minWidth: 0 }}>
+            <i style={{ display: "inline-block", width: 12, height: 12, borderRadius: 6, background: `#${t.color}`, marginRight: 8 }} />
+            <b>{t.name}</b>
+            <span style={{ color: "var(--muted)", fontSize: 12, marginLeft: 8 }}>{t.hasLogo ? "con logo" : "sin logo"} · gancho {t.hook ? "sí" : "no"}</span>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="btn ghost sm" disabled={busy} onClick={() => confirm(`¿Poner “${t.name}” como tu marca general? Reemplaza el logo y los subtítulos de arriba.`) && call("POST", { apply: t.id }, `“${t.name}” ahora es tu marca general.`)}>Usar como general</button>
+            <button className="btn ghost sm" disabled={busy} onClick={() => confirm(`¿Borrar la plantilla “${t.name}”?`) && call("DELETE", { id: t.id }, "Plantilla borrada.")}>Borrar</button>
+          </div>
+        </div>
+      ))}
+      {msg && <div className={`banner ${msg.ok ? "ok" : ""}`} style={{ marginTop: 12, marginBottom: 0 }}>{msg.text}</div>}
+    </div>
+  );
+}
+
+export default function Ajustes() {
+  const rows: [string, string, string][] = [
+    ["Quién elige los clips", "LLM_PROVIDER", "groq (gratis) o anthropic"],
+    ["Modelo de Groq", "GROQ_MODEL", "openai/gpt-oss-120b"],
+    ["Idioma del video", "LANGUAGE", "es"],
+    ["Formato vertical", "CLIP_LAYOUT", "crop, split (cara arriba + gameplay), duo (dos personas) o blur"],
+    ["Seguir a quien habla", "CLIP_FRAMING", "auto (sigue la cara) o center (fijo)"],
+    ["Calidad del video", "CLIP_CRF", "18 (más bajo = más nítido y pesado)"],
+    ["Encuadre del recorte", "CLIP_FOCUS_X", "0 = izquierda, 0.5 = centro, 1 = derecha"],
+    ["Segundos por trozo (En vivo)", "SEGMENT_SECONDS", "120"],
+    ["Puntaje mínimo En vivo", "LIVE_MIN_SCORE", "55"],
+    ["Transcripción local", "WHISPER_MODEL", "small (solo si no usas Groq)"],
+  ];
+  return (
+    <>
+      <h1>Ajustes de IA</h1>
+      <OriginalSection />
+      <LogoSection />
+      <WatermarkSection />
+      <SubsSection />
+      <TemplatesSection />
+      <p className="sub">Por ahora estos ajustes se cambian en el archivo <code>worker/.env</code> y se aplican al reiniciar el worker.</p>
+      <div className="card neon" style={{ maxWidth: 720 }}>
+        {rows.map(([label, key, hint]) => (
+          <div key={key} style={{ padding: "10px 0", borderBottom: "1px solid var(--line)" }}>
+            <b>{label}</b><br />
+            <code>{key}</code> <span style={{ color: "var(--muted)", fontSize: 13 }}>· {hint}</span>
+          </div>
+        ))}
+        <p className="sub" style={{ marginTop: 14, marginBottom: 0, fontSize: 13 }}>
+          La cantidad de clips, la duración y la calidad se eligen en “Crear clips”.
+        </p>
+      </div>
+    </>
+  );
+}

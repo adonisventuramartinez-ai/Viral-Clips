@@ -1,0 +1,182 @@
+"""Publica lo que ya llegó a su hora (tabla `posts`) y lo programado a mano en Facebook (scheduler).
+Corre en un hilo propio (start_thread) para que un directo largo o un render no frenen las publicaciones.
+
+Seguridad contra publicar dos veces: el post se reserva (queued -> publishing) ANTES de subir; si el worker se cae a mitad queda en
+'error: interrumpido' y NO se repite solo. Un error NO se reintenta solo (podría ya haber salido); lo reintentas tú desde la web.
+"""
+import hashlib
+import hmac
+import json
+import threading
+import time
+import urllib.request
+from datetime import datetime, timezone
+from pathlib import Path
+
+import config
+import packager
+
+NETS = ("facebook", "instagram", "youtube")
+
+
+def fb_page_of(network):
+    """'facebook:123456' -> '123456'. 'facebook' (de siempre) -> None."""
+    n = str(network or "")
+    if n.startswith("facebook:") and n.split(":", 1)[1].isdigit():
+        return n.split(":", 1)[1]
+    return None
+
+
+def caption(clip, network):
+    """(título, texto) de ese clip para esa red."""
+    if network == "youtube":
+        p = ((clip.get("pack") or {}).get("shorts") or {}) if isinstance(clip.get("pack"), dict) else {}
+        title = p.get("title") or clip.get("title") or "Clip"
+        body = packager.caption_for(clip, "shorts")
+        return title, body
+    return clip.get("title") or "", packager.caption_for(clip, "reels")
+
+
+def _cover_url(clip, db):
+    """URL firmada de la miniatura elegida en Hacerlo viral (o None). Nunca falla."""
+    try:
+        p = db.cover_path(clip)
+        return db.signed_url(p) if p else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _cover_bytes(clip, db):
+    try:
+        p = db.cover_path(clip)
+        return db.download_clip(p) if p else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def publish_to_page(page_id, post, clip):
+    """Piloto automático: la web firma el clip y publica en esta página con su token fresco."""
+    if not config.WEB_URL:
+        raise RuntimeError("Falta WEB_URL en worker/.env")
+    title, text = caption(clip, f"facebook:{page_id}")
+    body = json.dumps({
+        "post_id": str(post.get("id") or ""), "page_id": str(page_id),
+        "storage_path": clip["storage_path"], "title": title, "message": text,
+    }).encode("utf-8")
+    secret = config.R2_SECRET_ACCESS_KEY
+    if not secret:
+        raise RuntimeError("Falta R2_SECRET_ACCESS_KEY en worker/.env (firma del piloto)")
+    firma = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+    req = urllib.request.Request(
+        f"{config.WEB_URL}/api/autopiloto/publicar", data=body, method="POST",
+        headers={"Content-Type": "application/json", "X-Autopiloto": firma},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=180) as resp:
+            out = json.loads(resp.read().decode("utf-8") or "{}")
+    except Exception as e:  # noqa: BLE001
+        detail = ""
+        if hasattr(e, "read"):
+            try:
+                detail = (e.read().decode("utf-8") or "")[:200]
+            except Exception:  # noqa: BLE001
+                pass
+        raise RuntimeError(f"la web no pudo publicar en la página {page_id}: {type(e).__name__}: {detail or str(e)[:120]}")
+    if not out.get("ok"):
+        raise RuntimeError(str(out.get("error") or "Facebook no aceptó el reel")[:300])
+    return out.get("id") or ""
+
+
+def publish_post(post, clip, db, workdir=None, fb=None, ig=None, yt=None):
+    """Publica un post. Devuelve el id externo o lanza RuntimeError con el motivo."""
+    net = post["network"]
+    title, text = caption(clip, net)
+    if not clip.get("storage_path"):
+        raise RuntimeError("el clip no tiene archivo")
+    page = fb_page_of(net)
+    if page:
+        return publish_to_page(page, post, clip)
+    if net == "instagram":
+        if ig is None:
+            import publisher_ig as ig
+        cover = _cover_url(clip, db)
+        return ig.publish(db.signed_url(clip["storage_path"]), text, cover_url=cover) if cover else ig.publish(db.signed_url(clip["storage_path"]), text)
+    workdir = Path(workdir or config.WORK_DIR / "posts")
+    workdir.mkdir(parents=True, exist_ok=True)
+    f = workdir / f"post_{post['id']}.mp4"
+    try:
+        f.write_bytes(db.download_clip(clip["storage_path"]))
+        if net == "facebook":
+            if fb is None:
+                import publisher as fb
+            vid = fb.publish_reel(f, text)
+            if not vid:
+                raise RuntimeError("Facebook no aceptó el Reel (mira los logs del worker)")
+            return vid
+        if net == "youtube":
+            if yt is None:
+                import publisher_yt as yt
+            tags = (((clip.get("pack") or {}).get("shorts") or {}).get("hashtags") if isinstance(clip.get("pack"), dict) else None) or clip.get("hashtags")
+            jpg = _cover_bytes(clip, db)
+            return yt.publish(f.read_bytes(), title, text, tags, thumb=jpg) if jpg else yt.publish(f.read_bytes(), title, text, tags)
+        raise RuntimeError(f"red desconocida: {net}")
+    finally:
+        f.unlink(missing_ok=True)
+
+
+def tick(db=None, **pubs):
+    """Publica los posts vencidos. Devuelve cuántos salieron."""
+    if db is None:
+        import db as db
+    done = 0
+    for post in db.due_posts(5):
+        if not db.claim_post(post["id"]):
+            continue    # otro lo tomó
+        clip = db.get_clip(post["clip_id"])
+        try:
+            if not clip:
+                raise RuntimeError("el clip ya no existe")
+            ext = publish_post(post, clip, db, **pubs)
+            db.update_post(post["id"], status="published", external_id=str(ext), error=None,
+                           published_at=datetime.now(timezone.utc).isoformat())
+            done += 1
+            print(f"  Publicado en {post['network']}: «{(clip or {}).get('title')}»", flush=True)
+        except Exception as e:  # noqa: BLE001
+            db.update_post(post["id"], status="error", error=str(e)[:300])
+            print(f"  No pude publicar en {post['network']} ({type(e).__name__}: {str(e)[:140]})", flush=True)
+    return done
+
+
+def _loop():
+    import autoqueue
+    import db
+    import scheduler
+    try:
+        db.recover_posts()
+    except Exception:  # noqa: BLE001
+        pass
+    while True:
+        for name, fn in (("Programación", scheduler.tick), ("Cola", autoqueue.tick), ("Publicación", tick)):
+            try:
+                fn()
+            except Exception as e:  # noqa: BLE001  (publicar es un extra: nunca debe tumbar nada)
+                print(f"{name}: error ({type(e).__name__}: {str(e)[:100]})", flush=True)
+        time.sleep(config.POSTER_SECONDS)
+
+
+def _stats_loop():
+    """Mi página (Parte 10) en su propio hilo: si una red tarda en contestar, las publicaciones no se retrasan."""
+    import insights
+    while True:
+        try:
+            insights.tick()
+        except Exception as e:  # noqa: BLE001  (las estadísticas son un extra: nunca deben tumbar nada)
+            print(f"Mi página: error ({type(e).__name__}: {str(e)[:100]})", flush=True)
+        time.sleep(config.POSTER_SECONDS)
+
+
+def start_thread():
+    threading.Thread(target=_stats_loop, name="insights", daemon=True).start()
+    t = threading.Thread(target=_loop, name="poster", daemon=True)
+    t.start()
+    return t

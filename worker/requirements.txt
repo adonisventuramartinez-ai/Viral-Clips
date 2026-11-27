@@ -1,0 +1,14 @@
+supabase>=2.9
+boto3>=1.34
+anthropic>=0.40
+yt-dlp[default]
+faster-whisper>=1.0
+requests
+python-dotenv
+numpy
+scikit-image
+chat-downloader @ git+https://github.com/Indigo128/chat-downloader.git@9313a9ba37b51438757e55e57c7ab58581726630
+opencv-python-headless
+edge-tts
+gTTS
+Pillow

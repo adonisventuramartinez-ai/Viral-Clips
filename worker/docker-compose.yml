@@ -1,0 +1,25 @@
+# Worker de ClipForge siempre activo.  Encender: INICIAR-SIEMPRE.bat   (o:  docker compose up -d --build)
+version: "3.7"   # compatible también con el docker-compose 1.x de Docker Toolbox
+services:
+  worker:
+    build:
+      context: .
+      args:
+        YTDLP_BUST: "${YTDLP_BUST:-0}"   # INICIAR-SIEMPRE.bat pone la fecha para bajar el yt-dlp más nuevo
+    image: clipforge-worker
+    container_name: clipforge-worker
+    env_file: .env
+    restart: unless-stopped              # se levanta solo si falla, si se reinicia la PC o si Docker arranca
+    stop_grace_period: 30s
+    init: true
+    environment:
+      TZ: "${TZ:-America/Santo_Domingo}"
+    volumes:
+      - ./work:/app/work                 # videos en proceso: sobreviven a un reinicio
+      - ./logs:/app/logs                 # logs/worker.log (se rota solo)
+      - hf_cache:/root/.cache            # modelo de Whisper: no se vuelve a bajar en cada reinicio
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+volumes:
+  hf_cache:

@@ -1,0 +1,513 @@
+"""Corta un tramo, lo pone vertical 9:16 y le quema subtítulos palabra por palabra."""
+import re
+import subprocess
+from pathlib import Path
+
+import config
+
+# ---------------------------------------------------------------- subtítulos (ASS)
+DEFAULT_SUBS = {"text": "FFFFFF", "active": "FFE000", "outline": "000000", "size": config.CLIP_SUB_SIZE, "outline_w": config.CLIP_SUB_OUTLINE,
+                "upper": True, "pop": True, "offset": 0}
+
+SPLIT_TOPS = {"split": 1312, "split_eq": 1000, "split_game": 780}
+DUO_H = 960
+
+SUB_MARGIN = {"crop": 600, "blur": 600, "duo": 890}
+
+
+def sync_words_for_clip(words, start, end, sync=None):
+    """Palabras que se OYEN en [start,end), con tiempos ya relativos al clip y acotados.
+
+    Con SMART_START el directo puede arrancar a mitad de frase: incluir la palabra
+    que empezó justo antes del corte evita que el primer segundo salga sin subtítulo.
+    El desfase de Whisper (SUB_SYNC_OFFSET) se aplica aquí una sola vez.
+    """
+    sync = config.SUB_SYNC_OFFSET if sync is None else sync
+    dur = max(0.0, end - start)
+    out = []
+    for w in words or []:
+        if w.get("end", 0) <= start or w.get("start", 0) >= end:
+            continue
+        a = max(0.0, min(dur, w["start"] - start + sync))
+        b = max(0.0, min(dur, w["end"] - start + sync))
+        if b <= a:
+            b = min(dur, a + 0.08)
+        if b <= a:
+            continue
+        out.append({**w, "start": a, "end": b})
+    return out
+
+
+def _hex(c: str, default: str = "FFFFFF") -> str:
+    c = str(c or "").lstrip("#")
+    if not re.fullmatch(r"[0-9a-fA-F]{6}", c):
+        c = default
+    return (c[4:6] + c[2:4] + c[0:2]).upper()
+
+
+def _subs(style):
+    st = {**DEFAULT_SUBS, **{k: v for k, v in (style or {}).items() if v is not None}}
+    st["size"] = int(min(140, max(40, float(st["size"]))))
+    st["outline_w"] = int(min(14, max(0, float(st["outline_w"]))))
+    st["offset"] = int(min(600, max(-400, float(st["offset"]))))
+    return st
+
+
+def _header(layout: str, st: dict) -> str:
+    base = SUB_MARGIN.get(layout) or (1920 - SPLIT_TOPS[layout] - 30 if layout in SPLIT_TOPS else 520)
+    margin = max(40, base + st["offset"])
+    return f"""[Script Info]
+ScriptType: v4.00+
+PlayResX: 1080
+PlayResY: 1920
+WrapStyle: 0
+
+[V4+ Styles]
+Format: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding
+Style: Cap,Montserrat,{st['size']},&H00{_hex(st['text'])},&H00{_hex(st['text'])},&H00{_hex(st['outline'], '000000')},&H96000000,-1,0,0,0,100,100,0,0,1,{st['outline_w']},6,2,120,120,{margin},1
+Style: Hook,DejaVu Sans,{config.CLIP_HOOK_SIZE},&H0000E0FF,&H0000E0FF,&H00000000,&HC8000000,-1,0,0,0,100,100,0,0,3,10,0,8,80,80,270,1
+
+[Events]
+Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
+"""
+
+
+def _t(sec: float) -> str:
+    sec = max(0.0, sec)
+    h, rem = divmod(sec, 3600)
+    m, s = divmod(rem, 60)
+    return f"{int(h)}:{int(m):02d}:{s:05.2f}"
+
+
+def _esc(text: str, upper: bool) -> str:
+    text = text.upper() if upper else text
+    return text.replace("{", "(").replace("}", ")").replace("\\", "/")
+
+
+HOOK_POP = "{\\fad(30,140)\\fscx65\\fscy65\\t(0,130,\\fscx100\\fscy100)\\t(0,130,\\fry1.2)\\blur1.0\\bord3}"   # el gancho aparece ya en el primer cuadro, con golpe de escala, giro, blur y borde (más fuerte)
+# La palabra que se está diciendo entra grande y SE QUEDA grande hasta que pasa a la siguiente.
+WORD_HOLD = "{\\fscx100\\fscy100\\t(0,40,\\fscx130\\fscy130)\\fad(20,0)\\blur0.5\\bord2}"   # entrada más rápida, fade-in, blur y borde
+LINE_CHARS = 18   # una sola línea: no se parte en dos y no choca con los botones del Reel (más caracteres)
+LINE_GAP = 0.4   # un silencio corta la frase; no se quedan juntas dos palabras que no van juntas (más sensible)
+
+
+def _lines(ws, max_words):
+    """Agrupa en frases cortas (tope de palabras y de letras). Una palabra larga va sola."""
+    lines, cur, n = [], [], 0
+    max_words = max(1, int(max_words))
+    for w in ws:
+        word = str(w.get("w") or "").strip()
+        if not word:
+            continue
+        gap = bool(cur) and w["start"] - cur[-1]["end"] > LINE_GAP
+        wide = bool(cur) and (len(cur) >= max_words or n + 1 + len(word) > LINE_CHARS)
+        if gap or wide:
+            lines.append(cur)
+            cur, n = [], 0
+        cur.append(w)
+        n += len(word) + (1 if n else 0)
+    if cur:
+        lines.append(cur)
+    return lines
+
+
+def build_ass(words, start, end, group=3, layout="crop", style=None, hook=None, hook_sec=3.5, tmap=None, n_speakers=0):
+    tmap = tmap or (lambda t: t)
+    st = _subs(style)
+    # Solapar, no recortar por el inicio: con SMART_START la frase puede venir de antes del corte.
+    ws = [w for w in words if w["start"] < end and w["end"] > start]
+    lines = [_header(layout, st)]
+
+    white = "{\\c&H" + _hex(st["text"]) + "&}"
+    pop = WORD_HOLD if st["pop"] else ""
+    if n_speakers >= 2:
+        import speakers
+        actives = ["{\\c&H" + _hex(c, "00E0FF") + "&}" for c in speakers.colors(n_speakers, st["active"])]
+    else:
+        actives = ["{\\c&H" + _hex(st["active"], "00E0FF") + "&}"]
+
+    def active_for(w):
+        k = w.get("spk")
+        return actives[k] if k is not None and 0 <= k < len(actives) else actives[0]
+
+    if hook and str(hook).strip():
+        h = _esc(str(hook).strip()[:70], True)
+        lines.append(f"Dialogue: 1,{_t(0.0)},{_t(max(1.0, min(hook_sec, end - start - 0.2)))},Hook,,0,0,0,,{HOOK_POP}{h}\n")
+
+    sync = config.SUB_SYNC_OFFSET
+    limit = max(0.1, tmap(max(0.0, end - start)))
+    for g in _lines(ws, group):
+        g2 = sync_words_for_clip(g, start, end, sync)
+        for j, w in enumerate(g2):
+            t0 = max(0.0, min(limit, tmap(w["start"])))
+            t1 = max(t0 + 0.1, min(limit, tmap(g2[j + 1]["start"] if j + 1 < len(g2) else w["end"])))
+            partes = []
+            for k, x in enumerate(g2):
+                partes.append((f"{active_for(x)}{pop}" if k == j else white) + _esc(x["w"], st["upper"]))
+            lines.append(f"Dialogue: 0,{_t(t0)},{_t(t1)},Cap,,0,0,0,,{' '.join(partes)}\n")
+    return "".join(lines)
+
+
+def _probe(path: Path):
+    r = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height",
+         "-of", "csv=p=0:s=x", str(path)], capture_output=True, text=True)
+    try:
+        w, h = r.stdout.strip().split("x")[:2]
+        return int(w), int(h)
+    except (ValueError, IndexError):
+        print(f"  Aviso: no pude leer el tamaño de {path.name}, usando 1920x1080 por defecto.", flush=True)
+        return 1920, 1080
+
+
+# --- ARREGLO DEFINITIVO: Bitrate calculado para no pasar de 35 MB en Supabase ---
+def _bitrate(dur: float) -> int:
+    """Bitrate de video para que el clip pese como máximo CLIP_MAX_MB (Supabase rechaza 50 MB o más).
+    Clips cortos: tope de calidad de 12 Mbps. Clips largos: baja solo lo necesario, hasta un piso de 1.5 Mbps."""
+    total = config.CLIP_MAX_MB * 1_000_000 * 8 / max(dur, 1.0)
+    return int(min(12_000_000, max(1_500_000, total - 192_000)))
+# --------------------------------------------------------------------------------
+
+
+def _even(v: float) -> int:
+    return max(2, int(v) // 2 * 2)
+
+
+def _box_filter(sw: int, sh: int, box: dict) -> str:
+    cw = min(sw, _even(sw * float(box["w"]) / 100))
+    ch = min(sh, _even(sh * float(box["h"]) / 100))
+    x = min(sw - cw, max(0, int(sw * float(box["x"]) / 100) // 2 * 2))
+    y = min(sh - ch, max(0, int(sh * float(box["y"]) / 100) // 2 * 2))
+    return f"crop=w={cw}:h={ch}:x={x}:y={y}"
+
+
+def _fit_filter(sw: int, sh: int, aspect: float, fx: float = 0.5) -> str:
+    if sw / sh > aspect:
+        cw, ch = min(sw, _even(sh * aspect)), sh
+    else:
+        cw, ch = sw, min(sh, _even(sw / aspect))
+    return f"crop=w={cw}:h={ch}:x='(iw-ow)*{min(1.0, max(0.0, fx)):.3f}':y='(ih-oh)/2'"
+
+
+def _crop_filter(source: Path, start: float, dur: float, custom_crop: dict = None, keys=None):
+    sw, sh = _probe(source)
+    if custom_crop:
+        return _box_filter(sw, sh, custom_crop)
+    if sw / sh > 9 / 16:
+        cw, ch = int(sh * 9 / 16) // 2 * 2, sh
+        crop_frac = cw / sw
+        if keys is None and config.CLIP_FRAMING == "auto":
+            import framing
+            keys = framing.camera_keys(source, start, dur, sw, sh, crop_frac)
+            if keys:
+                moves = max(0, len(keys) - 1) // 2
+                print(f"  Encuadre: sigo a la persona ({moves} cambio(s) de cámara)", flush=True)
+        if keys:
+            import framing
+            xexpr = framing.x_expression(keys)
+        else:
+            xexpr = f"(iw-ow)*{min(1.0, max(0.0, config.CLIP_FOCUS_X)):.3f}"   # un poco más a la derecha por defecto
+        return f"crop=w={cw}:h={ch}:x='{xexpr}':y=0"
+    ch, cw = int(sw * 16 / 9) // 2 * 2, sw
+    return f"crop=w={cw}:h={min(ch, sh)}:x=0:y='(ih-oh)/2'"
+
+
+def _cam_box(source: Path, start: float, dur: float, sw: int, sh: int, custom_crop: dict = None, top_h: int = 1312) -> dict:
+    if custom_crop:
+        return custom_crop
+    aspect = 1080 / top_h
+    if config.CLIP_FRAMING == "auto":
+        import framing
+        if config.CLIP_FACECAM:
+            box = framing.facecam_box(source, start, dur, sw, sh, aspect)
+            if box:
+                print("  Dividido: encontré el recuadro de la cámara del streamer", flush=True)
+                return box
+        box = framing.cam_box(source, start, dur, sw, sh, aspect)
+        if box:
+            print("  Dividido: encontré la cámara por la cara", flush=True)
+            return box
+    print("  Dividido: no encontré la cámara, uso la esquina inferior derecha", flush=True)
+    w = 26.0
+    h = min(100.0, w * sw / (sh * aspect))
+    return {"x": 100 - w - 1, "y": 100 - h - 1, "w": w, "h": h}
+
+
+def _duo_boxes(source: Path, start: float, dur: float, sw: int, sh: int):
+    aspect = 1080 / DUO_H
+    if config.CLIP_FRAMING == "auto":
+        import framing
+        two = framing.duo_boxes(source, start, dur, sw, sh, aspect)
+        if two:
+            print("  Dos personas: encontré a las dos (izquierda/arriba va arriba)", flush=True)
+            return two
+    print("  Dos personas: no vi a dos personas claras, uso mitad izquierda y derecha", flush=True)
+    h = min(100.0, 50.0 * sw / (sh * aspect))
+    return ({"x": 0.0, "y": (100 - h) / 2, "w": 50.0, "h": h}, {"x": 50.0, "y": (100 - h) / 2, "w": 50.0, "h": h})
+
+
+def _ass_for(words, start, end, workdir: Path, stem: str, layout: str, brand: dict = None, hook: str = None,
+             tmap=None, n_speakers: int = 0) -> Path:
+    ass = workdir / f"{stem}.ass"
+    b = brand or {}
+    ass.write_text(build_ass(words, start, end, layout=layout, style=b.get("subs"),
+                             hook=hook if b.get("hook", True) else None, hook_sec=float(b.get("hook_sec", 3.5)),
+                             tmap=tmap, n_speakers=n_speakers),
+                   encoding="utf-8")
+    return ass
+
+
+def _polish() -> str:
+    """Nitidez final: CAS (pensado para recortes ampliados) + un toque de unsharp. Devuelve '' si está apagado."""
+    parts = []
+    cas = getattr(config, "CLIP_CAS", 0.0)
+    if cas > 0:
+        parts.append(f"cas=strength={cas:.2f}")
+    if config.CLIP_SHARPEN > 0:
+        parts.append(f"unsharp=5:5:{config.CLIP_SHARPEN:.2f}:5:5:0.0")
+    return ",".join(parts)
+
+
+def _finish(tail: str) -> str:
+    p = _polish()
+    return tail + ("," + p if p else "")
+
+
+def layout_graph(layout: str, source: Path, start: float, dur: float, custom_crop: dict = None, keys=None,
+                 polish: bool = True) -> str:
+    # `polish=False` lo usa _render_core: la nitidez se aplica DESPUÉS del zoom para que no se pierda.
+    fin = _finish if polish else (lambda tail: tail)
+    if layout == "blur":
+        # Difuminar a resolución completa costaba ~20 min por clip de 1 min en la VM de 3 CPU.
+        # Se desdifumina a 1/4 (mismo radio aparente), se procesa ahí y se vuelve a subir: el
+        # resultado se ve igual y el render baja a segundos.
+        return (
+            "[0:v]split=2[bg][fg];"
+            "[bg]scale=270:480:force_original_aspect_ratio=increase:flags=bilinear,crop=270:480,"
+            "boxblur=8:2,eq=brightness=-0.12,scale=1080:1920:flags=bicubic[b];"
+            "[fg]scale=1080:-2:flags=lanczos[f];"
+            "[b][f]overlay=(W-w)/2:(H-h)/2," + fin("setsar=1")
+        )
+    if layout == "duo":
+        sw, sh = _probe(source)
+        top, bot = _duo_boxes(source, start, dur, sw, sh)
+        a, b = _box_filter(sw, sh, top), _box_filter(sw, sh, bot)
+        return (
+            "[0:v]split=2[a][b];"
+            f"[a]{a},scale=1080:{DUO_H}:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:{DUO_H},setsar=1[t];"
+            f"[b]{b},scale=1080:{DUO_H}:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:{DUO_H},setsar=1[g];"
+            "[t][g]vstack=inputs=2," + fin("setsar=1")
+        )
+    if layout in SPLIT_TOPS:
+        top_h = SPLIT_TOPS[layout]
+        bot_h = 1920 - top_h
+        sw, sh = _probe(source)
+        cam = _box_filter(sw, sh, _cam_box(source, start, dur, sw, sh, custom_crop, top_h))
+        if bot_h <= 640:
+            game = f"scale=1080:{bot_h}:force_original_aspect_ratio=decrease:flags=lanczos,pad=1080:{bot_h}:(ow-iw)/2:(oh-ih)/2:black"
+        else:
+            game = (f"{_fit_filter(sw, sh, 1080 / bot_h, config.CLIP_FOCUS_X)},"
+                    f"scale=1080:{bot_h}:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:{bot_h}")
+        return (
+            "[0:v]split=2[a][b];"
+            f"[a]{cam},scale=1080:{top_h}:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:{top_h},setsar=1[t];"
+            f"[b]{game},setsar=1[g];"
+            "[t][g]vstack=inputs=2," + fin("setsar=1")
+        )
+    return (
+        "[0:v]" + _crop_filter(source, start, dur, custom_crop, keys)
+        + ",scale=1080:1920:flags=lanczos+accurate_rnd+full_chroma_int,"
+        + fin("setsar=1")
+    )
+
+
+def build_filter(layout: str, source: Path, start: float, dur: float, ass_name: str, custom_crop: dict = None, keys=None) -> str:
+    return layout_graph(layout, source, start, dur, custom_crop, keys) + f",subtitles={ass_name}"
+
+
+_LOGO_POS = {
+    "bc": "(W-w)/2:H-h-{m}", "bl": "40:H-h-{m}", "br": "W-w-40:H-h-{m}",
+    "tc": "(W-w)/2:{t}", "tl": "40:{t}", "tr": "W-w-40:{t}",
+}
+SAFE_TOP, SAFE_BOTTOM = 170, 240
+
+
+def _logo_graph(graph: str, brand: dict, src: str = "v") -> str:
+    key = brand.get("pos", "bc")
+    key = "tl" if key == "auto" else key
+    m = max(SAFE_BOTTOM, int(brand.get("margin", 110)))
+    pos = _LOGO_POS.get(key, _LOGO_POS["bc"]).format(m=m, t=SAFE_TOP)
+    width = max(40, int(1080 * min(60, max(5, float(brand.get("size", 24)))) / 100)) // 2 * 2
+    alpha = min(1.0, max(0.1, float(brand.get("opacity", 100)) / 100))
+    return (f"{graph};[1:v]scale={width}:-1,format=rgba,colorchannelmixer=aa={alpha:.2f}[logo];"
+            f"[{src}][logo]overlay={pos}:format=auto[out]")
+
+
+def _bar_graph(graph: str, dur: float, src_in: str = "vA", src_out: str = "vB") -> str:
+    d = max(0.5, dur)
+    return (f"{graph};color=c=white:s=1080x16:r=30:d={d:.2f}[bar];"
+            f"[{src_in}][bar]overlay=x='-w+w*t/{d:.2f}':y=H-h-12:shortest=1[{src_out}]")
+
+
+def _flag(opt, default):
+    import postfx
+    v = postfx._mode(opt)
+    return default if v is None else v
+
+
+def _encode(cmd_head, cmd_tail, vb, workdir, preset=None):
+    import encoder
+    preset = preset or config.CLIP_PRESET
+    kind = encoder.pick()
+    r = subprocess.run(cmd_head + encoder.video_args(kind, config.CLIP_CRF, preset, vb) + cmd_tail,
+                       cwd=workdir, capture_output=True, text=True)
+    if r.returncode != 0 and kind != "cpu":
+        print(f"  Codificador {kind} falló; repito con CPU.", flush=True)
+        encoder.mark_bad(kind)
+        r = subprocess.run(cmd_head + encoder.video_args("cpu", config.CLIP_CRF, preset, vb) + cmd_tail,
+                           cwd=workdir, capture_output=True, text=True)
+    if r.returncode != 0:
+        raise RuntimeError("ffmpeg falló: " + r.stderr[-600:])
+    return kind
+
+
+def render_clip(source: Path, words, start: float, end: float, out: Path, workdir: Path,
+                custom_crop: dict = None, layout: str = None, brand: dict = None, hook: str = None,
+                profile: dict = None, opts: dict = None):
+    import postfx
+    tight = None
+    try:
+        if postfx.wants_tighten(profile, opts):
+            import tighten
+            tight = tighten.apply(source, words, start, end, workdir, out.stem)
+    except Exception as e:
+        print(f"  Ritmo: no pude aplicarlo ({type(e).__name__}: {str(e)[:100]})", flush=True)
+    try:
+        if tight:
+            src2, words2, dur2, punch = tight
+            return _render_core(src2, words2, 0.0, dur2, out, workdir, custom_crop, layout, brand, hook, profile, opts, extra_zooms=punch)
+        return _render_core(source, words, start, end, out, workdir, custom_crop, layout, brand, hook, profile, opts)
+    finally:
+        if tight:
+            Path(tight[0]).unlink(missing_ok=True)
+
+
+def _render_core(source: Path, words, start: float, end: float, out: Path, workdir: Path,
+                 custom_crop: dict = None, layout: str = None, brand: dict = None, hook: str = None,
+                 profile: dict = None, opts: dict = None, extra_zooms=None):
+    import postfx
+    dur = end - start
+    opts = opts or {}
+    fast = bool(opts.get("live_fast"))   # directos: prioridad que no se atragante la grabación
+    layout = (layout or config.CLIP_LAYOUT or "crop").strip().lower()
+    if layout not in ("crop", "blur", "duo", *SPLIT_TOPS):
+        layout = "crop"
+
+    keys = None
+    if layout == "crop" and not custom_crop and config.CLIP_FRAMING == "auto":
+        sw, sh = _probe(source)
+        if sw / sh > 9 / 16:
+            import framing
+            found = framing.camera_keys(source, start, dur, sw, sh, int(sh * 9 / 16) // 2 * 2 / sw)
+            # Lista vacía = ya busqué y no hay cara: el recorte se queda al centro y no vuelve a detectar.
+            keys = found or []
+            if not keys:
+                print("  Encuadre: no vi una cara clara, recorto al centro", flush=True)
+
+    has_aud = postfx.has_audio(source)
+    beeps = []
+    try:
+        if _flag(opts.get("bleep"), config.CLIP_BLEEP):
+            beeps = postfx.find_profanity(words, start, end)
+            if beeps:
+                words = postfx.censor_words(words)
+                print(f"  Pitido: {len(beeps)} grosería(s) tapada(s)", flush=True)
+                if not has_aud:
+                    beeps = []
+    except Exception as e:
+        print(f"  Pitido: no pude aplicarlo ({type(e).__name__}: {str(e)[:100]})", flush=True)
+        beeps = []
+    measured, norm = None, False
+    if has_aud and dur >= 3 and _flag(opts.get("loudnorm"), config.CLIP_LOUDNORM):
+        norm = True
+        measured = postfx.measure_loudness(source, start, dur)
+        if measured:
+            print(f"  Volumen: {measured['input_i']:.1f} LUFS -> {config.CLIP_LUFS:g} LUFS", flush=True)
+        else:
+            print(f"  Volumen: no pude medirlo, ajusto en una sola pasada a {config.CLIP_LUFS:g} LUFS", flush=True)
+
+    fx = None
+    try:
+        fx = postfx.plan_fx(source, start, dur, profile, opts)
+    except Exception as e:
+        print(f"  Efectos: no pude calcularlos ({type(e).__name__}: {str(e)[:100]})", flush=True)
+    slow = fx["slow"] if fx else None
+    zooms = (fx["zoom"] if fx else []) + list(extra_zooms or [])
+    if fx:
+        print("  Efectos: " + ", ".join(x for x in (
+            f"zoom en {zooms[0][0]:.1f} s" if zooms else "", f"cámara lenta en {slow[0]:.1f} s" if slow else "") if x), flush=True)
+    dur_out = postfx.out_duration(dur, slow)
+
+    n_spk = 0
+    if _flag(opts.get("speakers"), config.SUBS_PER_SPEAKER not in ("0", "false", "no", "off")):
+        try:
+            import speakers
+            words, n_spk = speakers.label_words(source, words, start, end, workdir)
+            if n_spk >= 2:
+                print(f"  Subtítulos: {n_spk} personas, un color para cada una", flush=True)
+        except Exception as e:
+            print(f"  Subtítulos por persona: no pude ({type(e).__name__}: {str(e)[:100]})", flush=True)
+            n_spk = 0
+    ass = _ass_for(words, start, end, workdir, out.stem, layout, brand, hook, tmap=postfx.make_tmap(slow), n_speakers=n_spk)
+
+    graph = layout_graph(layout, source, start, dur, custom_crop, keys, polish=False) + "[vL]"
+    cur = "vL"
+    if zooms:
+        graph += f";[{cur}]{postfx.zoom_chain(zooms)[:-1]}[vZ]"
+        cur = "vZ"
+    if slow:
+        graph += ";" + postfx.slow_video(cur, "vS", slow)
+        cur = "vS"
+    # CAS + unsharp al FINAL: si se aplican antes del zoom, el reescalado se come el filo.
+    # En directos se saltan: a 1080x1920 con eval=frame son los filtros que más frenan.
+    p = "" if fast else _polish()
+    if p:
+        graph += f";[{cur}]{p}[vP]"
+        cur = "vP"
+    graph += f";[{cur}]subtitles={ass.name}[vA]"
+    cur = "vA"
+    # Marca de agua (texto) si está configurada (web tiene prioridad sobre .env)
+    wm_cfg = (brand or {}).get("watermark") if isinstance(brand, dict) else None
+    if not wm_cfg and config.WATERMARK_TEXT:
+        wm_cfg = {"text": config.WATERMARK_TEXT, "pos": config.WATERMARK_POS, "size": config.WATERMARK_SIZE, "opacity": config.WATERMARK_OPACITY}
+    if wm_cfg and wm_cfg.get("text"):
+        wm = str(wm_cfg["text"]).replace(":", "\\:").replace("'", "\\'")
+        pos_map = {"tl": "x=20:y=20", "tr": "x=w-tw-20:y=20", "bl": "x=20:y=h-th-20", "br": "x=w-tw-20:y=h-th-20", "center": "x=(w-tw)/2:y=(h-th)/2"}
+        pos = pos_map.get(wm_cfg.get("pos", "br"), pos_map["br"])
+        alpha = float(wm_cfg.get("opacity", 0.6))
+        size = int(wm_cfg.get("size", 18))
+        wm_filter = f"drawtext=text='{wm}':fontsize={size}:fontcolor=white@{alpha:.2f}:borderw=2:bordercolor=black@{alpha:.2f}:{pos}:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+        graph += f";[{cur}]{wm_filter}[vW]"
+        cur = "vW"
+    if brand and brand.get("progress_bar"):
+        graph = _bar_graph(graph, dur_out, cur, "vB")
+        cur = "vB"
+    logo = Path(brand["path"]) if brand and brand.get("path") else None
+    use_logo = bool(logo and logo.exists())
+    if use_logo:
+        graph = _logo_graph(graph, brand, cur)
+        inputs = ["-i", str(source.resolve()), "-i", str(logo.resolve())]
+    else:
+        graph = f"{graph};[{cur}]null[out]"
+        inputs = ["-i", str(source.resolve())]
+
+    amap = ["-map", "0:a?"]
+    if has_aud and (beeps or slow or norm):
+        graph += ";" + postfx.audio_graph(dur, beeps, slow, measured, norm)
+        amap = ["-map", "[aout]"]
+
+    vb = _bitrate(dur_out)
+    head = ["ffmpeg", "-y", "-ss", f"{start:.2f}", "-t", f"{dur:.2f}"] + inputs + ["-filter_complex", graph, "-map", "[out]"] + amap
+    tail = ["-r", str(config.CLIP_OUTPUT_FPS), "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(out.resolve())]
+    _encode(head, tail, vb, workdir, preset=config.LIVE_CLIP_PRESET if fast else None)
+    return out

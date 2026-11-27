@@ -1,0 +1,8 @@
+# Esta web se despliega completa desde la raíz. El worker es Python/Docker y no va en Vercel.
+worker/
+
+# Archivos de configuración local / secretos nunca se suben al deploy.
+.env*
+!.env.example
+*cookies*.txt
+worker/.env

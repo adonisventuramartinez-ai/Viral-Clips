@@ -1,0 +1,469 @@
+"use client";
+import { useEffect, useMemo, useState } from "react";
+import CropPreview from "@/components/CropPreview";
+import CommunityFeed from "@/components/CommunityFeed";
+import PhonePreview, { type Layout } from "@/components/PhonePreview";
+import { useBrand } from "@/lib/useBrand";
+import { ASPECT_VERT, DEFAULT_CAM, DEFAULT_CROP, aspectCam, boxH, isSplit, parseEmbed, round2, toSeconds, type Box } from "@/lib/embed";
+
+type Src = "twitch" | "kick" | "archivo" | "transform";
+const LAYOUTS: [Layout, string][] = [["crop", "Vertical"], ["split_eq", "Dividido"], ["duo", "Dos personas"], ["blur", "Fondo difuminado"]];
+const PROPS: [Layout, string][] = [["split", "Cara grande"], ["split_eq", "Equilibrado"], ["split_game", "Juego grande"]];
+const FX_DEFAULT: Record<string, string> = { bleep: "auto", loudnorm: "auto", zoom: "auto", slowmo: "auto", tighten: "auto" };
+const FX_OPTIONS: [string, string, string][] = [
+  ["bleep", "Pitido en groserías", "Tapa la palabra con un pitido y censura el subtítulo (p***)."],
+  ["loudnorm", "Volumen parejo", "Deja todos los clips al mismo volumen (-14 LUFS)."],
+  ["zoom", "Zoom en el momento fuerte", "Acercamiento corto en explosiones, ráfagas de disparos o picos de volumen."],
+  ["slowmo", "Cámara lenta", "Un segundo en cámara lenta sobre una explosión."],
+  ["tighten", "Quitar silencios y muletillas", "Acorta pausas largas y quita los \"eh\" / \"mmm\"; mete un zoom suave en cada corte. Automático: solo en charlas."],
+];
+const TYPES: [string, string][] = [["auto", "General"], ["reality", "Reality (Casa de Alofoke)"], ["podcast", "Podcast"], ["entrevista", "Entrevista"], ["juego", "Juegos"], ["gta", "GTA 5 acción"], ["gta6", "GTA 6 acción"], ["gta_rp", "GTA RP"], ["directo", "Directo (charla)"]];
+const TYPE_HELP: Record<string, string> = {
+  auto: "La IA busca lo más viral sin suponer nada del contenido.",
+  podcast: "Busca polémica, confesiones y anécdotas; el clip arranca en la pregunta si la hubo.",
+  entrevista: "El clip empieza en la pregunta y sigue con la respuesta completa.",
+  juego: "Da más peso a la acción en pantalla y al volumen, y empieza unos segundos antes de la jugada.",
+  directo: "Prioriza reacciones, historias y los momentos donde explota el chat.",
+  reality: "Busca peleas, discusiones, traiciones, chisme y reacciones fuertes; arranca justo antes del conflicto. Clips de ~45 s.",
+  gta: "GTA 5 con acción: tiroteos, persecuciones, explosiones y reacciones. Clips cortos de ~25 s que empiezan antes de la jugada.",
+  gta6: "GTA 6: prioriza la primera reacción, los descubrimientos, tiroteos, persecuciones, explosiones y bugs graciosos. Clips de ~25 s.",
+  gta_rp: "GTA Roleplay: prioriza el diálogo y la actuación (escenas graciosas o tensas con remate). Clips de ~40 s.",
+};
+const PH: Record<Src, string> = { twitch: "https://www.twitch.tv/videos/…", kick: "https://kick.com/…/videos/…", archivo: "https://… (YouTube o enlace directo .mp4)", transform: "https://…/video.mp4 (opcional si ya subiste un archivo)" };
+
+export default function Crear() {
+  const [src, setSrc] = useState<Src>("twitch");
+  const [url, setUrl] = useState("");
+  const [transformFile, setTransformFile] = useState<File | null>(null); // Modo Transformar: video subido
+  const [originalOn, setOriginalOn] = useState(true); // Modo Original (anti-penalización), activo por defecto
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [layout, setLayout] = useState<Layout>("crop");
+  const [cropBox, setCropBox] = useState<Box>(DEFAULT_CROP);
+  const [camBox, setCamBox] = useState<Box>(DEFAULT_CAM);
+  const [manualCrop, setManualCrop] = useState(false); // vertical: false = sigue a la persona (automático)
+  const [manualCam, setManualCam] = useState(true); // dividido: true = tú marcas dónde está la cámara
+  const [name, setName] = useState("");
+  const [secs, setSecs] = useState("0");
+  const [count, setCount] = useState("5");
+  const [quality, setQuality] = useState("1080p");
+  const [ctype, setCtype] = useState("auto");
+  const [game, setGame] = useState("");
+  const [bar, setBar] = useState(false);
+  const [pv, setPv] = useState<{ state: "idle" | "working" | "ready" | "error"; url?: string; text?: string }>({ state: "idle" });
+  const [tpl, setTpl] = useState(""); // plantilla de marca ("" = la marca general)
+  const [tpls, setTpls] = useState<{ id: string; name: string }[]>([]);
+  const [fx, setFx] = useState<Record<string, string>>({ ...FX_DEFAULT }); // audio y efectos: auto = lo decide el tipo de contenido / el .env del worker
+  const [multi, setMulti] = useState(false); // varios links a la vez (uno por línea)
+  const [presets, setPresets] = useState<Record<string, any>>({});
+  const [presetName, setPresetName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const { brand, logoUrl } = useBrand();
+  const [stats, setStats] = useState<{ clips: number; creators: number; users: number } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/brand/templates", { cache: "no-store" }).then((r) => r.json()).then((j) => setTpls(j.items ?? [])).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    try { setName(localStorage.getItem("cf_clipper") || ""); } catch {}
+    try { setPresets(JSON.parse(localStorage.getItem("cf_presets") || "{}")); } catch {}
+    fetch("/api/hub/stats").then((r) => r.json()).then((j) => j.stats && setStats(j.stats)).catch(() => {});
+  }, []);
+
+  const startSec = toSeconds(from);
+  const links = useMemo(() => url.split(/[\s,]+/).filter(Boolean), [url]);
+  const first = links[0] ?? "";
+  const embed = useMemo(() => parseEmbed(first, startSec), [first, startSec]);
+  const live = embed.kind !== "none";
+  const isKick = /kick\.com/i.test(first);
+
+  // El recuadro de la cámara tiene que respetar la proporción del panel de arriba (cambia con "Cara grande / Equilibrado / Juego grande")
+  const camFixed: Box = (() => { const h = Math.min(100, boxH(camBox.w, aspectCam(layout))); return { ...camBox, h, y: Math.min(camBox.y, 100 - h) }; })();
+
+  // Recuadro que realmente se enviará al worker (null = que lo decida la IA)
+  const sentBox: Box | null = !live ? null : layout === "crop" ? (manualCrop ? cropBox : null) : isSplit(layout) ? (manualCam ? camFixed : null) : null;
+  const previewCrop = layout === "crop" && manualCrop ? cropBox : null;
+  const previewCam = isSplit(layout) && manualCam ? camFixed : null;
+
+  const step = !url ? 1 : msg?.ok ? 4 : layout !== "crop" || manualCrop ? 2 : 3;
+
+  function savePresets(next: Record<string, any>) {
+    setPresets(next);
+    try { localStorage.setItem("cf_presets", JSON.stringify(next)); } catch {}
+  }
+  function savePreset() {
+    const n = presetName.trim().slice(0, 30);
+    if (!n) return setMsg({ ok: false, text: "Ponle un nombre a tu configuración." });
+    savePresets({ ...presets, [n]: { layout, secs, count, quality, manualCrop, cropBox, manualCam, camBox, ctype, game, bar, fx, tpl } });
+    setPresetName("");
+    setMsg({ ok: true, text: `Guardé “${n}”. La puedes cargar cuando quieras.` });
+  }
+  function loadPreset(n: string) {
+    const p = presets[n];
+    if (!p) return;
+    setLayout(p.layout); setSecs(p.secs); setCount(p.count); setQuality(p.quality);
+    setCtype(p.ctype ?? "auto"); setGame(p.game ?? ""); setBar(!!p.bar); setFx({ ...FX_DEFAULT, ...(p.fx ?? {}) }); setTpl(p.tpl ?? "");
+    setManualCrop(!!p.manualCrop); setCropBox(p.cropBox ?? DEFAULT_CROP); setManualCam(p.manualCam !== false); setCamBox(p.camBox ?? DEFAULT_CAM);
+    setMsg({ ok: true, text: `Cargué “${n}”.` });
+  }
+  function deletePreset(n: string) {
+    const { [n]: _x, ...rest } = presets;
+    savePresets(rest);
+  }
+
+  /** Pide al worker UN cuadro real (encuadre + gancho + logo + subtítulos) del video, sin crear los clips. */
+  async function preview() {
+    if (!links.length) return setMsg({ ok: false, text: "Pega el link del video primero." });
+    setPv({ state: "working" });
+    const r = await fetch("/api/preview", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: links[0], t: from || "", layout, custom_crop: sentBox ? round2(sentBox) : null, content_type: ctype, game: ctype === "juego" ? game.trim() : "", brand_template: tpl || null }),
+    }).catch(() => null);
+    const j = await r?.json().catch(() => ({}));
+    if (!r?.ok) return setPv({ state: "error", text: j?.error ?? "No se pudo pedir la vista previa" });
+    for (let i = 0; i < 80; i++) {   // hasta ~4 min
+      await new Promise((ok) => setTimeout(ok, 3000));
+      const g = await fetch(`/api/preview?id=${j.id}`, { cache: "no-store" }).then((x) => x.json()).catch(() => null);
+      if (g?.status === "ready") return setPv({ state: "ready", url: g.url });
+      if (g?.status === "error") return setPv({ state: "error", text: g.error });
+    }
+    setPv({ state: "error", text: "Tardó demasiado. Inténtalo otra vez." });
+  }
+
+  async function paste() {
+    try { setUrl(await navigator.clipboard.readText()); } catch { setMsg({ ok: false, text: "No pude leer el portapapeles: pega con Ctrl+V." }); }
+  }
+
+  /** Videos > 4 MB: subida directa a Supabase Storage para no pasar por el límite de Vercel. */
+  async function uploadDirect(file: File): Promise<string> {
+    const r = await fetch("/api/uploads/sign", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: file.name, size: file.size, type: file.type }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error ?? "No pude preparar la subida del archivo");
+    if (j.demo) throw new Error("Modo demo: conecta Supabase para subir videos.");
+    const up = await fetch(j.signedUrl, {
+      method: "PUT",
+      headers: { "Content-Type": file.type || "application/octet-stream", "x-upsert": "true" },
+      body: file,
+    });
+    if (!up.ok) throw new Error("Supabase rechazó el archivo (¿supera el límite de tu plan?).");
+    return j.path as string;
+  }
+
+  async function submit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const clipper = name.trim();
+    try { if (clipper) localStorage.setItem("cf_clipper", clipper); } catch {}
+
+    // ---- Modo Transformar (Anti-Penalización) ----------------------------------
+    if (src === "transform") {
+      if (!transformFile && !url.trim()) {
+        setMsg({ ok: false, text: "Sube un video o pega un link .mp4 para transformarlo." });
+        return;
+      }
+      setBusy(true); setMsg(null);
+      try {
+        const fd = new FormData();
+        let uploadPath = "";
+        if (transformFile) {
+          if (transformFile.size > 4 * 1024 * 1024) uploadPath = await uploadDirect(transformFile);
+          else fd.append("file", transformFile, transformFile.name);
+        }
+        fd.append("kind", "transform");
+        fd.append("url", url.trim());
+        if (uploadPath) fd.append("upload_path", uploadPath);
+        fd.append("layout", "crop");
+        fd.append("content_type", ctype);
+        fd.append("quality", "1080p");
+        fd.append("clips", "1");
+        fd.append("clip_seconds", "0");
+        fd.append("range_from", from || "");
+        fd.append("range_to", to || "");
+        fd.append("custom_crop", JSON.stringify(manualCrop ? round2(cropBox) : null));
+        fd.append("original", originalOn ? "1" : "0");
+        fd.append("progress_bar", bar ? "true" : "false");
+        fd.append("brand_template", tpl || "");
+        if (name.trim()) fd.append("clipper", name.trim());
+        if (game.trim()) fd.append("game", game.trim());
+        fd.append("title", transformFile?.name || url.trim().split("/").pop() || "Video transformado");
+        Object.entries(fx).forEach(([k, v]) => fd.append(k, v));
+
+        const res = await fetch("/api/jobs", { method: "POST", body: fd });
+        const data = await res.json().catch(() => ({}));
+        if (data.demo) { setMsg({ ok: true, text: data.message }); setBusy(false); return; }
+        if (!res.ok) { setMsg({ ok: false, text: data.error ?? "No se pudo encolar la transformación." }); setBusy(false); return; }
+        window.location.href = "/biblioteca";
+        return;
+      } catch (err) {
+        setMsg({ ok: false, text: err instanceof Error ? err.message : "No se pudo conectar con el servidor." });
+        setBusy(false);
+        return;
+      }
+    }
+
+    // ---- Flujo existente: YouTube / Twitch / Kick / link ------------------------
+    if (!links.length) { setMsg({ ok: false, text: "Pega el link del stream primero." }); return; }
+    setBusy(true); setMsg(null);
+    let sent = 0;
+    try {
+      for (const link of links.slice(0, 10)) {
+        const res = await fetch("/api/jobs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            kind: "vod_url", url: link, range_from: links.length === 1 ? from || null : null, range_to: links.length === 1 ? to || null : null,
+            clip_seconds: Number(secs), clips: Number(count), quality,
+            layout, custom_crop: sentBox ? round2(sentBox) : null, clipper,
+            content_type: ctype, game: ctype === "juego" ? game.trim() : "", progress_bar: bar, brand_template: tpl || null, ...fx,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (data.demo) { setMsg({ ok: true, text: data.message }); setBusy(false); return; }
+        if (!res.ok) { setMsg({ ok: false, text: `${sent ? `Se enviaron ${sent}, pero el link ${sent + 1} falló: ` : ""}${data.error ?? "Error"}` }); setBusy(false); return; }
+        sent++;
+      }
+      window.location.href = "/biblioteca";
+      return;
+    } catch {
+      setMsg({ ok: false, text: "No se pudo conectar con el servidor." });
+    }
+    setBusy(false);
+  }
+
+  const tab = (k: Src, label: string) => (
+    <button type="button" className={`tab ${k === "kick" ? "kick" : ""} ${src === k ? "on" : ""}`}
+      onClick={() => { setSrc(k); if (k === "transform") { setCtype("podcast"); setLayout("crop"); } }}>
+      {label}
+    </button>
+  );
+
+  const editable = live && (layout === "crop" || isSplit(layout));
+  const manual = layout === "crop" ? manualCrop : manualCam;
+  const toggleManual = () => (layout === "crop" ? setManualCrop(!manualCrop) : setManualCam(!manualCam));
+
+  return (
+    <>
+      <div className="hero">
+        <h1>Convertí tus streams en <em>clips virales</em></h1>
+        <small style={{ color: "var(--muted)" }}>Vertical, con subtítulos y listo para TikTok, Reels y Shorts. En minutos.</small>
+      </div>
+
+      <div className="cols">
+        {/* IZQUIERDA: fuente */}
+        <form className="card" onSubmit={submit}>
+          <h3 style={{ fontSize: 13, color: "var(--muted)", letterSpacing: ".08em", marginBottom: 16 }}>VIDEO ORIGINAL</h3>
+          <div className="tabs3" style={{ flexWrap: "wrap" }}>{tab("kick", "KICK")}{tab("twitch", "Twitch")}{tab("archivo", "Archivo")}{tab("transform", "✨ Transformar")}</div>
+          <label style={{ textAlign: "center", textTransform: "none", fontSize: 15, color: "var(--text)", fontWeight: 600 }}>
+            {src === "transform" ? "Link directo .mp4 (opcional)" : src === "archivo" ? "Pega el link del video" : "Pegá el link del stream"}
+          </label>
+          <div className="pasterow">
+            {multi
+              ? <textarea value={url} onChange={(e) => setUrl(e.target.value)} placeholder={"Un link por línea (máx. 10)\n" + PH[src]} rows={4} style={{ border: 0, background: "transparent", resize: "vertical" }} />
+              : <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={PH[src]} />}
+            <button type="button" className="btn ghost sm" onClick={paste}>Pegar</button>
+          </div>
+          <small style={{ display: "block", textAlign: "center", color: "var(--muted)", margin: "8px 0 16px" }}>
+            Ejemplo: twitch.tv/videos/123456789, un clip o un link de YouTube ·{" "}
+            <a href="#" onClick={(e) => { e.preventDefault(); setMulti(!multi); }} style={{ color: "var(--cyan)" }}>{multi ? "un solo link" : "varios links a la vez"}</a>
+            {links.length > 1 && ` · ${links.length} links (se procesan en cola con los mismos ajustes)`}
+          </small>
+
+          {src === "transform" && (
+            <div style={{ border: "1px solid var(--line)", borderRadius: 12, padding: 14, margin: "0 0 16px" }}>
+              <label style={{ textTransform: "none", fontSize: 14, color: "var(--text)", fontWeight: 600 }}>
+                Sube tu video (TikTok, Instagram, MP4, MOV…)
+              </label>
+              <input
+                type="file"
+                accept="video/*"
+                onChange={(e) => setTransformFile(e.target.files?.[0] ?? null)}
+                style={{ width: "100%", marginTop: 6, fontSize: 13 }}
+              />
+              {transformFile && (
+                <small style={{ display: "block", color: "var(--cyan)", marginTop: 6 }}>
+                  {transformFile.name} · {(transformFile.size / 1024 / 1024).toFixed(1)} MB
+                  {transformFile.size > 4 * 1024 * 1024 && " · se sube directo a Storage"}
+                </small>
+              )}
+              <small style={{ display: "block", color: "var(--muted)", marginTop: 8, lineHeight: 1.5 }}>
+                Hasta 45 MB. Vídeos más grandes: usa un link .mp4. El worker recorta a 10 min para no caerse.
+              </small>
+              <label style={{ display: "flex", gap: 8, alignItems: "flex-start", textTransform: "none", fontSize: 13, color: "var(--text)", margin: "14px 0 6px" }}>
+                <input type="checkbox" checked={originalOn} onChange={(e) => setOriginalOn(e.target.checked)} style={{ width: "auto", marginTop: 2 }} />
+                <span><b>Modo Original (anti-penalización)</b><br />
+                  <small style={{ color: "var(--muted)" }}>Voz narradora, contexto, dramómetro, encuesta A/B y tu logo. Facebook lo ve como aporte propio.</small></span>
+              </label>
+            </div>
+          )}
+
+          <div className="row" style={{ gridTemplateColumns: "repeat(4,1fr)" }}>
+            <div><label>Desde</label><input value={from} onChange={(e) => setFrom(e.target.value)} placeholder="0:00" /></div>
+            <div><label>Hasta</label><input value={to} onChange={(e) => setTo(e.target.value)} placeholder="1:00" /></div>
+            <div><label>Duración</label><select name="secs" value={secs} onChange={(e) => setSecs(e.target.value)}><option value="0">Automática (según el tipo)</option><option value="15">15 s</option><option value="20">20 s</option><option value="30">30 s</option><option value="45">45 s</option><option value="60">60 s</option><option value="75">75 s</option><option value="90">90 s</option></select></div>
+            <div><label>Cantidad</label><select name="count" value={count} onChange={(e) => setCount(e.target.value)}><option>1</option><option>3</option><option>5</option><option>10</option><option>15</option><option>20</option><option>30</option><option>50</option></select></div>
+          </div>
+          <div className="row" style={{ gridTemplateColumns: "1fr 1fr" }}>
+            <div><label>Calidad</label><select name="quality" value={quality} onChange={(e) => setQuality(e.target.value)}><option value="720p">720p</option><option value="1080p">1080p</option><option value="1440p">1440p (2K)</option><option value="2160p">2160p (4K)</option></select></div>
+            <div><label>Tu nombre (ranking)</label><input value={name} onChange={(e) => setName(e.target.value)} placeholder="ej. Juan" maxLength={40} /></div>
+          </div>
+
+          <label>Tipo de contenido</label>
+          <div className="tabs3" style={{ flexWrap: "wrap" }}>{TYPES.map(([k, l]) => (
+            <button type="button" key={k} className={`tab ${ctype === k ? "on" : ""}`} style={{ fontSize: 12 }} onClick={() => setCtype(k)}>{l}</button>
+          ))}</div>
+          <small style={{ display: "block", color: "var(--muted)", margin: "-2px 0 10px" }}>{TYPE_HELP[ctype]}</small>
+          {ctype === "juego" && (
+            <input value={game} onChange={(e) => setGame(e.target.value)} placeholder="¿Qué juego es? (ej. Valorant, Fortnite, GTA)" maxLength={60} style={{ marginBottom: 10 }} />
+          )}
+          <label style={{ display: "flex", gap: 8, alignItems: "center", textTransform: "none", fontSize: 13, color: "var(--text)", margin: "0 0 12px" }}>
+            <input type="checkbox" checked={bar} onChange={(e) => setBar(e.target.checked)} style={{ width: "auto" }} /> Barra de progreso abajo del clip (retiene más gente)
+          </label>
+          {tpls.length > 0 && (
+            <label style={{ display: "block", textTransform: "none", fontSize: 13, color: "var(--text)", margin: "0 0 12px" }}>
+              Plantilla de marca
+              <select value={tpl} onChange={(e) => setTpl(e.target.value)} style={{ marginTop: 4 }}>
+                <option value="">Marca general (la de Ajustes)</option>
+                {tpls.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </label>
+          )}
+          <details style={{ margin: "0 0 12px" }}>
+            <summary style={{ cursor: "pointer", fontSize: 13 }}>Audio y efectos (pitido, volumen, zoom, cámara lenta)</summary>
+            <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
+              {FX_OPTIONS.map(([k, l, help]) => (
+                <label key={k} style={{ display: "block", textTransform: "none", fontSize: 13, color: "var(--text)" }}>
+                  {l}
+                  <select value={fx[k] ?? "auto"} onChange={(e) => setFx({ ...fx, [k]: e.target.value })} style={{ marginTop: 4 }}>
+                    <option value="auto">Automático (según el tipo de contenido)</option>
+                    <option value="1">Siempre</option>
+                    <option value="0">Nunca</option>
+                  </select>
+                  <small style={{ display: "block", color: "var(--muted)" }}>{help}</small>
+                </label>
+              ))}
+            </div>
+          </details>
+
+          <label>Encuadre en el teléfono</label>
+          <div className="tabs3">{LAYOUTS.map(([k, l]) => (
+            <button type="button" key={k} className={`tab ${(k === "split_eq" ? isSplit(layout) : layout === k) ? "on" : ""}`} style={{ fontSize: 12 }} onClick={() => setLayout(k)}>{l}</button>
+          ))}</div>
+
+          <div style={{ border: "1px dashed var(--line)", borderRadius: 12, padding: 12, margin: "6px 0 12px" }}>
+            <label style={{ marginTop: 0 }}>Mis configuraciones guardadas</label>
+            {Object.keys(presets).length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+                {Object.keys(presets).map((n) => (
+                  <span key={n} className="pill ghost" style={{ display: "inline-flex", gap: 6, alignItems: "center", cursor: "pointer" }}>
+                    <span onClick={() => loadPreset(n)}>{n}</span>
+                    <b onClick={() => deletePreset(n)} title="Borrar" style={{ opacity: .6 }}>×</b>
+                  </span>
+                ))}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 8 }}>
+              <input value={presetName} onChange={(e) => setPresetName(e.target.value)} placeholder="Nombre (ej. Mis clips dividido)" maxLength={30} />
+              <button type="button" className="btn ghost sm" onClick={savePreset}>Guardar</button>
+            </div>
+            <small style={{ color: "var(--muted)" }}>Guarda encuadre, duración, cantidad y calidad actuales.</small>
+          </div>
+
+          {isSplit(layout) && (
+            <>
+              <label>Tamaño de cada parte</label>
+              <div className="tabs3">{PROPS.map(([k, l]) => (
+                <button type="button" key={k} className={`tab ${layout === k ? "on" : ""}`} style={{ fontSize: 12 }} onClick={() => setLayout(k)}>{l}</button>
+              ))}</div>
+              <small style={{ display: "block", color: "var(--muted)", margin: "-6px 0 12px" }}>
+                {layout === "split" ? "Tu cara grande arriba y el gameplay completo abajo, sin recortar." : layout === "split_eq" ? "Mitad y mitad: el gameplay se ve más grande y se recorta un poco de los lados." : "El gameplay ocupa más de la mitad (se recortan más los lados): ideal si lo importante pasa en el centro."}
+              </small>
+            </>
+          )}
+
+          <button type="button" className="btn ghost" style={{ width: "100%", marginTop: 6 }} onClick={preview} disabled={busy || pv.state === "working" || !links.length || src === "transform"}>
+            {pv.state === "working" ? "Preparando la vista previa… (puede tardar un minuto)" : "👁 Vista previa (1 cuadro real, sin crear clips)"}
+          </button>
+          {pv.state === "error" && <div className="banner" style={{ marginTop: 10 }}>{pv.text}</div>}
+          {pv.state === "ready" && pv.url && (
+            <div style={{ marginTop: 10, textAlign: "center" }}>
+              <img src={pv.url} alt="Vista previa del clip" style={{ width: 220, maxWidth: "100%", aspectRatio: "9 / 16", objectFit: "cover", borderRadius: 14, border: "1px solid var(--line)" }} />
+              <small style={{ display: "block", color: "var(--muted)", marginTop: 6 }}>Así saldrá: encuadre, gancho, logo y subtítulos. Si algo no te gusta, cambia el encuadre o la plantilla y pídela otra vez.</small>
+            </div>
+          )}
+          <button className="btn" style={{ width: "100%", marginTop: 10 }} disabled={busy}>
+            {busy ? "Procesando…" : src === "transform" ? "✨ Transformar y blindar para Facebook" : links.length > 1 ? `Importar ${links.length} links y generar clips` : "Importar link y generar clips"}
+          </button>
+          {msg && <div className={`banner ${msg.ok ? "ok" : ""}`} style={{ marginTop: 14, marginBottom: 0 }}>{msg.text}</div>}
+
+          {stats && (
+            <div className="stat"><div className="ic">✂</div><div><b>{stats.clips.toLocaleString("es")}</b><span>Clips creados</span></div></div>
+          )}
+        </form>
+
+        {/* CENTRO: teléfono + editor */}
+        <div className="card neon" style={{ padding: 0, overflow: "hidden" }}>
+          <h3 style={{ padding: "16px 20px", fontSize: 15, color: "#b79bff", borderBottom: "1px solid var(--line)" }}>📱 ASÍ SE VEN TUS CLIPS</h3>
+          <div style={{ padding: 20 }}>
+            <PhonePreview layout={layout} embed={embed} cropBox={previewCrop} camBox={previewCam} brand={brand} logoUrl={logoUrl} />
+
+            {!live && (
+              <small style={{ display: "block", textAlign: "center", color: "var(--muted)", margin: "14px 0 0" }}>
+                {url
+                  ? isKick
+                    ? "Kick no permite mostrar el video aquí. Los clips se generan igual y el encuadre lo decide la IA."
+                    : "No puedo mostrar este link en la vista previa. Los clips se generan igual."
+                  : "Pega un link de YouTube, Twitch o un .mp4 y verás aquí tu video con el encuadre elegido."}
+              </small>
+            )}
+
+            {layout === "duo" && (
+              <small style={{ display: "block", textAlign: "center", color: "var(--muted)", margin: "14px 0 0" }}>
+                La IA busca a las dos personas sola: la de la izquierda va arriba y la de la derecha abajo (si una está sobre la otra, la de más arriba va arriba). La vista previa es aproximada. Si no las ve claras, usa la mitad izquierda y la mitad derecha del video.
+              </small>
+            )}
+
+            {editable && (
+              <div style={{ marginTop: 16 }}>
+                <small style={{ display: "block", color: "var(--muted)", marginBottom: 8, textAlign: "center" }}>
+                  {layout === "crop"
+                    ? manual ? "Arrastra el recuadro para elegir qué parte se ve en vertical." : "La IA sigue a la persona que habla."
+                    : manual ? "Arrastra el recuadro sobre tu cámara (esquina para agrandar). Arriba va tu cara y abajo el gameplay completo." : "La IA buscará tu cara para el panel de arriba; abajo va el gameplay completo."}
+                </small>
+                {manual && (
+                  layout === "crop"
+                    ? <CropPreview embed={embed} box={cropBox} aspect={ASPECT_VERT} onChange={setCropBox} />
+                    : <CropPreview embed={embed} box={camFixed} aspect={aspectCam(layout)} onChange={setCamBox} />
+                )}
+                <button type="button" className="btn ghost sm" style={{ width: "100%", marginTop: 10 }} onClick={toggleManual}>
+                  {manual ? (layout === "crop" ? "Usar encuadre automático" : "Que la IA busque mi cámara") : (layout === "crop" ? "Ajustar encuadre a mano" : "Marcar mi cámara a mano")}
+                </button>
+              </div>
+            )}
+
+            {stats && <div className="stat" style={{ marginTop: 16 }}><div className="ic">✨</div><div><b>{stats.creators.toLocaleString("es")}</b><span>Creadores de clips</span></div></div>}
+          </div>
+        </div>
+
+        {/* DERECHA: cómo funciona */}
+        <div className="card">
+          <h3 style={{ fontSize: 13, color: "var(--muted)", letterSpacing: ".08em", marginBottom: 10 }}>CÓMO FUNCIONA</h3>
+          <ul className="how" style={{ padding: 0 }}>
+            {["Subir el video", "Elegir el encuadre", "Generar el clip", "Descargar y publicar en el Top"].map((t, i) => (
+              <li key={t} className={step === i + 1 ? "on" : ""}><span className="n">{i + 1}</span>{t}</li>
+            ))}
+          </ul>
+          <div className="why" style={{ color: "var(--text)" }}>
+            <b>Paso 1:</b> pegá un link de Twitch, YouTube o Kick. Después elegís cómo se ve en el teléfono: vertical, dividido (cámara arriba, juego abajo) o con fondo difuminado.
+          </div>
+          {stats && <div className="stat" style={{ marginTop: 18 }}><div className="ic">👥</div><div><b>{stats.users.toLocaleString("es")}</b><span>Usuarios registrados</span></div></div>}
+          <h3 style={{ fontSize: 14, margin: "26px 0 10px" }}>Últimos clips de la comunidad</h3>
+          <CommunityFeed kind="feed" limit={8} />
+        </div>
+      </div>
+    </>
+  );
+}
