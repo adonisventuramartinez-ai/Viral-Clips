@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const fetchCache = "force-no-store";
 
-const LAYOUTS = ["crop", "split", "split_eq", "split_game", "blur", "duo"];
+const LAYOUTS = ["crop", "casa", "split", "split_eq", "split_game", "blur", "duo"];
 const TYPES = ["auto", "reality", "podcast", "entrevista", "juego", "gta", "gta6", "gta_rp", "directo"];
 const PREVIEW_TITLE = "__preview__";
 

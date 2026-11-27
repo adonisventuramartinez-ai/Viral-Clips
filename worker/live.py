@@ -218,6 +218,8 @@ def process_live(job):
     opts = {**(src.get("options") or {}), **{k: v for k, v in payload.items() if v is not None}}
     prof = profiles.get(opts.get("content_type"), opts.get("game"))
     game = opts.get("game") or prof.get("game")
+    custom_crop = src.get("custom_crop")
+    clip_layout = profiles.layout_for(prof, src.get("layout"), custom_crop)
     secs = profiles.resolve_secs(payload.get("clip_seconds"), prof)
     quality = payload.get("quality", "720p")
     review_sec = _clamp(payload.get("review_minutes"), config.REVIEW_MINUTES, 1, 10) * 60
@@ -430,7 +432,7 @@ def process_live(job):
         clip_queue.put({
             "cid": cid, "cov": cov, "base": base, "mstart": mstart, "end": end,
             "m": m, "words": rel_words, "all_words": all_words_snapshot,
-            "custom_crop": src.get("custom_crop"), "layout": src.get("layout"), "brand": st.get("brand"),
+            "custom_crop": custom_crop, "layout": clip_layout, "brand": st.get("brand"),
             "hook": live_hook, "profile": prof, "opts": {**opts, "live_fast": True},
             "user_id": src.get("user_id"), "command": command,
         })

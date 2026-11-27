@@ -11,8 +11,10 @@ DEFAULT_SUBS = {"text": "FFFFFF", "active": "FFE000", "outline": "000000", "size
 
 SPLIT_TOPS = {"split": 1312, "split_eq": 1000, "split_game": 780}
 DUO_H = 960
+# Formato "La Casa": cara grande arriba, mismo momento abajo con fondo oscuro/difuminado.
+CASA_H = 1250
 
-SUB_MARGIN = {"crop": 600, "blur": 600, "duo": 890}
+SUB_MARGIN = {"crop": 600, "blur": 600, "duo": 890, "casa": 700}
 
 
 def sync_words_for_clip(words, start, end, sync=None):
@@ -277,6 +279,19 @@ def layout_graph(layout: str, source: Path, start: float, dur: float, custom_cro
                  polish: bool = True) -> str:
     # `polish=False` lo usa _render_core: la nitidez se aplica DESPUÉS del zoom para que no se pierda.
     fin = _finish if polish else (lambda tail: tail)
+    if layout == "casa":
+        # Reality 24/7: lo que vende es la CARA y la reacción, no el cuarto completo.
+        # Arriba va la cara grande (misma detección que "split"); abajo el mismo tramo
+        # con fondo oscuro difuminado para que el ojo no se pierda, sin quitar contexto.
+        sw, sh = _probe(source)
+        cam = _box_filter(sw, sh, _cam_box(source, start, dur, sw, sh, custom_crop, CASA_H))
+        return (
+            "[0:v]split=2[a][b];"
+            f"[a]{cam},scale=1080:{CASA_H}:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:{CASA_H},setsar=1[t];"
+            f"[b]{_crop_filter(source, start, dur, custom_crop, keys)},scale=1080:670:force_original_aspect_ratio=increase:flags=lanczos,"
+            "crop=1080:670,boxblur=12:3,eq=brightness=-0.18:saturation=0.85,setsar=1[g];"
+            "[t][g]vstack=inputs=2," + fin("setsar=1")
+        )
     if layout == "blur":
         # Difuminar a resolución completa costaba ~20 min por clip de 1 min en la VM de 3 CPU.
         # Se desdifumina a 1/4 (mismo radio aparente), se procesa ahí y se vuelve a subir: el
@@ -400,11 +415,11 @@ def _render_core(source: Path, words, start: float, end: float, out: Path, workd
     opts = opts or {}
     fast = bool(opts.get("live_fast"))   # directos: prioridad que no se atragante la grabación
     layout = (layout or config.CLIP_LAYOUT or "crop").strip().lower()
-    if layout not in ("crop", "blur", "duo", *SPLIT_TOPS):
+    if layout not in ("crop", "blur", "duo", "casa", *SPLIT_TOPS):
         layout = "crop"
 
     keys = None
-    if layout == "crop" and not custom_crop and config.CLIP_FRAMING == "auto":
+    if layout in ("crop", "casa") and not custom_crop and config.CLIP_FRAMING == "auto":
         sw, sh = _probe(source)
         if sw / sh > 9 / 16:
             import framing

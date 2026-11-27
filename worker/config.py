@@ -71,6 +71,8 @@ LANGUAGE = os.environ.get("LANGUAGE", "es")
 
 # "crop" = el video llena TODA la pantalla vertical 9:16 (por defecto); "blur" = video chico centrado con fondo difuminado
 CLIP_LAYOUT = (os.environ.get("CLIP_LAYOUT") or "crop").strip().lower()
+# La Casa de Alofoke: "cara grande arriba + mismo momento difuminado abajo". Ponlo en "crop" para desactivarlo.
+CLIP_REALITY_LAYOUT = (os.environ.get("CLIP_REALITY_LAYOUT") or "casa").strip().lower()
 # Encuadre: "auto" = sigue la cara de quien habla (necesita scikit-image); "center" = fijo según CLIP_FOCUS_X
 CLIP_FRAMING = (os.environ.get("CLIP_FRAMING") or "auto").strip().lower()
 # Calidad: CRF más bajo = más nítido y más pesado (17-20 va bien); nitidez 0 = apagada, 0.5 suave, 1.0 fuerte

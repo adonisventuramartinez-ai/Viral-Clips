@@ -311,8 +311,8 @@ def process(job):
     print(f"  Tipo de contenido: {prof['label']}" + (f" · juego: {game}" if game else "") + f" · clips de ~{secs} s", flush=True)
 
     # Encuadre elegido en la web: crop | split | blur y, si lo marcó a mano, el recuadro en % del video
-    clip_layout = src.get("layout") or config.CLIP_LAYOUT
     custom_crop = src.get("custom_crop")
+    clip_layout = profiles.layout_for(prof, src.get("layout"), custom_crop)
     if "layout" not in src:
         print("  AVISO: la tabla sources no tiene la columna 'layout'. Ejecuta 0004_comunidad.sql en Supabase.", flush=True)
     print(f"  Encuadre pedido: {clip_layout} | recuadro manual: {'sí' if custom_crop else 'no (automático)'}", flush=True)

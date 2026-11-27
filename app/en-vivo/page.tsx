@@ -163,6 +163,7 @@ export default function EnVivo() {
             <label>Formato del video</label>
             <select name="layout" defaultValue="crop">
               <option value="crop">Vertical (recomendado - sigue la cara)</option>
+              <option value="casa">La Casa de Alofoke: cara grande + fondo difuminado</option>
               <option value="split">Dividido: cara grande arriba, juego abajo</option>
               <option value="split_eq">Dividido: equilibrado (mitad y mitad)</option>
               <option value="split_game">Dividido: juego grande</option>

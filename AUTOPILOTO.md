@@ -2,7 +2,7 @@
 
 ## Cómo funciona
 
-1. El worker graba el directo y saca clips (máx. **3** por revisión, sin cambios).
+1. El worker graba el directo y saca clips (máx. **3** por revisión, sin cambios). Los de La Casa salen en formato **🏠 Cara grande arriba + fondo difuminado abajo** (ver `FORMATO-CASA.md`).
 2. `Hacerlo viral` los puntúa. Con el piloto encendido, los `ready` pasan a `approved` solos.
 3. Cada clip entra en la cola del worker (**cada 2 min**) y se programa en **todas las páginas marcadas** (`facebook:<id>`), con 45 s de separación entre páginas y anti-duplicado por clip+página.
 4. A la hora, el worker llama a la web con una firma HMAC hecha con **la misma llave R2/Tigris**; la web busca el token fresco de la página, firma el clip y publica el Reel.

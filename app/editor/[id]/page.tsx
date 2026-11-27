@@ -30,6 +30,7 @@ type Word = { w?: string; start?: number; end?: number; spk?: number };
 
 const LAYOUTS = [
   { id: "crop", icon: "▣", label: "Vertical", hint: "Llena la pantalla 9:16" },
+  { id: "casa", icon: "🏠", label: "La Casa", hint: "Cara grande arriba, fondo difuminado abajo" },
   { id: "split", icon: "◫", label: "Split", hint: "Original arriba, recorte abajo" },
   { id: "split_eq", icon: "◧", label: "Split 50/50", hint: "Dos mitades iguales" },
   { id: "split_game", icon: "◪", label: "Gaming", hint: "Cara + pantalla de juego" },
