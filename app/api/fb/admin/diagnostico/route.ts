@@ -6,6 +6,8 @@ import { configGithub } from "@/lib/github";
 import { limpiarEnv, tipoLlaveSupabase, esLlaveSecreta, urlSupabase } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
 export const maxDuration = 30;
 
 type Nivel = "ok" | "aviso" | "error";
