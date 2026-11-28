@@ -213,3 +213,18 @@ def get(name, game=None):
         prof["guide"] += (" Elenco conocido (úsalo para saber quién es quién y escribe los nombres bien): "
                           + ", ".join(config.CAST_NAMES) + ".")
     return prof
+
+
+def layout_for(prof, requested, custom_crop=None):
+    """Formato de entrega según el tipo de contenido.
+
+    Reality (La Casa): cara grande arriba y el mismo momento difuminado abajo. Así el
+    drama se ve en la expresión de quien habla, sin perder el contexto del cuarto.
+    Los juegos y el resto conservan el formato pedido por la web / config.
+    """
+    layout = (requested or config.CLIP_LAYOUT or "crop").strip().lower()
+    if not custom_crop and prof.get("name") == "reality" and layout == "crop":
+        preferido = getattr(config, "CLIP_REALITY_LAYOUT", "auto").strip().lower()
+        if preferido and preferido != "crop":
+            return "casa" if preferido == "auto" else preferido
+    return layout

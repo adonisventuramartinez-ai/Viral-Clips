@@ -55,7 +55,7 @@ export default function Lote({ theme }: { theme: Theme }) {
   useEffect(() => {
     setSel(new Set());
     if (!cuentaId) return setPaginas([]);
-    fetch(`/api/accounts/${cuentaId}/paginas`)
+    fetch(`/api/fb/accounts/${cuentaId}/paginas`)
       .then((r) => r.json())
       .then((d) => (d.error ? (toast.error(d.error), setPaginas([])) : setPaginas(d.paginas || [])));
   }, [cuentaId]);
@@ -125,7 +125,7 @@ export default function Lote({ theme }: { theme: Theme }) {
   }
 
   async function borrarPlantilla(id: number) {
-    await fetch(`/api/plantillas?id=${id}`, { method: "DELETE" });
+    await fetch(`/api/fb/plantillas?id=${id}`, { method: "DELETE" });
     cargarPlantillas();
   }
 

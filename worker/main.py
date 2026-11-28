@@ -143,14 +143,35 @@ def _normalize_transform(video, work, opts):
     if dur and dur > length + 1:
         print(f"  Transformar: video de {int(dur)} s → uso {int(length)} s para no saturar el worker", flush=True)
 
-    vf = (f"scale={original.W}:{original.H}:force_original_aspect_ratio=increase:flags=lanczos,"
-          f"crop={original.W}:{original.H},setsar=1,fps={original.FPS}")
-    cap = original.size_cap(length)   # tope para que el MP4 final nunca pase de CLIP_MAX_MB
-    cmd = ["ffmpeg", "-y", "-loglevel", "error", "-ss", f"{ss:.2f}", "-t", f"{length:.2f}", "-i", str(video)]
-
     logo_cfg = brand.load(work, template=opts.get("brand_template"))
     logo = Path(logo_cfg["path"]) if logo_cfg.get("path") else None
     has_logo = bool(logo and logo.exists())
+
+    vf = (f"scale={original.W}:{original.H}:force_original_aspect_ratio=increase:flags=lanczos,"
+          f"crop={original.W}:{original.H},setsar=1,fps={original.FPS}")
+    # Marca de agua (texto) si está configurada
+    wm_text = ""
+    wm_pos = "br"
+    wm_size = 18
+    wm_opacity = 0.6
+    if isinstance(logo_cfg, dict) and isinstance(logo_cfg.get("watermark"), dict) and logo_cfg["watermark"].get("text"):
+        wm = logo_cfg["watermark"]
+        wm_text = str(wm["text"])
+        wm_pos = wm.get("pos", "br")
+        wm_size = int(wm.get("size", 18))
+        wm_opacity = float(wm.get("opacity", 0.6))
+    elif config.WATERMARK_TEXT:
+        wm_text = config.WATERMARK_TEXT
+        wm_pos = config.WATERMARK_POS
+        wm_size = config.WATERMARK_SIZE
+        wm_opacity = config.WATERMARK_OPACITY
+    if wm_text:
+        wm_escaped = wm_text.replace(":", "\\:").replace("'", "\\'")
+        pos_map = {"tl": "x=20:y=20", "tr": "x=w-tw-20:y=20", "bl": "x=20:y=h-th-20", "br": "x=w-tw-20:y=h-th-20", "center": "x=(w-tw)/2:y=(h-th)/2"}
+        pos = pos_map.get(wm_pos, pos_map["br"])
+        vf += f",drawtext=text='{wm_escaped}':fontsize={wm_size}:fontcolor=white@{wm_opacity:.2f}:borderw=2:bordercolor=black@{wm_opacity:.2f}:{pos}:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+    cap = original.size_cap(length)   # tope para que el MP4 final nunca pase de CLIP_MAX_MB
+    cmd = ["ffmpeg", "-y", "-loglevel", "error", "-ss", f"{ss:.2f}", "-t", f"{length:.2f}", "-i", str(video)]
     if has_logo:
         cmd += ["-i", str(logo)]      # render._logo_graph espera el logo en el input [1:v]
 
@@ -290,8 +311,8 @@ def process(job):
     print(f"  Tipo de contenido: {prof['label']}" + (f" · juego: {game}" if game else "") + f" · clips de ~{secs} s", flush=True)
 
     # Encuadre elegido en la web: crop | split | blur y, si lo marcó a mano, el recuadro en % del video
-    clip_layout = src.get("layout") or config.CLIP_LAYOUT
     custom_crop = src.get("custom_crop")
+    clip_layout = profiles.layout_for(prof, src.get("layout"), custom_crop)
     if "layout" not in src:
         print("  AVISO: la tabla sources no tiene la columna 'layout'. Ejecuta 0004_comunidad.sql en Supabase.", flush=True)
     print(f"  Encuadre pedido: {clip_layout} | recuadro manual: {'sí' if custom_crop else 'no (automático)'}", flush=True)
@@ -520,8 +541,13 @@ def main():
                 cp = Path(config.COOKIES_FILE)
                 if not cp.exists():
                     print(f"  ⚠ Archivo de cookies no encontrado: {config.COOKIES_FILE}", flush=True)
+        try:
+            _ap_cfg = db.autopilot_config()
+        except Exception:  # noqa: BLE001
+            _ap_cfg = {}
         db.BASE_INFO = {"auto_queue": db.auto_queue_on(), "discover": db.discover_on(), "switches": True, "networks": autoqueue.networks_available(),
-                        "stats": config.STATS, "learn_slots": config.LEARN_SLOTS, "learn_min_posts": config.LEARN_MIN_POSTS}
+                        "stats": config.STATS, "learn_slots": config.LEARN_SLOTS, "learn_min_posts": config.LEARN_MIN_POSTS,
+                        "autopilot": bool(_ap_cfg.get("enabled")), "autopilot_pages": _ap_cfg.get("page_ids") or []}
         db.heartbeat()
         if time.time() - last_clean > 600:
             db.requeue_stale()

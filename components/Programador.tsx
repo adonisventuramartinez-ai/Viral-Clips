@@ -65,7 +65,8 @@ export default function Programador({ theme }: ProgramadorProps) {
   useEffect(() => {
     fetch("/api/fb/accounts")
       .then((r) => r.json())
-      .then((d) => setCuentas(d.cuentas || []));
+      .then((d) => setCuentas(d.cuentas || []))
+      .catch(() => toast.error("No se pudieron cargar las cuentas de Facebook"));
     cargarPosts();
   }, []);
 
@@ -73,8 +74,11 @@ export default function Programador({ theme }: ProgramadorProps) {
     setCargandoPosts(true);
     try {
       const res = await fetch("/api/fb/schedule");
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "No se pudo cargar la cola");
       setPosts(data.posts || []);
+    } catch {
+      toast.error("Sin conexión con el servidor");
     } finally {
       setCargandoPosts(false);
     }
@@ -87,7 +91,7 @@ export default function Programador({ theme }: ProgramadorProps) {
     }
     setCargandoPaginas(true);
     setSeleccionadas(new Set());
-    fetch(`/api/accounts/${cuentaId}/paginas`)
+    fetch(`/api/fb/accounts/${cuentaId}/paginas`)
       .then((r) => r.json())
       .then((d) => {
         if (d.error) {
@@ -97,6 +101,7 @@ export default function Programador({ theme }: ProgramadorProps) {
           setPaginasCuenta(d.paginas || []);
         }
       })
+      .catch(() => toast.error("No se pudieron cargar las páginas"))
       .finally(() => setCargandoPaginas(false));
   }, [cuentaId]);
 
@@ -174,12 +179,17 @@ export default function Programador({ theme }: ProgramadorProps) {
 
   async function cancelar(id: number) {
     if (!confirm("¿Cancelar esta publicación programada?")) return;
-    const res = await fetch(`/api/schedule/${id}`, { method: "DELETE" });
-    if (res.ok) {
-      toast.success("Cancelada");
-      cargarPosts();
-    } else {
-      toast.error("Error al cancelar");
+    try {
+      const res = await fetch(`/api/fb/schedule/${id}`, { method: "DELETE" });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok) {
+        toast.success("Cancelada");
+        cargarPosts();
+      } else {
+        toast.error(d.error || "Error al cancelar");
+      }
+    } catch {
+      toast.error("Sin conexión con el servidor");
     }
   }
 

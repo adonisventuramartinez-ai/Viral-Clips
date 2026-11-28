@@ -19,7 +19,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const start = toSec(b.start), end = toSec(b.end);
   if (!Number.isFinite(start) || !Number.isFinite(end)) return NextResponse.json({ error: "Escribe el inicio y el fin como 1:23" }, { status: 400 });
   if (end - start < 5 || end - start > 180) return NextResponse.json({ error: "El clip debe durar entre 5 y 180 segundos" }, { status: 400 });
-  const layout = ["crop", "split", "split_eq", "split_game", "blur", "duo"].includes(b.layout) ? b.layout : null;
+  const layout = ["crop", "casa", "split", "split_eq", "split_game", "blur", "duo"].includes(b.layout) ? b.layout : null;
   const hook = typeof b.hook === "string" && b.hook.trim() ? b.hook.trim().slice(0, 70) : null;   // gancho alternativo (A/B)
   const narrate = b.narrate === true;   // genera una versión con voz narradora (Modo Original en modo "card")
 const quality = ["720p", "1080p", "1440p", "2160p"].includes(b.quality) ? b.quality : "1080p";

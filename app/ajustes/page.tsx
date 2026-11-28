@@ -73,6 +73,69 @@ function LogoSection() {
   );
 }
 
+function WatermarkSection() {
+  const { brand, reload } = useBrand();
+  const [wm, setWm] = useState({ text: "", pos: "br", size: 18, opacity: 60, enabled: false });
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (brand?.watermark) setWm({ ...wm, ...brand.watermark, enabled: brand.watermark.enabled !== false });
+  }, [brand]);
+
+  const set = (p: Partial<typeof wm>) => setWm((x) => ({ ...x, ...p }));
+  async function save() {
+    setBusy(true); setMsg(null);
+    const f = new FormData();
+    f.set("watermark", JSON.stringify(wm));
+    const r = await fetch("/api/brand", { method: "POST", body: f }).catch(() => null);
+    const j = await r?.json().catch(() => ({}));
+    setMsg(r?.ok ? { ok: true, text: "Guardado. Se usa en los próximos clips." } : { ok: false, text: j?.error ?? "No se pudo guardar" });
+    if (r?.ok) reload();
+    setBusy(false);
+  }
+  async function remove() {
+    if (!confirm("¿Quitar la marca de agua?")) return;
+    setBusy(true);
+    const f = new FormData();
+    f.set("watermark", JSON.stringify({ text: "", enabled: false }));
+    const r = await fetch("/api/brand", { method: "POST", body: f }).catch(() => null);
+    const j = await r?.json().catch(() => ({}));
+    setMsg(r?.ok ? { ok: true, text: "Marca de agua quitada." } : { ok: false, text: j?.error ?? "No se pudo" });
+    if (r?.ok) { setWm({ text: "", pos: "br", size: 18, opacity: 60, enabled: false }); reload(); }
+    setBusy(false);
+  }
+
+  const POS: [string, string][] = [["tl", "Arriba izquierda"], ["tr", "Arriba derecha"], ["bl", "Abajo izquierda"], ["br", "Abajo derecha"], ["center", "Centro"]];
+
+  return (
+    <div className="card neon" style={{ maxWidth: 720, marginBottom: 18 }}>
+      <h3 style={{ marginBottom: 6 }}>💧 Marca de agua (texto)</h3>
+      <p className="sub" style={{ marginBottom: 14, fontSize: 13 }}>Pone un texto (ej: @tu_usuario) en todos los clips. Ideal para proteger tu contenido.</p>
+      <label style={{ display: "flex", gap: 8, alignItems: "center", textTransform: "none", fontSize: 14, color: "var(--text)", margin: "0 0 12px" }}>
+        <input type="checkbox" checked={wm.enabled} onChange={(e) => set({ enabled: e.target.checked })} style={{ width: "auto" }} /> Poner marca de agua en los clips
+      </label>
+      {wm.enabled && (
+        <>
+          <label>Texto</label>
+          <input value={wm.text} onChange={(e) => set({ text: e.target.value })} maxLength={40} placeholder="@tu_usuario" />
+          <label style={{ marginTop: 12 }}>Posición</label>
+          <select value={wm.pos} onChange={(e) => set({ pos: e.target.value })}>{POS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
+          <label style={{ marginTop: 12 }}>Tamaño: {wm.size}</label>
+          <input type="range" min={12} max={60} value={wm.size} onChange={(e) => set({ size: Number(e.target.value) })} />
+          <label style={{ marginTop: 12 }}>Opacidad: {wm.opacity}%</label>
+          <input type="range" min={10} max={100} value={wm.opacity} onChange={(e) => set({ opacity: Number(e.target.value) })} />
+        </>
+      )}
+      <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+        <button className="btn sm" onClick={save} disabled={busy}>{busy ? "Guardando…" : "Guardar"}</button>
+        <button className="btn sm ghost" onClick={remove} disabled={busy}>Quitar</button>
+      </div>
+      {msg && <div className={`banner ${msg.ok ? "ok" : ""}`} style={{ marginTop: 12, marginBottom: 0 }}>{msg.text}</div>}
+    </div>
+  );
+}
+
 function SubsSection() {
   const { brand, reload } = useBrand();
   const [subs, setSubs] = useState<Subs>(SUB_PRESETS.classic.v);
@@ -260,7 +323,8 @@ export default function Ajustes() {
     ["Quién elige los clips", "LLM_PROVIDER", "groq (gratis) o anthropic"],
     ["Modelo de Groq", "GROQ_MODEL", "openai/gpt-oss-120b"],
     ["Idioma del video", "LANGUAGE", "es"],
-    ["Formato vertical", "CLIP_LAYOUT", "crop, split (cara arriba + gameplay), duo (dos personas) o blur"],
+    ["Formato vertical", "CLIP_LAYOUT", "crop, casa (La Casa), split (cara + juego), duo o blur"],
+    ["Formato de La Casa", "CLIP_REALITY_LAYOUT", "auto (cara grande, o dúo si hay dos personas), casa o crop"],
     ["Seguir a quien habla", "CLIP_FRAMING", "auto (sigue la cara) o center (fijo)"],
     ["Calidad del video", "CLIP_CRF", "18 (más bajo = más nítido y pesado)"],
     ["Encuadre del recorte", "CLIP_FOCUS_X", "0 = izquierda, 0.5 = centro, 1 = derecha"],
@@ -273,6 +337,7 @@ export default function Ajustes() {
       <h1>Ajustes de IA</h1>
       <OriginalSection />
       <LogoSection />
+      <WatermarkSection />
       <SubsSection />
       <TemplatesSection />
       <p className="sub">Por ahora estos ajustes se cambian en el archivo <code>worker/.env</code> y se aplican al reiniciar el worker.</p>

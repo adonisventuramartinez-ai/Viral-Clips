@@ -54,7 +54,7 @@ export default function Eliminador({ theme }: { theme: Theme }) {
   useEffect(() => {
     setPaginas([]); setPaginaId(""); reiniciar();
     if (!cuentaId) return;
-    fetch(`/api/accounts/${cuentaId}/paginas`).then((r) => r.json()).then((d) => {
+    fetch(`/api/fb/accounts/${cuentaId}/paginas`).then((r) => r.json()).then((d) => {
       if (d.error) return toast.error(d.error);
       setPaginas(d.paginas || []);
       if (d.paginas?.length) setPaginaId(d.paginas[0].id);
@@ -87,7 +87,7 @@ export default function Eliminador({ theme }: { theme: Theme }) {
     try {
       while (!cancelarCarga.current && acumulado.length < hasta) {
         const q = new URLSearchParams({ cuenta: String(cuentaId), pagina: paginaId, tipo, ...(cursor ? { despues: cursor } : {}) });
-        const r = await fetch(`/api/eliminar?${q}`);
+        const r = await fetch(`/api/fb/eliminar?${q}`);
         const d = await r.json().catch(() => ({}));
         if (!r.ok) {
           if (d.pausa) {

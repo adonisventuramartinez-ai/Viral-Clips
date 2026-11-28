@@ -20,8 +20,12 @@ export default function Cola({ theme }: { theme: Theme }) {
 
   async function cargar() {
     try {
-      const d = await (await fetch("/api/fb/schedule")).json();
+      const r = await fetch("/api/fb/schedule");
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || "No se pudo cargar la cola");
       setPosts(d.posts || []);
+    } catch (e: any) {
+      toast.error(e?.message || "Sin conexión con el servidor");
     } finally {
       setCargando(false);
     }
@@ -34,20 +38,28 @@ export default function Cola({ theme }: { theme: Theme }) {
 
   async function cancelar(id: number) {
     if (!confirm("¿Cancelar esta publicación?")) return;
-    const r = await fetch(`/api/schedule/${id}`, { method: "DELETE" });
-    const d = await r.json().catch(() => ({}));
-    r.ok ? toast.success("Cancelada") : toast.error(d.error || "No se pudo cancelar");
+    try {
+      const r = await fetch(`/api/fb/schedule/${id}`, { method: "DELETE" });
+      const d = await r.json().catch(() => ({}));
+      r.ok ? toast.success("Cancelada") : toast.error(d.error || "No se pudo cancelar");
+    } catch {
+      toast.error("Sin conexión con el servidor");
+    }
     cargar();
   }
 
   async function reintentar(id: number) {
-    const r = await fetch(`/api/schedule/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ accion: "reintentar" }),
-    });
-    const d = await r.json().catch(() => ({}));
-    r.ok ? toast.success("Volvió a la cola") : toast.error(d.error || "No se pudo reintentar");
+    try {
+      const r = await fetch(`/api/fb/schedule/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accion: "reintentar" }),
+      });
+      const d = await r.json().catch(() => ({}));
+      r.ok ? toast.success("Volvió a la cola") : toast.error(d.error || "No se pudo reintentar");
+    } catch {
+      toast.error("Sin conexión con el servidor");
+    }
     cargar();
   }
 

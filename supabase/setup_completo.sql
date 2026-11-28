@@ -1,6 +1,6 @@
--- ClipForge · TODO el SQL en un solo archivo (Partes 1 + 2).
--- Pégalo completo en Supabase > SQL Editor > New query y toca Run.
--- Se puede ejecutar más de una vez sin problema.
+-- ClipForge Â· TODO el SQL en un solo archivo (Partes 1 + 2).
+-- PÃ©galo completo en Supabase > SQL Editor > New query y toca Run.
+-- Se puede ejecutar mÃ¡s de una vez sin problema.
 
 create extension if not exists "pgcrypto";
 
@@ -17,7 +17,7 @@ create table if not exists public.sources (
   error        text,
   created_at   timestamptz not null default now()
 );
--- estados válidos (incluye 'downloading' que usa el worker)
+-- estados vÃ¡lidos (incluye 'downloading' que usa el worker)
 alter table public.sources drop constraint if exists sources_status_check;
 alter table public.sources add constraint sources_status_check
   check (status in ('queued','downloading','recording','transcribing','analyzing','clipping','done','error','stopped'));
@@ -114,7 +114,7 @@ begin
 end $$;
 
 -- RLS activado. La app usa la service role key en el servidor, que salta RLS;
--- sin políticas, el acceso público con la anon key queda bloqueado.
+-- sin polÃ­ticas, el acceso pÃºblico con la anon key queda bloqueado.
 alter table public.sources             enable row level security;
 alter table public.clips               enable row level security;
 alter table public.rejected_moments    enable row level security;
@@ -136,7 +136,7 @@ insert into storage.buckets (id, name, public) values
 on conflict (id) do nothing;
 
 -- ===== 0004 comunidad =====
--- ClipForge · comunidad. Ejecútalo en Supabase > SQL Editor. Se puede correr varias veces.
+-- ClipForge Â· comunidad. EjecÃºtalo en Supabase > SQL Editor. Se puede correr varias veces.
 
 -- 1) Columnas que la API y el worker ya usan
 alter table public.sources add column if not exists layout text default 'crop';
@@ -188,10 +188,10 @@ alter table public.social_accounts enable row level security;
 
 -- ===== 0005 calidad =====
 
--- Opciones de cada fuente (tipo de contenido, juego, barra de progreso...). El botón "Ajustar" las reutiliza.
+-- Opciones de cada fuente (tipo de contenido, juego, barra de progreso...). El botÃ³n "Ajustar" las reutiliza.
 alter table public.sources add column if not exists options jsonb;
 
--- Descripción y hashtags que escribe la IA para cada clip (la web los usa al copiar para TikTok / Shorts / Reels)
+-- DescripciÃ³n y hashtags que escribe la IA para cada clip (la web los usa al copiar para TikTok / Shorts / Reels)
 alter table public.clips add column if not exists description text;
 alter table public.clips add column if not exists hashtags text[];
 
@@ -210,7 +210,7 @@ create table if not exists public.live_commands (
 create index if not exists live_commands_pending on public.live_commands (source_id, status, created_at);
 alter table public.live_commands enable row level security;
 
--- 2) Canales automáticos: el worker mira cada pocos minutos si entraron en vivo y empieza a grabar solo
+-- 2) Canales automÃ¡ticos: el worker mira cada pocos minutos si entraron en vivo y empieza a grabar solo
 create table if not exists public.watch_channels (
   id             uuid primary key default gen_random_uuid(),
   name           text,
@@ -232,14 +232,14 @@ create table if not exists public.watch_channels (
 );
 alter table public.watch_channels enable row level security;
 
--- ===== 0007 publicación =====
--- ClipForge · Mejora 3 (paquete de publicación, miniatura, programación). Ejecútalo en Supabase > SQL Editor. Se puede correr varias veces.
+-- ===== 0007 publicaciÃ³n =====
+-- ClipForge Â· Mejora 3 (paquete de publicaciÃ³n, miniatura, programaciÃ³n). EjecÃºtalo en Supabase > SQL Editor. Se puede correr varias veces.
 
 -- Paquete que escribe la IA para cada clip: textos por red (TikTok, Reels/Facebook, Shorts), 3 ganchos alternativos y comentario fijado
 alter table public.clips add column if not exists pack jsonb;
 -- Miniatura (JPG vertical) guardada en el bucket "clips"
 alter table public.clips add column if not exists thumb_path text;
--- Programación: el worker publica el clip en tu página de Facebook cuando llega la hora
+-- ProgramaciÃ³n: el worker publica el clip en tu pÃ¡gina de Facebook cuando llega la hora
 alter table public.clips add column if not exists scheduled_at timestamptz;
 alter table public.clips add column if not exists publish_status text check (publish_status in ('scheduled','published','error'));
 alter table public.clips add column if not exists publish_error text;
@@ -256,11 +256,11 @@ alter table public.jobs add column if not exists last_error text;
 create index if not exists jobs_queue on public.jobs (status, priority desc, created_at);
 
 -- ===== 0009 viral =====
--- ClipForge · Parte 7 (área "Hacerlo viral"). Ejecútalo en Supabase > SQL Editor. Se puede correr varias veces.
+-- ClipForge Â· Parte 7 (Ã¡rea "Hacerlo viral"). EjecÃºtalo en Supabase > SQL Editor. Se puede correr varias veces.
 
--- Análisis viral de cada clip: puntaje, veredicto, mejor título y alternativas, hashtags, texto de miniatura, riesgos
+-- AnÃ¡lisis viral de cada clip: puntaje, veredicto, mejor tÃ­tulo y alternativas, hashtags, texto de miniatura, riesgos
 alter table public.clips add column if not exists viral jsonb;
--- pending = falta analizar | ready = listo para publicar | review = míralo tú | rejected = descartado | approved = lo aprobaste tú
+-- pending = falta analizar | ready = listo para publicar | review = mÃ­ralo tÃº | rejected = descartado | approved = lo aprobaste tÃº
 alter table public.clips add column if not exists viral_status text check (viral_status in ('pending','ready','review','rejected','approved'));
 -- Segunda miniatura para probar A/B
 alter table public.clips add column if not exists thumb_b_path text;
@@ -268,12 +268,12 @@ alter table public.clips add column if not exists thumb_b_path text;
 alter table public.clips alter column viral_status set default 'pending';
 create index if not exists clips_viral_status on public.clips (viral_status) where viral_status in ('pending','ready');
 
--- ===== 0010 cola de publicación =====
--- ClipForge · Parte 8 (cola de publicación en Facebook, Instagram y YouTube). Ejecútalo en Supabase > SQL Editor. Se puede correr varias veces.
+-- ===== 0010 cola de publicaciÃ³n =====
+-- ClipForge Â· Parte 8 (cola de publicaciÃ³n en Facebook, Instagram y YouTube). EjecÃºtalo en Supabase > SQL Editor. Se puede correr varias veces.
 create table if not exists public.posts (
   id           uuid primary key default gen_random_uuid(),
   clip_id      uuid not null references public.clips(id) on delete cascade,
-  network      text not null check (network in ('facebook','instagram','youtube')),
+  network      text not null check (network in ('facebook','instagram','youtube') or network ~ '^facebook:[0-9]+$'),
   status       text not null default 'queued' check (status in ('queued','publishing','published','error','cancelled')),
   scheduled_at timestamptz not null,
   external_id  text,
@@ -286,13 +286,13 @@ create table if not exists public.posts (
 create index if not exists posts_due on public.posts (scheduled_at) where status = 'queued';
 alter table public.posts enable row level security;
 
--- ===== 0011 clips automáticos =====
--- ClipForge · Parte 9 (clips automáticos de lo mejor del momento). Ejecútalo en Supabase > SQL Editor. Se puede correr varias veces.
+-- ===== 0011 clips automÃ¡ticos =====
+-- ClipForge Â· Parte 9 (clips automÃ¡ticos de lo mejor del momento). EjecÃºtalo en Supabase > SQL Editor. Se puede correr varias veces.
 create table if not exists public.discover_feeds (
   id           uuid primary key default gen_random_uuid(),
   name         text,
   kind         text not null default 'channel' check (kind in ('channel','search')),
-  target       text not null,                    -- link del canal, o texto de búsqueda
+  target       text not null,                    -- link del canal, o texto de bÃºsqueda
   active       boolean not null default true,
   content_type text not null default 'auto',
   game         text,
@@ -325,11 +325,11 @@ create index if not exists discovered_recent on public.discovered_videos (create
 alter table public.discover_feeds enable row level security;
 alter table public.discovered_videos enable row level security;
 
--- ===== 0012 mi página =====
+-- ===== 0012 mi pÃ¡gina =====
 
--- Números de cada publicación (última lectura)
+-- NÃºmeros de cada publicaciÃ³n (Ãºltima lectura)
 create table if not exists public.post_stats (
-  network      text not null check (network in ('facebook','instagram','youtube')),
+  network      text not null check (network in ('facebook','instagram','youtube') or network ~ '^facebook:[0-9]+$'),
   external_id  text not null,
   post_id      uuid,
   clip_id      uuid references public.clips(id) on delete set null,
@@ -344,7 +344,7 @@ create table if not exists public.post_stats (
 );
 create index if not exists post_stats_pub on public.post_stats (published_at desc);
 
--- Mejores horas aprendidas (hora local de tu país). network = 'all' junta todas las redes.
+-- Mejores horas aprendidas (hora local de tu paÃ­s). network = 'all' junta todas las redes.
 create table if not exists public.best_hours (
   network    text not null,
   slot       text not null,                -- 'HH:MM'
@@ -356,7 +356,7 @@ create table if not exists public.best_hours (
   primary key (network, slot)
 );
 
--- Seguidores por día (para ver cuánto crece tu página)
+-- Seguidores por dÃ­a (para ver cuÃ¡nto crece tu pÃ¡gina)
 create table if not exists public.page_followers (
   network   text not null,
   day       date not null,
@@ -364,7 +364,7 @@ create table if not exists public.page_followers (
   primary key (network, day)
 );
 
--- Facebook como fuente de clips automáticos
+-- Facebook como fuente de clips automÃ¡ticos
 alter table public.discover_feeds drop constraint if exists discover_feeds_kind_check;
 alter table public.discover_feeds add constraint discover_feeds_kind_check check (kind in ('channel','search','facebook'));
 
@@ -375,7 +375,7 @@ alter table public.page_followers enable row level security;
 -- ===== 0013 conexiones =====
 -- Guarda las llaves de tus redes. Solo el servidor (service role) puede leerlas: la web nunca las devuelve completas.
 create table if not exists public.connections (
-  network    text primary key check (network in ('facebook','instagram','youtube')),
+  network    text primary key check (network in ('facebook','instagram','youtube','autopilot')),
   data       jsonb not null default '{}'::jsonb,
   updated_at timestamptz not null default now()
 );
@@ -386,13 +386,13 @@ alter table public.connections enable row level security;
 -- Pedido que la web le deja al worker sobre un clip: {"action":"thumbs"|"reanalyze", ...}. El worker lo atiende y lo borra.
 -- Si falla, queda {"error":"motivo"} para que la web lo muestre.
 alter table public.clips add column if not exists viral_req jsonb;
--- Cuál miniatura se usa al publicar: a (principal) o b (la de prueba)
+-- CuÃ¡l miniatura se usa al publicar: a (principal) o b (la de prueba)
 alter table public.clips add column if not exists thumb_choice text check (thumb_choice in ('a','b'));
 
--- Ajustes de la página Hacerlo viral (una sola fila, id = 1)
+-- Ajustes de la pÃ¡gina Hacerlo viral (una sola fila, id = 1)
 create table if not exists public.viral_config (
   id               int primary key check (id = 1),
-  require_approval boolean not null default false,   -- true: nada entra a la cola sin que tú lo apruebes en Hacerlo viral
+  require_approval boolean not null default false,   -- true: nada entra a la cola sin que tÃº lo apruebes en Hacerlo viral
   updated_at       timestamptz not null default now()
 );
 insert into public.viral_config (id) values (1) on conflict (id) do nothing;
@@ -400,7 +400,7 @@ alter table public.viral_config enable row level security;
 
 create index if not exists clips_viral_req on public.clips (created_at) where viral_req is not null;
 
--- ===== 0015 botones (clips automáticos y cola) =====
+-- ===== 0015 botones (clips automÃ¡ticos y cola) =====
 
 -- Una sola fila (id = 1). Cada interruptor vale:
 --   true  = encendido desde la web
@@ -417,14 +417,95 @@ alter table public.app_switches enable row level security;
 
 -- ===== 0016 cuentas =====
 
--- Solo el servidor (service role) puede leer esta tabla: la web nunca devuelve contraseñas ni la lista de cuentas.
+-- Solo el servidor (service role) puede leer esta tabla: la web nunca devuelve contraseÃ±as ni la lista de cuentas.
 create table if not exists public.accounts (
   id            uuid primary key default gen_random_uuid(),
   username      text not null unique check (username ~ '^[a-z0-9_.]{3,24}$'),
   display_name  text not null check (char_length(display_name) between 2 and 40),
-  password_hash text not null,                     -- scrypt$sal$hash (nunca la contraseña)
+  password_hash text not null,                     -- scrypt$sal$hash (nunca la contraseÃ±a)
   avatar        text,                              -- foto de perfil ya achicada (data:image/jpeg;base64,...)
   created_at    timestamptz not null default now(),
   last_login    timestamptz
 );
 alter table public.accounts enable row level security;
+
+
+-- ClipForge 2.0 Â· Buscador de clips virales en TikTok / Instagram Reels.
+-- EjecÃºtalo en Supabase > SQL Editor. Se puede correr varias veces.
+
+-- 0) Los trabajos de bÃºsqueda no tienen una fuente de video: source_id puede ser null.
+alter table public.jobs alter column source_id drop not null;
+
+-- 1) El worker necesita un tipo de trabajo nuevo: 'search'.
+do $$
+declare c text;
+begin
+  for c in
+    select conname from pg_constraint
+    where conrelid = 'public.jobs'::regclass
+      and contype = 'c'
+      and pg_get_constraintdef(oid) ilike '%(type%'
+  loop
+    execute format('alter table public.jobs drop constraint %I', c);
+  end loop;
+
+  alter table public.jobs add constraint jobs_type_check
+    check (type in ('download','record','transcribe','analyze','clip','narrate','summary','transform','text_to_video','search'));
+end $$;
+
+-- 2) Una bÃºsqueda = lo que pidiÃ³ la persona + lo que encontrÃ³ el worker.
+create table if not exists public.clip_searches (
+  id            uuid primary key default gen_random_uuid(),
+  user_id       uuid references auth.users(id) on delete cascade,
+  query         text,
+  networks      text[] not null default array['tiktok','instagram'],
+  accounts      text[] not null default '{}',
+  links         text[] not null default '{}',
+  min_views     int not null default 10000,
+  max_age_hours int not null default 72,
+  max_results   int not null default 10,
+  auto_queue    int not null default 5,
+  content_type  text not null default 'auto',
+  publish_fb    boolean not null default true,
+  status        text not null default 'queued' check (status in ('queued','running','done','error')),
+  found         int not null default 0,
+  queued        int not null default 0,
+  error         text,
+  created_at    timestamptz not null default now(),
+  finished_at   timestamptz
+);
+
+create table if not exists public.clip_search_results (
+  id         uuid primary key default gen_random_uuid(),
+  search_id  uuid not null references public.clip_searches(id) on delete cascade,
+  network    text not null check (network in ('tiktok','instagram')),
+  video_id   text not null,
+  url        text,
+  title      text,
+  views      int not null default 0,
+  likes      int not null default 0,
+  comments   int not null default 0,
+  duration   int not null default 0,
+  posted_at  timestamptz,
+  score      int not null default 0,
+  velocity   numeric not null default 0,
+  status     text not null default 'found' check (status in ('found','queued','skipped','rejected')),
+  reason     text,
+  source_id  uuid references public.sources(id) on delete set null,
+  created_at timestamptz not null default now(),
+  unique (search_id, network, video_id)
+);
+
+create index if not exists clip_search_results_rank on public.clip_search_results (search_id, score desc);
+create index if not exists clip_searches_recent on public.clip_searches (created_at desc);
+
+alter table public.clip_searches enable row level security;
+alter table public.clip_search_results enable row level security;
+
+-- ===== BUSCADOR: RLS + PERMISOS =====
+alter table public.clip_searches disable row level security;
+alter table public.clip_search_results disable row level security;
+GRANT ALL ON public.clip_searches TO service_role;
+GRANT ALL ON public.clip_search_results TO service_role;
+GRANT ALL ON public.clip_searches TO anon;
+GRANT ALL ON public.clip_search_results TO anon;

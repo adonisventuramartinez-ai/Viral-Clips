@@ -118,7 +118,7 @@ export async function POST(req: Request) {
   if (kind === "transform") options.original = originalOn;
   if (kind === "text_to_video") Object.assign(options, { prompt: promptIA, style: styleIA, music: musicIA });
   Object.assign(safe, options);
-  const safeLayout = ["crop", "split", "split_eq", "split_game", "blur", "duo"].includes(String(layout)) ? String(layout) : "crop";
+  const safeLayout = ["crop", "casa", "split", "split_eq", "split_game", "blur", "duo"].includes(String(layout)) ? String(layout) : "crop";
   const finalLayout = kind === "transform" || kind === "text_to_video" ? "crop" : safeLayout;
 
   const db = serverClient();

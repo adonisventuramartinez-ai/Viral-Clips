@@ -285,7 +285,7 @@ create index if not exists clips_viral_status on public.clips (viral_status) whe
 create table if not exists public.posts (
   id           uuid primary key default gen_random_uuid(),
   clip_id      uuid not null references public.clips(id) on delete cascade,
-  network      text not null check (network in ('facebook','instagram','youtube')),
+  network      text not null check (network in ('facebook','instagram','youtube') or network ~ '^facebook:[0-9]+$'),
   status       text not null default 'queued' check (status in ('queued','publishing','published','error','cancelled')),
   scheduled_at timestamptz not null,
   external_id  text,
@@ -341,7 +341,7 @@ alter table public.discovered_videos enable row level security;
 
 -- Números de cada publicación (última lectura)
 create table if not exists public.post_stats (
-  network      text not null check (network in ('facebook','instagram','youtube')),
+  network      text not null check (network in ('facebook','instagram','youtube') or network ~ '^facebook:[0-9]+$'),
   external_id  text not null,
   post_id      uuid,
   clip_id      uuid references public.clips(id) on delete set null,
@@ -387,7 +387,7 @@ alter table public.page_followers enable row level security;
 -- ===== 0013 conexiones =====
 -- Guarda las llaves de tus redes. Solo el servidor (service role) puede leerlas: la web nunca las devuelve completas.
 create table if not exists public.connections (
-  network    text primary key check (network in ('facebook','instagram','youtube')),
+  network    text primary key check (network in ('facebook','instagram','youtube','autopilot')),
   data       jsonb not null default '{}'::jsonb,
   updated_at timestamptz not null default now()
 );
@@ -620,3 +620,44 @@ create index if not exists clip_searches_recent on public.clip_searches (created
 
 alter table public.clip_searches enable row level security;
 alter table public.clip_search_results enable row level security;
+
+-- ============================================================
+-- ARCHIVO: 0020_autopiloto.sql (piloto automático multi-página)
+-- ============================================================
+
+DO $$
+DECLARE
+  c record;
+BEGIN
+  FOR c IN
+    SELECT conname FROM pg_constraint AS pc
+    WHERE pc.conrelid = 'public.connections'::regclass
+      AND pc.contype = 'c'
+      AND pg_get_constraintdef(pc.oid) ILIKE '%network%'
+  LOOP
+    EXECUTE format('ALTER TABLE public.connections DROP CONSTRAINT %I', c.conname);
+  END LOOP;
+
+  FOR c IN
+    SELECT conname FROM pg_constraint AS pc
+    WHERE pc.conrelid = 'public.posts'::regclass
+      AND pc.contype = 'c'
+      AND pg_get_constraintdef(pc.oid) ILIKE '%network%'
+  LOOP
+    EXECUTE format('ALTER TABLE public.posts DROP CONSTRAINT %I', c.conname);
+  END LOOP;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'public.connections'::regclass AND conname = 'connections_network_check') THEN
+    ALTER TABLE public.connections ADD CONSTRAINT connections_network_check
+      CHECK (network IN ('facebook','instagram','youtube','autopilot'));
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'public.posts'::regclass AND conname = 'posts_network_check') THEN
+    ALTER TABLE public.posts ADD CONSTRAINT posts_network_check
+      CHECK (network IN ('facebook','instagram','youtube') OR network ~ '^facebook:[0-9]+$');
+  END IF;
+END $$;
+
+INSERT INTO public.connections (network, data)
+VALUES ('autopilot', '{"enabled": false, "page_ids": [], "auto_approve": true, "max_per_run": 5}'::jsonb)
+ON CONFLICT (network) DO NOTHING;

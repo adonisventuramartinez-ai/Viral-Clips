@@ -11,8 +11,12 @@ DEFAULT_SUBS = {"text": "FFFFFF", "active": "FFE000", "outline": "000000", "size
 
 SPLIT_TOPS = {"split": 1312, "split_eq": 1000, "split_game": 780}
 DUO_H = 960
+# Formato "La Casa": cara grande arriba, mismo momento abajo con fondo oscuro/difuminado.
+# La franja inferior es solo contexto (22%); el protagonista es el primer plano, como en Reels.
+CASA_H = 1500
+CASA_BOTTOM = 1920 - CASA_H
 
-SUB_MARGIN = {"crop": 600, "blur": 600, "duo": 890}
+SUB_MARGIN = {"crop": 600, "blur": 600, "duo": 890, "casa": 450}
 
 
 def sync_words_for_clip(words, start, end, sync=None):
@@ -246,6 +250,27 @@ def _duo_boxes(source: Path, start: float, dur: float, sw: int, sh: int):
     return ({"x": 0.0, "y": (100 - h) / 2, "w": 50.0, "h": h}, {"x": 50.0, "y": (100 - h) / 2, "w": 50.0, "h": h})
 
 
+def reality_layout(layout: str, source: Path, start: float, dur: float, profile: dict,
+                   sw: int, sh: int, custom_crop: dict = None) -> str:
+    """La Casa: si hay dos caras claras en el tramo, usa dúo; si no, cara grande con contexto.
+
+    Viene de lo que hacen OpusClip/Cut.Pro: 'split' para el back-and-forth, primer plano
+    para el monólogo. El fondo difuminado queda como contexto, no como protagonista.
+    """
+    if layout != "casa" or custom_crop or (profile or {}).get("name") != "reality":
+        return layout
+    if config.CLIP_FRAMING != "auto":
+        return layout
+    try:
+        import framing
+        if framing.duo_boxes(source, start, dur, sw, sh, 1080 / DUO_H):
+            print("  La Casa: dos caras claras -> dúo (pelea/reacción)", flush=True)
+            return "duo"
+    except Exception:
+        pass
+    return layout
+
+
 def _ass_for(words, start, end, workdir: Path, stem: str, layout: str, brand: dict = None, hook: str = None,
              tmap=None, n_speakers: int = 0) -> Path:
     ass = workdir / f"{stem}.ass"
@@ -277,6 +302,19 @@ def layout_graph(layout: str, source: Path, start: float, dur: float, custom_cro
                  polish: bool = True) -> str:
     # `polish=False` lo usa _render_core: la nitidez se aplica DESPUÉS del zoom para que no se pierda.
     fin = _finish if polish else (lambda tail: tail)
+    if layout == "casa":
+        # Reality 24/7: lo que vende es la CARA y la reacción, no el cuarto completo.
+        # Arriba va la cara grande (misma detección que "split"); abajo el mismo tramo
+        # con fondo oscuro difuminado para que el ojo no se pierda, sin quitar contexto.
+        sw, sh = _probe(source)
+        cam = _box_filter(sw, sh, _cam_box(source, start, dur, sw, sh, custom_crop, CASA_H))
+        return (
+            "[0:v]split=2[a][b];"
+            f"[a]{cam},scale=1080:{CASA_H}:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:{CASA_H},setsar=1[t];"
+            f"[b]{_crop_filter(source, start, dur, custom_crop, keys)},scale=1080:{CASA_BOTTOM}:force_original_aspect_ratio=increase:flags=lanczos,"
+            f"crop=1080:{CASA_BOTTOM},boxblur=12:3,eq=brightness=-0.18:saturation=0.85,setsar=1[g];"
+            "[t][g]vstack=inputs=2," + fin("setsar=1")
+        )
     if layout == "blur":
         # Difuminar a resolución completa costaba ~20 min por clip de 1 min en la VM de 3 CPU.
         # Se desdifumina a 1/4 (mismo radio aparente), se procesa ahí y se vuelve a subir: el
@@ -355,15 +393,16 @@ def _flag(opt, default):
     return default if v is None else v
 
 
-def _encode(cmd_head, cmd_tail, vb, workdir):
+def _encode(cmd_head, cmd_tail, vb, workdir, preset=None):
     import encoder
+    preset = preset or config.CLIP_PRESET
     kind = encoder.pick()
-    r = subprocess.run(cmd_head + encoder.video_args(kind, config.CLIP_CRF, config.CLIP_PRESET, vb) + cmd_tail,
+    r = subprocess.run(cmd_head + encoder.video_args(kind, config.CLIP_CRF, preset, vb) + cmd_tail,
                        cwd=workdir, capture_output=True, text=True)
     if r.returncode != 0 and kind != "cpu":
         print(f"  Codificador {kind} falló; repito con CPU.", flush=True)
         encoder.mark_bad(kind)
-        r = subprocess.run(cmd_head + encoder.video_args("cpu", config.CLIP_CRF, config.CLIP_PRESET, vb) + cmd_tail,
+        r = subprocess.run(cmd_head + encoder.video_args("cpu", config.CLIP_CRF, preset, vb) + cmd_tail,
                            cwd=workdir, capture_output=True, text=True)
     if r.returncode != 0:
         raise RuntimeError("ffmpeg falló: " + r.stderr[-600:])
@@ -397,14 +436,16 @@ def _render_core(source: Path, words, start: float, end: float, out: Path, workd
     import postfx
     dur = end - start
     opts = opts or {}
+    fast = bool(opts.get("live_fast"))   # directos: prioridad que no se atragante la grabación
     layout = (layout or config.CLIP_LAYOUT or "crop").strip().lower()
-    if layout not in ("crop", "blur", "duo", *SPLIT_TOPS):
+    if layout not in ("crop", "blur", "duo", "casa", *SPLIT_TOPS):
         layout = "crop"
 
     keys = None
-    if layout == "crop" and not custom_crop and config.CLIP_FRAMING == "auto":
+    if layout in ("crop", "casa") and not custom_crop and config.CLIP_FRAMING == "auto":
         sw, sh = _probe(source)
-        if sw / sh > 9 / 16:
+        layout = reality_layout(layout, source, start, dur, profile, sw, sh, custom_crop)
+        if layout == "crop" and sw / sh > 9 / 16:
             import framing
             found = framing.camera_keys(source, start, dur, sw, sh, int(sh * 9 / 16) // 2 * 2 / sw)
             # Lista vacía = ya busqué y no hay cara: el recorte se queda al centro y no vuelve a detectar.
@@ -467,14 +508,28 @@ def _render_core(source: Path, words, start: float, end: float, out: Path, workd
         graph += ";" + postfx.slow_video(cur, "vS", slow)
         cur = "vS"
     # CAS + unsharp al FINAL: si se aplican antes del zoom, el reescalado se come el filo.
-    p = _polish()
+    # En directos se saltan: a 1080x1920 con eval=frame son los filtros que más frenan.
+    p = "" if fast else _polish()
     if p:
         graph += f";[{cur}]{p}[vP]"
         cur = "vP"
     graph += f";[{cur}]subtitles={ass.name}[vA]"
     cur = "vA"
+    # Marca de agua (texto) si está configurada (web tiene prioridad sobre .env)
+    wm_cfg = (brand or {}).get("watermark") if isinstance(brand, dict) else None
+    if not wm_cfg and config.WATERMARK_TEXT:
+        wm_cfg = {"text": config.WATERMARK_TEXT, "pos": config.WATERMARK_POS, "size": config.WATERMARK_SIZE, "opacity": config.WATERMARK_OPACITY}
+    if wm_cfg and wm_cfg.get("text"):
+        wm = str(wm_cfg["text"]).replace(":", "\\:").replace("'", "\\'")
+        pos_map = {"tl": "x=20:y=20", "tr": "x=w-tw-20:y=20", "bl": "x=20:y=h-th-20", "br": "x=w-tw-20:y=h-th-20", "center": "x=(w-tw)/2:y=(h-th)/2"}
+        pos = pos_map.get(wm_cfg.get("pos", "br"), pos_map["br"])
+        alpha = float(wm_cfg.get("opacity", 0.6))
+        size = int(wm_cfg.get("size", 18))
+        wm_filter = f"drawtext=text='{wm}':fontsize={size}:fontcolor=white@{alpha:.2f}:borderw=2:bordercolor=black@{alpha:.2f}:{pos}:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+        graph += f";[{cur}]{wm_filter}[vW]"
+        cur = "vW"
     if brand and brand.get("progress_bar"):
-        graph = _bar_graph(graph, dur_out, "vA", "vB")
+        graph = _bar_graph(graph, dur_out, cur, "vB")
         cur = "vB"
     logo = Path(brand["path"]) if brand and brand.get("path") else None
     use_logo = bool(logo and logo.exists())
@@ -493,5 +548,5 @@ def _render_core(source: Path, words, start: float, end: float, out: Path, workd
     vb = _bitrate(dur_out)
     head = ["ffmpeg", "-y", "-ss", f"{start:.2f}", "-t", f"{dur:.2f}"] + inputs + ["-filter_complex", graph, "-map", "[out]"] + amap
     tail = ["-r", str(config.CLIP_OUTPUT_FPS), "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(out.resolve())]
-    _encode(head, tail, vb, workdir)
+    _encode(head, tail, vb, workdir, preset=config.LIVE_CLIP_PRESET if fast else None)
     return out

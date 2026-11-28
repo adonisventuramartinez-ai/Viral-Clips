@@ -61,6 +61,11 @@ def _enabled(db=None):
         return bool(config.AUTO_QUEUE)
 
 
+def autopilot_networks(pages):
+    """Redes internas que usa el piloto: facebook:<id_página> (una fila por página)."""
+    return [f"facebook:{p}" for p in pages if str(p).isdigit()]
+
+
 def tick(db=None):
     global _last
     if time.time() - _last < 120 or not _enabled(db):
@@ -68,12 +73,41 @@ def tick(db=None):
     _last = time.time()
     if db is None:
         import db as db
-    nets = networks_available()
+    done = 0
+
+    # Piloto automático: el mismo clip se programa en TODAS las páginas elegidas
+    # (varios proyectos, varias páginas por proyecto). La web publica por cada página
+    # con su token fresco; aquí solo llenamos la cola.
+    try:
+        cfg = db.autopilot_config() if hasattr(db, "autopilot_config") else {}
+    except Exception:  # noqa: BLE001
+        cfg = {}
+    pages = list(cfg.get("page_ids") or []) if cfg.get("enabled") else []
+    if pages:
+        targets = autopilot_networks(pages)
+        clips = db.clips_ready_for_autopilot(pages, max(1, int(cfg.get("max_per_run") or 5)),
+                                             auto_approve=bool(cfg.get("auto_approve")))
+        if clips:
+            slots = {}
+            try:
+                learned = db.learned_slots(["facebook"]) if config.LEARN_SLOTS else {}
+            except Exception:  # noqa: BLE001
+                learned = {}
+            for n in targets:
+                slots[n] = (learned or {}).get("facebook")
+            rows = plan(clips, db.autopilot_taken(pages), targets, pending=db.autopilot_pending(pages),
+                        slots=slots, max_pending=int(cfg.get("max_per_run") or 5))
+            if rows:
+                db.create_posts(rows)
+                done += len(rows)
+                print(f"  Piloto: {len(rows)} publicación(es) en {len(set(r['network'] for r in rows))} página(s)", flush=True)
+
+    nets = [n for n in networks_available() if not (pages and n == "facebook")]
     if not nets:
-        return 0
+        return done
     clips = db.clips_ready_for_queue(nets, 10)
     if not clips:
-        return 0
+        return done
     try:
         learned = db.learned_slots(nets) if config.LEARN_SLOTS else None    # horas aprendidas en Mi página
     except Exception:  # noqa: BLE001  (sin migración 0012: se usan POST_SLOTS)
@@ -81,5 +115,6 @@ def tick(db=None):
     rows = plan(clips, db.posts_taken(nets), nets, pending=db.posts_pending(nets), slots=learned)
     if rows:
         db.create_posts(rows)
+        done += len(rows)
         print(f"  Cola: {len(rows)} publicación(es) programada(s) en {', '.join(sorted({r['network'] for r in rows}))}", flush=True)
-    return len(rows)
+    return done

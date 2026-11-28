@@ -12,7 +12,7 @@ const POS = ["auto", "bc", "bl", "br", "tc", "tl", "tr"];
 const EXT: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" };
 
 type Subs = { text: string; active: string; outline: string; size: number; outline_w: number; upper: boolean; pop: boolean; offset: number };
-type Settings = { enabled: boolean; pos: string; size: number; opacity: number; file?: string; subs?: Subs; hook: boolean; hook_sec: number };
+type Settings = { enabled: boolean; pos: string; size: number; opacity: number; file?: string; subs?: Subs; hook: boolean; hook_sec: number; watermark?: { text: string; pos: string; size: number; opacity: number; enabled: boolean } };
 const DEFAULT: Settings = { enabled: true, pos: "bc", size: 24, opacity: 100, hook: true, hook_sec: 3.5 };
 const hex = (v: unknown, d: string) => (/^#?[0-9a-fA-F]{6}$/.test(String(v)) ? String(v).replace("#", "").toUpperCase() : d);
 
@@ -68,6 +68,21 @@ export async function POST(req: Request) {
   }
   if (form.get("hook") !== null) next.hook = form.get("hook") !== "false";
   if (form.get("hook_sec") !== null) next.hook_sec = Math.min(8, Math.max(1.5, Number(form.get("hook_sec")) || 3.5));
+
+  // marca de agua (texto)
+  const rawWm = form.get("watermark");
+  if (typeof rawWm === "string" && rawWm) {
+    try {
+      const w = JSON.parse(rawWm);
+      next.watermark = {
+        text: String(w.text || "").slice(0, 40),
+        pos: ["tl","tr","bl","br","center"].includes(w.pos) ? w.pos : "br",
+        size: clamp(w.size, 12, 60, 18),
+        opacity: clamp(w.opacity, 10, 100, 60),
+        enabled: w.enabled !== false,
+      };
+    } catch { return NextResponse.json({ error: "Marca de agua no válida" }, { status: 400 }); }
+  }
 
   const file = form.get("file");
   if (file && typeof file !== "string" && file.size > 0) {

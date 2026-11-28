@@ -2,7 +2,8 @@
 import { useCallback, useEffect, useState } from "react";
 
 export type Subs = { text: string; active: string; outline: string; size: number; outline_w: number; upper: boolean; pop: boolean; offset: number };
-export type Brand = { enabled: boolean; pos: string; size: number; opacity: number; file?: string; subs?: Subs; hook?: boolean; hook_sec?: number };
+export type Watermark = { text: string; pos: string; size: number; opacity: number; enabled: boolean };
+export type Brand = { enabled: boolean; pos: string; size: number; opacity: number; file?: string; subs?: Subs; hook?: boolean; hook_sec?: number; watermark?: Watermark };
 
 /** Estilos de subtítulos listos (los mismos valores los usa el worker). Fuente: Montserrat. */
 export const SUB_PRESETS: Record<string, { label: string; v: Subs }> = {

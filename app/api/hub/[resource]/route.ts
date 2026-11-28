@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { serverClient } from "@/lib/supabase";
+import { signClipPaths } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -13,8 +14,8 @@ async function signed(db: any, rows: any[]) {
   const paths = rows.map((r) => r.storage_path).filter(Boolean) as string[];
   const map = new Map<string, string>();
   if (paths.length) {
-    const { data } = await db.storage.from("clips").createSignedUrls(paths, 3600);
-    (data ?? []).forEach((x: any) => x.path && x.signedUrl && map.set(x.path, x.signedUrl));
+    const urls = await signClipPaths(paths, 3600, false, db);
+    urls.forEach((x) => x.signedUrl && map.set(x.path, x.signedUrl));
   }
   return rows.map((r) => ({
     id: r.id,

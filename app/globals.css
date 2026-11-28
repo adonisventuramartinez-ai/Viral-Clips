@@ -442,6 +442,11 @@ h1 { font-size: 28px; letter-spacing: -.02em; margin: 28px 0 6px; font-weight: 7
 .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; animation: fadeIn 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
 @media (max-width: 800px) { .grid2, .grid3 { grid-template-columns: 1fr; } }
 
+.editor-grid { display: grid; grid-template-columns: minmax(320px, 1.05fr) minmax(340px, .95fr); gap: 18px; align-items: start; }
+@media (max-width: 1000px) { .editor-grid { grid-template-columns: 1fr; } }
+.editor-handle { position: absolute; top: 0; bottom: 0; width: 8px; margin-left: -4px; border-radius: 4px; box-shadow: 0 0 10px rgba(255, 255, 255, .35); pointer-events: none; }
+.editor-handle::after { content: ""; position: absolute; top: 50%; left: 50%; width: 14px; height: 14px; transform: translate(-50%, -50%); border-radius: 50%; background: #fff; border: 2px solid rgba(0, 0, 0, .45); }
+
 label {
   display: block;
   font-size: 12px;

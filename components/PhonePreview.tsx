@@ -3,7 +3,7 @@ import { Media, Region } from "@/components/CropPreview";
 import { DEFAULT_CAM, DEFAULT_CROP, aspectGame, centerBox, isSplit, splitTop, type Box, type Embed } from "@/lib/embed";
 import { logoStyle, type Brand } from "@/lib/useBrand";
 
-export type Layout = "crop" | "split" | "split_eq" | "split_game" | "blur" | "duo";
+export type Layout = "crop" | "split" | "split_eq" | "split_game" | "casa" | "blur" | "duo";
 
 const grad = { game: "linear-gradient(180deg,#7bb7ff,#4a7a3a)", cam: "linear-gradient(160deg,#ff6ad5,#8b3dff)" };
 
@@ -28,8 +28,10 @@ export default function PhonePreview({ layout, embed, cropBox, camBox, brand, lo
       {layout === "crop" && zone({ inset: 0 }, grad.game, "Recorte vertical del juego", <Region e={embed} box={crop} />)}
 
       {isSplit(layout) && (<>
-        {zone({ top: 0, height: `${topPct}%` }, grad.cam, "Cámara", <Region e={embed} box={cam} />)}
-        {zone({ top: `${topPct}%`, bottom: 0 }, grad.game, fullGame ? "Juego completo" : "Juego", fullGame ? <Media e={embed} /> : <Region e={embed} box={centerBox(aspectGame(layout))} />)}
+        {zone({ top: 0, height: `${topPct}%` }, grad.cam, "Cara", <Region e={embed} box={cam} />)}
+        {layout === "casa"
+          ? zone({ top: `${topPct}%`, bottom: 0, filter: "blur(10px) brightness(.7)" }, grad.game, "Contexto difuminado", <Region e={embed} box={{ ...DEFAULT_CROP }} still />)
+          : zone({ top: `${topPct}%`, bottom: 0 }, grad.game, fullGame ? "Juego completo" : "Juego", fullGame ? <Media e={embed} /> : <Region e={embed} box={centerBox(aspectGame(layout))} />)}
       </>)}
 
       {layout === "duo" && (<>

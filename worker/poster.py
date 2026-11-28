@@ -4,8 +4,12 @@ Corre en un hilo propio (start_thread) para que un directo largo o un render no 
 Seguridad contra publicar dos veces: el post se reserva (queued -> publishing) ANTES de subir; si el worker se cae a mitad queda en
 'error: interrumpido' y NO se repite solo. Un error NO se reintenta solo (podría ya haber salido); lo reintentas tú desde la web.
 """
+import hashlib
+import hmac
+import json
 import threading
 import time
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -13,6 +17,14 @@ import config
 import packager
 
 NETS = ("facebook", "instagram", "youtube")
+
+
+def fb_page_of(network):
+    """'facebook:123456' -> '123456'. 'facebook' (de siempre) -> None."""
+    n = str(network or "")
+    if n.startswith("facebook:") and n.split(":", 1)[1].isdigit():
+        return n.split(":", 1)[1]
+    return None
 
 
 def caption(clip, network):
@@ -42,12 +54,48 @@ def _cover_bytes(clip, db):
         return None
 
 
+def publish_to_page(page_id, post, clip):
+    """Piloto automático: la web firma el clip y publica en esta página con su token fresco."""
+    if not config.WEB_URL:
+        raise RuntimeError("Falta WEB_URL en worker/.env")
+    title, text = caption(clip, f"facebook:{page_id}")
+    body = json.dumps({
+        "post_id": str(post.get("id") or ""), "page_id": str(page_id),
+        "storage_path": clip["storage_path"], "title": title, "message": text,
+    }).encode("utf-8")
+    secret = config.R2_SECRET_ACCESS_KEY
+    if not secret:
+        raise RuntimeError("Falta R2_SECRET_ACCESS_KEY en worker/.env (firma del piloto)")
+    firma = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+    req = urllib.request.Request(
+        f"{config.WEB_URL}/api/autopiloto/publicar", data=body, method="POST",
+        headers={"Content-Type": "application/json", "X-Autopiloto": firma},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=180) as resp:
+            out = json.loads(resp.read().decode("utf-8") or "{}")
+    except Exception as e:  # noqa: BLE001
+        detail = ""
+        if hasattr(e, "read"):
+            try:
+                detail = (e.read().decode("utf-8") or "")[:200]
+            except Exception:  # noqa: BLE001
+                pass
+        raise RuntimeError(f"la web no pudo publicar en la página {page_id}: {type(e).__name__}: {detail or str(e)[:120]}")
+    if not out.get("ok"):
+        raise RuntimeError(str(out.get("error") or "Facebook no aceptó el reel")[:300])
+    return out.get("id") or ""
+
+
 def publish_post(post, clip, db, workdir=None, fb=None, ig=None, yt=None):
     """Publica un post. Devuelve el id externo o lanza RuntimeError con el motivo."""
     net = post["network"]
     title, text = caption(clip, net)
     if not clip.get("storage_path"):
         raise RuntimeError("el clip no tiene archivo")
+    page = fb_page_of(net)
+    if page:
+        return publish_to_page(page, post, clip)
     if net == "instagram":
         if ig is None:
             import publisher_ig as ig

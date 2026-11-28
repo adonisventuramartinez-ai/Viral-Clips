@@ -1,6 +1,7 @@
 """Pruebas de la Parte 2 (modo en vivo). No gasta IA ni necesita internet ni Supabase: usa un video de prueba y piezas falsas.
 Ejecuta: python test_live.py   (necesita ffmpeg)"""
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -100,9 +101,12 @@ def test_live_flow():
     src_video = TMP / "stream.mp4"
     dur_v = 16 if os.environ.get("LIVE_TEST_PACED") else 20
     make_video(src_video, dur=dur_v, burst=(10, 12), flash=(10, 11))
+    src_audio = TMP / "audio.mp4"
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", f"sine=f=440:d={dur_v}",
+                    "-c:a", "aac", str(src_audio)], check=True)
 
     rec = {"finish_cmd": [], "clips": [], "progress": [], "status": [], "saved_tr": 0, "review": [], "renders": [],
-           "resolves": 0, "sleeps": 0}
+           "resolves": 0, "sleeps": 0, "cmds": []}
 
     class FakeDB:
         sb = None
@@ -133,9 +137,9 @@ def test_live_flow():
     sys.modules["brand"] = types.SimpleNamespace(load=lambda w, template=None: {})
 
     def fake_render(win, words, start, end, out, work, **kw):
-        rec["renders"].append((round(start, 1), round(end, 1), kw.get("hook")))
+        rec["renders"].append((round(start, 1), round(end, 1), kw.get("hook"), kw["opts"]))
         Path(out).write_bytes(b"x" * 100)
-    sys.modules["render"] = types.SimpleNamespace(render_clip=fake_render)
+    sys.modules["render"] = types.SimpleNamespace(render_clip=fake_render, sync_words_for_clip=lambda words, start, end: [])
 
     def fake_transcribe(f, work):
         dur = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(f)],
@@ -180,14 +184,19 @@ def test_live_flow():
     def fake_resolve(url, quality):
         rec["resolves"] += 1
         if rec["resolves"] <= 2:      # primera conexión y primera reconexión: el directo sigue
-            return [(str(src_video), {})], ["-map", "0:v:0", "-map", "0:a:0?"], "Directo de prueba"
+            return ([(str(src_video), {}), (str(src_audio), {})],
+                    ["-map", "0:v:0", "-map", "1:a:0?"], "Directo de prueba")
         raise live.NotLive("terminó")
     live._resolve = fake_resolve
     if os.environ.get("LIVE_TEST_PACED"):       # el stream sale a velocidad real (como un directo de verdad)
-        orig = live._start_ffmpeg
         def paced(inputs, maps, seg_dir, logf, session=1):
             inputs = [(s_, h_) for s_, h_ in inputs]
-            cmd = ["ffmpeg", "-y", "-loglevel", "warning", "-re", "-i", inputs[0][0]] + maps + [
+            cmd = ["ffmpeg", "-y", "-loglevel", "warning", "-copyts", "-start_at_zero"]
+            for i, (s_, _h) in enumerate(inputs):
+                if i == 1:
+                    cmd += ["-isync", "0"]
+                cmd += ["-re", "-i", s_]
+            cmd += maps + [
                 "-c", "copy", "-f", "segment", "-segment_time", str(config.SEGMENT_SECONDS), "-segment_format", "mpegts",
                 "-reset_timestamps", "1", str(seg_dir / f"s{session:02d}_seg_%05d.ts")]
             return subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=logf)
@@ -197,9 +206,15 @@ def test_live_flow():
     job = {"id": "job1", "source_id": "sid1", "payload": {"clip_seconds": 20, "review_minutes": 1, "max_new": 2, "min_score": 50,
                                                           "progress_bar": True}}
     config.REVIEW_MINUTES = 1
+    real_popen = live.subprocess.Popen
+    def spy_popen(cmd, *a, **kw):
+        rec["cmds"].append(list(cmd))
+        return real_popen(cmd, *a, **kw)
+    live.subprocess.Popen = spy_popen
     t0 = time.time()
     live.process_live(job)
     took = time.time() - t0
+    live.subprocess.Popen = real_popen
 
     assert rec["resolves"] == 4, rec["resolves"]            # conexión + reconexión + 2 comprobaciones de "ya terminó"
     assert rec["finished"] is True and rec["status"][-1] == "done", rec["status"]
@@ -207,6 +222,9 @@ def test_live_flow():
     assert last["reconnects"] == 1 and last["chat_msgs"] == 123, last
     assert last["transcribed_sec"] >= (28 if rec.get("paced") else 38), last              # 2 sesiones de 20 s: la grabación sigue después de reconectar
     assert rec["review"], "no hubo ninguna revisión"
+    seg_cmds = [c for c in rec["cmds"] if "-f" in c and "segment" in c]
+    assert seg_cmds and all("-copyts" in c and "-start_at_zero" in c and "-isync" in c for c in seg_cmds), rec["cmds"]
+    assert rec["renders"] and all(r[3].get("live_fast") for r in rec["renders"]), rec["renders"]
     r0 = rec["review"][0]
     assert r0["profile"] == "juego" and r0["game"] == "Counter" and r0["max_new"] == 2 and r0["min_score"] == 50, r0
     assert any(m in r0["hot"] for m in "🔊🎮💬"), r0          # llegaron pistas a la IA
@@ -218,6 +236,62 @@ def test_live_flow():
     assert rec.get("chat_stopped"), "el chat debe detenerse al final"
     assert not (config.WORK_DIR / "sid1").exists(), "debe limpiar la carpeta de trabajo"
     print(f"  (directo simulado: {took:.0f} s, {len(rec['clips'])} clips, {len(rec['review'])} revisiones)")
+
+
+# ---------------------------------------------------------------- 5) audio/video separados: no se come el desfase
+def test_av_sync():
+    import config
+    import live
+
+    v = TMP / "sync_v.mp4"
+    a = TMP / "sync_a.mp4"
+    seg_dir = TMP / "sync_seg"
+    shutil.rmtree(seg_dir, ignore_errors=True)
+    seg_dir.mkdir(parents=True, exist_ok=True)
+    config.SEGMENT_SECONDS = 5
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=blue:s=320x240:r=25:d=12",
+                    "-c:v", "libx264", "-g", "25", "-pix_fmt", "yuv420p", str(v)], check=True)
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-itsoffset", "2", "-f", "lavfi", "-i", "sine=f=440:d=12",
+                    "-c:a", "aac", str(a)], check=True)
+
+    with open(TMP / "sync_ffmpeg.log", "wb") as logf:
+        proc = live._start_ffmpeg([(str(v), {}), (str(a), {})],
+                                  ["-map", "0:v:0", "-map", "1:a:0?"], seg_dir, logf)
+        assert proc.wait(timeout=60) == 0
+
+    segs = sorted(seg_dir.glob("s01_seg_*.ts"))
+    assert len(segs) >= 2, segs
+    seg = segs[0]
+
+    def first_pts(path, sel):
+        r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", sel, "-show_entries",
+                            "packet=pts_time", "-of", "csv=p=0", str(path)], capture_output=True, text=True)
+        return float(next(x for x in r.stdout.splitlines() if x).rstrip(","))
+
+    v0, a0 = first_pts(seg, "v:0"), first_pts(seg, "a:0")
+    assert a0 - v0 >= 1.5, (v0, a0)   # el audio empieza 2 s después: ffmpeg no debe alinearlo a cero
+    assert live._duration(seg) <= 5.2, live._duration(seg)   # la cola de audio no cuenta como video grabado
+    assert 1.5 <= live._audio_offset(seg) <= 2.1, live._audio_offset(seg)   # para correr palabras/volumen
+
+    def concat(name, use_video_duration):
+        lst = TMP / f"sync_{name}.txt"
+        lines = []
+        for s in segs:
+            lines.append(f"file '{s.resolve()}'\n")
+            if use_video_duration:
+                lines.append(f"duration {live._duration(s):.3f}\n")
+        lst.write_text("".join(lines))
+        ts, mp4 = TMP / f"sync_{name}.ts", TMP / f"sync_{name}.mp4"
+        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", str(lst),
+                        "-c", "copy", str(ts)], check=True)
+        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(ts), "-c", "copy", str(mp4)], check=True)
+        return mp4
+
+    good = concat("good", True)
+    bad = concat("bad", False)
+    assert live._duration(good) <= 13, live._duration(good)   # 12 s de video, sin huecos entre trozos
+    assert live._duration(bad) > 9, live._duration(bad)      # sin 'duration' el concat se come el desfase
+    assert 1.5 <= live._audio_offset(good) <= 2.1, live._audio_offset(good)
 
 
 if __name__ == "__main__":

@@ -36,7 +36,7 @@ export default function PublicarYa({ video, theme, onCerrar, onHecho }: { video:
   }, []);
 
   useEffect(() => {
-    fetch(`/api/tendencias?desc=${encodeURIComponent(desc.slice(0, 400))}`)
+    fetch(`/api/fb/tendencias?desc=${encodeURIComponent(desc.slice(0, 400))}`)
       .then((r) => r.json())
       .then((d) => { setTendencias(d.tendencias || []); setGeo(d.geo || ""); })
       .catch(() => setTendencias([]));
@@ -45,7 +45,7 @@ export default function PublicarYa({ video, theme, onCerrar, onHecho }: { video:
   useEffect(() => {
     setSel(new Set());
     if (!cuentaId) return setPaginas([]);
-    fetch(`/api/accounts/${cuentaId}/paginas`).then((r) => r.json()).then((d) => {
+    fetch(`/api/fb/accounts/${cuentaId}/paginas`).then((r) => r.json()).then((d) => {
       if (d.error) { toast.error(d.error); setPaginas([]); } else {
         const p: Pagina[] = d.paginas || [];
         setPaginas(p);

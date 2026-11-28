@@ -65,7 +65,7 @@ export default function TikTok({ theme, onIr }: { theme: Theme; onIr: (s: Seccio
 
   async function accion(id: number, tipo: "borrar" | "reintentar") {
     if (tipo === "borrar" && !confirm("¿Quitar de la lista? Si el video aún no se usó, también se borra el archivo.")) return;
-    const r = await fetch(`/api/importar/${id}`, tipo === "borrar"
+    const r = await fetch(`/api/fb/importar/${id}`, tipo === "borrar"
       ? { method: "DELETE" }
       : { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accion: "reintentar" }) });
     const d = await r.json().catch(() => ({}));

@@ -83,34 +83,38 @@ class LiveChat:
     def _run(self):
         from chat_downloader import ChatDownloader
         fails = 0
-        max_fails = 8  # más reintentos antes de rendirse
+        max_fails = 8  # reintentos de verdad: get_chat() puede abrir y fallar al primer mensaje
         while not self._stop.is_set() and fails < max_fails:
             chat = None
+            got_message = False
             try:
-                # Intentar con diferentes parámetros si el primero falla
                 chat = ChatDownloader().get_chat(self.url, message_types=["text_message"])
-                if not self.started:
-                    self.started = True
-                    self.log("  Chat en vivo: conectado, leyendo mensajes.")
-                fails = 0
                 for msg in chat:
                     if self._stop.is_set():
                         break
                     self.add(msg.get("timestamp"))
+                    got_message = True
+                    if not self.started:
+                        self.started = True
+                        self.log("  Chat en vivo: conectado, leyendo mensajes.")
                 if self._stop.is_set():
                     break
                 time.sleep(5)       # el chat se cerró solo (directo terminado o corte): se reintenta unas veces
-                fails += 1
+                # Solo se considera éxito si llegó algún mensaje; si no, suma fallo aunque get_chat() no lanzara.
+                if got_message:
+                    fails = 0
+                else:
+                    fails += 1
             except Exception as e:  # noqa: BLE001
                 fails += 1
                 self.error = f"{type(e).__name__}: {str(e)[:100]}"
-                if fails <= 3:
+                if fails <= 3 or fails == max_fails:
                     self.log(f"  Chat en vivo: no pude leerlo ({self.error}); reintento {fails}/{max_fails}.")
-                # Si el error es de parsing, esperar más antes de reintentar
+                # Espera creciente pero topada: antes 15*fails llegaba a 2 min por intento.
                 if "ParsingError" in str(e) or "Unable to parse" in str(e):
-                    self._stop.wait(15 * fails)
+                    self._stop.wait(min(60, 15 * fails))
                 else:
-                    self._stop.wait(10 * fails)
+                    self._stop.wait(min(60, 10 * fails))
             finally:
                 close = getattr(chat, "close", None)
                 if callable(close):
@@ -118,6 +122,8 @@ class LiveChat:
                         close()
                     except Exception:  # noqa: BLE001
                         pass
+        if fails >= max_fails and not self.started:
+            self.log(f"  Chat en vivo: desactivado tras {max_fails} intentos ({self.error}). Sigo sin esa pista.")
 
     def stop(self):
         self._stop.set()

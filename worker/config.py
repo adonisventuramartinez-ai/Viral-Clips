@@ -11,6 +11,20 @@ except ImportError:
 SUPABASE_URL = os.environ.get("SUPABASE_URL") or os.environ.get("NEXT_PUBLIC_SUPABASE_URL", "")
 SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 
+# Storage de clips. 'supabase' (por defecto, sin cambios) o 'r2' (Cloudflare R2, egress gratis).
+# El bucket 'uploads' sigue siempre en Supabase: solo se mueven los MP4/miniaturas de clips.
+STORAGE_DRIVER = (os.environ.get("STORAGE_DRIVER") or "supabase").strip().lower()
+R2_ACCOUNT_ID = os.environ.get("R2_ACCOUNT_ID", "")
+R2_ACCESS_KEY_ID = os.environ.get("R2_ACCESS_KEY_ID", "")
+R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY", "")
+R2_CLIPS_BUCKET = os.environ.get("R2_CLIPS_BUCKET", "clips")
+R2_ENDPOINT = os.environ.get("R2_ENDPOINT", "")
+R2_REGION = os.environ.get("R2_REGION", "auto")  # Tigris usa 'auto'; Backblaze B2 usa su región (ej. us-west-004)
+
+# Web de ClipForge: el worker le pide el token de cada página de Facebook y publica por ella.
+# No es un secreto: es la URL del deploy (Vercel). Se puede cambiar sin tocar código.
+WEB_URL = (os.environ.get("WEB_URL") or "https://viral-clips-nine.vercel.app").strip().rstrip("/")
+
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 
 
@@ -57,11 +71,15 @@ LANGUAGE = os.environ.get("LANGUAGE", "es")
 
 # "crop" = el video llena TODA la pantalla vertical 9:16 (por defecto); "blur" = video chico centrado con fondo difuminado
 CLIP_LAYOUT = (os.environ.get("CLIP_LAYOUT") or "crop").strip().lower()
+# La Casa de Alofoke: "auto" elige cara grande si habla uno y dúo si se pelean dos; "casa" o "crop" fuerzan uno.
+CLIP_REALITY_LAYOUT = (os.environ.get("CLIP_REALITY_LAYOUT") or "auto").strip().lower()
 # Encuadre: "auto" = sigue la cara de quien habla (necesita scikit-image); "center" = fijo según CLIP_FOCUS_X
 CLIP_FRAMING = (os.environ.get("CLIP_FRAMING") or "auto").strip().lower()
 # Calidad: CRF más bajo = más nítido y más pesado (17-20 va bien); nitidez 0 = apagada, 0.5 suave, 1.0 fuerte
 CLIP_CRF = int(os.environ.get("CLIP_CRF") or 16)
 CLIP_PRESET = (os.environ.get("CLIP_PRESET") or "medium").strip()   # ultrafast ... veryfast, fast, medium, slow
+# En directos el render corre mientras se sigue grabando: usa preset rápido para no bloquear la cola.
+LIVE_CLIP_PRESET = (os.environ.get("LIVE_CLIP_PRESET") or "veryfast").strip()
 # 60 fps a 1080x1920 reparte el presupuesto de bits entre el doble de cuadros y se ve peor.
 # El contenido de directos/realities se ve igual a 30 fps y cada cuadro recibe el doble de bits.
 try:
@@ -173,6 +191,12 @@ COOKIES_FILE = os.environ.get("COOKIES_FILE", "")  # cookies.txt de YouTube si t
 
 # --- NUEVO: Ruta del logo para el Brand Kit ---
 LOGO_PATH = os.environ.get("LOGO_PATH", "")
+
+# --- Marca de agua (texto) ---
+WATERMARK_TEXT = os.environ.get("WATERMARK_TEXT", "").strip()
+WATERMARK_POS = (os.environ.get("WATERMARK_POS") or "br").strip().lower()  # tl, tr, bl, br, center
+WATERMARK_SIZE = max(12, min(60, int(os.environ.get("WATERMARK_SIZE") or 18)))
+WATERMARK_OPACITY = min(1.0, max(0.1, float(os.environ.get("WATERMARK_OPACITY") or 0.6)))
 
 POLL_SECONDS = int(os.environ.get("POLL_SECONDS", "5"))
 # Absoluta: varios subprocess de ffmpeg corren con cwd=work; si fuera relativa,

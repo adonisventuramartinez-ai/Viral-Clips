@@ -43,6 +43,12 @@ def load(workdir: Path, template=None) -> dict:
     out["subs"] = {k: cfg["subs"][k] for k in SUB_KEYS if isinstance(cfg.get("subs"), dict) and k in cfg["subs"]}
     out["hook"] = bool(cfg.get("hook", True))
     out["hook_sec"] = float(cfg.get("hook_sec", 3.5))
+    # Marca de agua (texto): primero la guardada en la web, si no la del .env
+    wm = cfg.get("watermark") if isinstance(cfg.get("watermark"), dict) else None
+    if wm and wm.get("enabled", True) and wm.get("text"):
+        out["watermark"] = {"text": str(wm["text"]), "pos": wm.get("pos", "br"), "size": int(wm.get("size", 18)), "opacity": int(wm.get("opacity", 60)) / 100.0}
+    elif config.WATERMARK_TEXT:
+        out["watermark"] = {"text": config.WATERMARK_TEXT, "pos": config.WATERMARK_POS, "size": config.WATERMARK_SIZE, "opacity": config.WATERMARK_OPACITY}
 
     if cfg.get("enabled", True) and cfg.get("file"):
         try:

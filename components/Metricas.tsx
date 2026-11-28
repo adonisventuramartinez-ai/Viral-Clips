@@ -38,7 +38,7 @@ export default function Metricas({ theme }: { theme: Theme }) {
     setCargando(true);
     setError(null);
     try {
-      const r = await fetch(`/api/insights${refrescar ? "?refrescar=1" : ""}`);
+      const r = await fetch(`/api/fb/insights${refrescar ? "?refrescar=1" : ""}`);
       const j = await r.json();
       if (j.error) throw new Error(j.error);
       setD(j);

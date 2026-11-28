@@ -60,9 +60,16 @@ export default function EnVivo() {
   }, []);
 
   useEffect(() => {
-    load();
-    const t = setInterval(load, 4000);
-    return () => clearInterval(t);
+    let t: ReturnType<typeof setInterval> | null = null;
+    const startPolling = () => {
+      if (document.visibilityState === "visible") {
+        load();
+        if (!t) t = setInterval(load, 4000);
+      } else if (t) { clearInterval(t); t = null; }
+    };
+    startPolling();
+    document.addEventListener("visibilitychange", startPolling);
+    return () => { if (t) clearInterval(t); document.removeEventListener("visibilitychange", startPolling); };
   }, [load]);
 
   async function start(e: React.FormEvent<HTMLFormElement>) {
@@ -70,26 +77,30 @@ export default function EnVivo() {
     setBusy(true);
     setErr("");
     const f = new FormData(e.currentTarget);
-    const res = await fetch("/api/jobs", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        kind: "live",
-        url: f.get("url"),
-        clip_seconds: Number(f.get("secs")),
-        quality: f.get("quality"),
-        review_minutes: Number(f.get("review")),
-        layout: f.get("layout"),
-        content_type: ctype,
-        game: ctype === "juego" ? String(f.get("game") ?? "").trim() : "",
-        max_new: Number(f.get("max_new")),
-        progress_bar: f.get("bar") === "on",
-        clipper: (() => { try { return localStorage.getItem("cf_clipper") || null; } catch { return null; } })(),
-      }),
-    });
-    const j = await res.json();
-    if (!res.ok) setErr(j.error ?? "No se pudo empezar");
-    else if (j.demo) setErr(j.message);
+    try {
+      const res = await fetch("/api/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: "live",
+          url: f.get("url"),
+          clip_seconds: Number(f.get("secs")),
+          quality: f.get("quality"),
+          review_minutes: Number(f.get("review")),
+          layout: f.get("layout"),
+          content_type: ctype,
+          game: ctype === "juego" ? String(f.get("game") ?? "").trim() : "",
+          max_new: Number(f.get("max_new")),
+          progress_bar: f.get("bar") === "on",
+          clipper: (() => { try { return localStorage.getItem("cf_clipper") || null; } catch { return null; } })(),
+        }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) setErr(j.error ?? "No se pudo empezar");
+      else if (j.demo) setErr(j.message);
+    } catch {
+      setErr("No se pudo conectar con el servidor");
+    }
     await load();
     setBusy(false);
   }
@@ -97,7 +108,13 @@ export default function EnVivo() {
   async function stop() {
     if (!source) return;
     setBusy(true);
-    await fetch("/api/live/stop", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source_id: source.id }) });
+    try {
+      const r = await fetch("/api/live/stop", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source_id: source.id }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) setErr(j.error ?? "No se pudo detener el directo");
+    } catch {
+      setErr("No se pudo conectar con el servidor");
+    }
     await load();
     setBusy(false);
   }
@@ -146,6 +163,7 @@ export default function EnVivo() {
             <label>Formato del video</label>
             <select name="layout" defaultValue="crop">
               <option value="crop">Vertical (recomendado - sigue la cara)</option>
+              <option value="casa">La Casa de Alofoke: cara grande + fondo difuminado</option>
               <option value="split">Dividido: cara grande arriba, juego abajo</option>
               <option value="split_eq">Dividido: equilibrado (mitad y mitad)</option>
               <option value="split_game">Dividido: juego grande</option>

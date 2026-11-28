@@ -8,6 +8,8 @@
     "start": "next start"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1178.0",
+    "@aws-sdk/s3-request-presigner": "^3.1178.0",
     "@supabase/supabase-js": "^2.45.0",
     "framer-motion": "^11.2.10",
     "next": "14.2.35",

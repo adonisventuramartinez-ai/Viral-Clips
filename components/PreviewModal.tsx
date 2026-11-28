@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { TipoContenido } from "@/lib/facebook";
 
@@ -34,9 +35,10 @@ export default function PreviewModal({
   paginasSeleccionadas,
   theme,
 }: PreviewModalProps) {
-  if (!abierto) return null;
+  const previewUrl = useMemo(() => (archivo ? URL.createObjectURL(archivo) : null), [archivo]);
+  useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl); }, [previewUrl]);
 
-  const previewUrl = archivo ? URL.createObjectURL(archivo) : null;
+  if (!abierto) return null;
 
   return (
     <AnimatePresence>

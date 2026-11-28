@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import Link from "next/link";
 import type { Clip } from "@/lib/types";
 
 const TAGS = ["#fyp", "#viral", "#clips", "#streamer"];
@@ -156,6 +157,7 @@ export default function ClipCard({ clip, onDeleted, onAdjusted }: { clip: Clip; 
           </button>
           {clip.pack?.hooks?.length ? <button className="btn sm ghost" onClick={() => setHooks(!hooks)} title="Otros 3 textos para el arranque del clip">🎣 Ganchos</button> : null}
           {clip.thumbUrl && <a className="btn sm ghost" href={clip.thumbUrl} target="_blank" rel="noreferrer" style={{ textAlign: "center" }} title="Miniatura automática">🖼 Miniatura</a>}
+          <Link className="btn sm ghost" href={`/editor/${clip.id}`} style={{ textAlign: "center" }} title="Editor completo: recorte, encuadre, texto y miniaturas">🎬 Editor</Link>
           <button className="btn sm ghost" onClick={() => setAdj(!adj)}>✏️ Ajustar</button>
           <button className="btn sm ghost" onClick={narrate} disabled={busy} title="Genera una versión con voz narrando el contexto (Modo Original)">🎙 Pasar a narrado</button>
           <button className="btn sm" onClick={remove} disabled={busy} style={{ background: "#ef4444", color: "#fff", border: "none" }}>

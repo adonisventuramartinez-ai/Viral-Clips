@@ -17,6 +17,8 @@ export default function Biblioteca() {
   const [minScore, setMinScore] = useState(0);
   const [cleaning, setCleaning] = useState(false);
   const [note, setNote] = useState("");
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const reload = useRef<() => void>(() => {});
 
   useEffect(() => {
@@ -95,12 +97,35 @@ export default function Biblioteca() {
   /** Pone otra vez en cola una fuente que falló (con las mismas opciones). */
   async function retry(id: string) {
     setCleaning(true);
-    const r = await fetch("/api/sources/retry", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) setErr(j.error ?? "No se pudo reintentar");
-    else setNote("Listo: lo puse otra vez en la cola.");
+    try {
+      const r = await fetch("/api/sources/retry", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) setErr(j.error ?? "No se pudo reintentar");
+      else setNote("Listo: lo puse otra vez en la cola.");
+    } catch {
+      setErr("No se pudo conectar con el servidor");
+    }
     setCleaning(false);
     reload.current();
+  }
+
+  async function deleteSelected() {
+    if (selected.size === 0) return;
+    if (!confirm(`¿Eliminar ${selected.size} clip(s) para siempre?`)) return;
+    setCleaning(true);
+    setNote("");
+    let deleted = 0;
+    for (const id of selected) {
+      try {
+        const res = await fetch(`/api/clips/${id}`, { method: "DELETE" });
+        if (res.ok) deleted++;
+      } catch { /* ignore */ }
+    }
+    setClips((p) => p.filter((x) => !selected.has(x.id)));
+    setSelected(new Set());
+    setSelectMode(false);
+    setNote(`Eliminados ${deleted} de ${selected.size} clips.`);
+    setCleaning(false);
   }
 
   const working = sources.filter((s) => ACTIVE.includes(s.status));
@@ -181,7 +206,37 @@ export default function Biblioteca() {
         </div>
       )}
 
-      <div className="clips">{shown.map((c) => <ClipCard key={c.id} clip={c} onDeleted={(id) => setClips((p) => p.filter((x) => x.id !== id))} onAdjusted={() => reload.current()} />)}</div>
+      {clips.length > 0 && (
+        <div style={{ margin: "10px 0", display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <button className="btn sm ghost" onClick={() => { setSelectMode(!selectMode); if (selectMode) setSelected(new Set()); }}>
+            {selectMode ? "✕ Cancelar selección" : "☑ Seleccionar clips"}
+          </button>
+          {selectMode && selected.size > 0 && (
+            <button className="btn sm" onClick={deleteSelected} disabled={cleaning} style={{ background: "#ef4444", color: "#fff", border: "none" }}>
+              {cleaning ? "Eliminando…" : `🗑 Eliminar ${selected.size} clip(s)`}
+            </button>
+          )}
+          {selectMode && (
+            <button className="btn sm ghost" onClick={() => setSelected(new Set(shown.map((c) => c.id)))}>
+              Seleccionar todos ({shown.length})
+            </button>
+          )}
+        </div>
+      )}
+      <div className="clips">{shown.map((c) => (
+        <div key={c.id} style={{ position: "relative", outline: selectMode && selected.has(c.id) ? "2px solid #3b82f6" : "none", borderRadius: 8 }}>
+          {selectMode && (
+            <label style={{ position: "absolute", top: 8, left: 8, zIndex: 10, background: "rgba(0,0,0,0.6)", borderRadius: 4, padding: "2px 6px", cursor: "pointer" }}>
+              <input type="checkbox" checked={selected.has(c.id)} onChange={(e) => {
+                const next = new Set(selected);
+                if (e.target.checked) next.add(c.id); else next.delete(c.id);
+                setSelected(next);
+              }} style={{ width: "auto", margin: 0 }} />
+            </label>
+          )}
+          <ClipCard clip={c} onDeleted={(id) => setClips((p) => p.filter((x) => x.id !== id))} onAdjusted={() => reload.current()} />
+        </div>
+      ))}</div>
 
       {loaded && !demo && clips.length === 0 && working.length === 0 && failed.length === 0 && (
         <div className="card" style={{ marginTop: 16 }}>

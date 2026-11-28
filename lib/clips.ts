@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fmtTime } from "./format";
+import { signClipPaths } from "./storage";
 import type { Clip, Pack, Viral } from "./types";
 
 type Row = {
@@ -49,13 +50,12 @@ export async function loadClips(db: SupabaseClient, sourceId?: string): Promise<
   const play = new Map<string, string>();
   const dl = new Map<string, string>();
   if (paths.length) {
-    const bucket = db.storage.from("clips");
     const [a, b] = await Promise.all([
-      bucket.createSignedUrls(paths, 3600),
-      bucket.createSignedUrls(paths, 3600, { download: true }),
+      signClipPaths(paths, 3600, false, db),
+      signClipPaths(paths, 3600, true, db),
     ]);
-    a.data?.forEach((x) => x.path && x.signedUrl && play.set(x.path, x.signedUrl));
-    b.data?.forEach((x) => x.path && x.signedUrl && dl.set(x.path, x.signedUrl));
+    a.forEach((x) => x.signedUrl && play.set(x.path, x.signedUrl));
+    b.forEach((x) => x.signedUrl && dl.set(x.path, x.signedUrl));
   }
 
   return rows.map((r) => ({

@@ -125,6 +125,43 @@ def _overlap(a, b):
     return inter / max(1e-6, min(a["end"] - a["start"], b["end"] - b["start"]))
 
 
+# En La Casa pasan varias historias a la vez en el mismo minuto: no basta con mirar el reloj.
+SAME_STORY_THRESHOLD = 0.35
+
+
+def _clip_text(c, segments):
+    """Texto de un clip ya hecho: el guardado en BD si viene de otra sesión, si no el de la transcripción."""
+    t = c.get("text")
+    if t:
+        return t
+    return _text_of({"start": c["start"], "end": c["end"]}, segments)
+
+
+def _same_story(m, c, segments):
+    """¿Es el MISMO relato que un clip anterior? Solaparse no basta: puede ser otra conversación."""
+    if _overlap(m, c) <= 0.3:
+        return False
+    ref = _clip_text(c, segments)
+    if not ref:
+        return True   # sin texto con qué comparar, mejor no arriesgar un duplicado
+    fp = detect.fingerprint(_text_of(m, segments))
+    old = detect.fingerprint(ref)
+    if not fp or not old:
+        return False
+    shared = len(fp & old)
+    # Contra el MÁS largo: un texto corto que cabe dentro de otro no prueba que sean el mismo relato.
+    if shared / max(len(fp), len(old)) < SAME_STORY_THRESHOLD:
+        return False
+    # Misma casa, mismo minuto: si cuentan cosas distintas (títulos distintos), son dos historias.
+    t1 = detect.fingerprint(str(m.get("title") or ""), k=1)
+    t2 = detect.fingerprint(str(c.get("title") or ""), k=1)
+    if t1 and t2:
+        title_sim = detect.similarity(t1, t2)   # contra la más corta: un título puede ser más corto
+        if title_sim < 0.5:
+            return False
+    return True
+
+
 def select_moments(candidates, n_clips):
     """Quita solapes y se queda con los mejores. Devuelve (elegidos, descartados)."""
     ranked = sorted(candidates, key=lambda m: m["score"], reverse=True)
@@ -301,7 +338,7 @@ def review_window(segments, secs, existing, duration, min_score=None, max_new=No
         ranked, dup = detect.drop_repeats(ranked, lambda m: _text_of(m, segments), known_texts, config.DEDUPE_THRESHOLD)
         rejected.extend(dup)
     for m in ranked:
-        if any(_overlap(m, c) > 0.3 for c in existing + chosen):
+        if any(_same_story(m, c, segments) for c in existing + chosen):
             rejected.append({"title": m["title"], "score": m["score"], "reason": "Ese momento o tema ya tiene clip"})
         elif m["score"] < min_score:
             rejected.append({"title": m["title"], "score": m["score"], "reason": f"Puntaje bajo (mínimo {min_score})"})

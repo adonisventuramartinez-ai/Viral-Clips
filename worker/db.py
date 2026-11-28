@@ -5,6 +5,7 @@ from pathlib import Path
 from supabase import create_client
 
 import config
+import storage  # clips en Supabase o R2 según STORAGE_DRIVER (uploads sigue en Supabase)
 
 sb = create_client(config.SUPABASE_URL, config.SUPABASE_KEY)
 
@@ -88,7 +89,7 @@ def reset_source_outputs(source_id):
     paths = [p for r in drop for p in (r.get("storage_path"), r.get("thumb_path")) if p]
     if paths:
         try:
-            sb.storage.from_("clips").remove(paths)
+            storage.remove("clips", paths)
         except Exception:  # noqa: BLE001
             pass
     for r in drop:
@@ -126,7 +127,7 @@ def save_rejected(source_id, rejected):
 
 def upload_clip(path, local_file):
     with open(local_file, "rb") as f:
-        sb.storage.from_("clips").upload(path, f.read(), {"content-type": "video/mp4", "upsert": "true"})
+        storage.upload("clips", path, f.read(), "video/mp4")
 
 
 # ----------------------------------------------------------------------------- Modo Transformar (bucket 'uploads')
@@ -237,11 +238,11 @@ def clips_needing_viral(limit=3):
 
 def upload_thumb(path, local_file):
     with open(local_file, "rb") as f:
-        sb.storage.from_("clips").upload(path, f.read(), {"content-type": "image/jpeg", "upsert": "true"})
+        storage.upload("clips", path, f.read(), "image/jpeg")
 
 
 def download_clip(path):
-    return sb.storage.from_("clips").download(path)
+    return storage.download("clips", path)
 
 
 def due_clips(limit=5):
@@ -287,7 +288,7 @@ def update_clip(clip_id, **fields):
 
 def remove_file(path):
     try:
-        sb.storage.from_("clips").remove([path])
+        storage.remove("clips", [path])
     except Exception:  # noqa: BLE001
         pass
 
@@ -310,9 +311,23 @@ def heartbeat(info=None):
             _hb_warned = time.time()
 
 
+def _safe_write(fn, what):
+    """Escritura auxiliar (latidos/progreso): reintenta una vez y NUNCA tumba el directo."""
+    for attempt in range(2):
+        try:
+            return fn()
+        except Exception as e:  # noqa: BLE001
+            if attempt == 0:
+                time.sleep(0.4)
+                continue
+            print(f"Aviso: no pude {what} ({str(e)[:140]}). Se reintentará en el próximo ciclo.", flush=True)
+            return None
+
+
 def touch_job(job_id):
     """Renueva locked_at para que un directo largo no se considere 'muerto'."""
-    sb.table("jobs").update({"locked_at": now()}).eq("id", job_id).execute()
+    _safe_write(lambda: sb.table("jobs").update({"locked_at": now()}).eq("id", job_id).execute(),
+                f"renovar el job {job_id}")
 
 
 def stop_requested(source_id) -> bool:
@@ -321,7 +336,9 @@ def stop_requested(source_id) -> bool:
 
 
 def set_progress(source_id, **p):
-    sb.table("sources").update({"progress": p}).eq("id", source_id).execute()
+    """Progreso del directo. Un corte momentáneo de Supabase no debe matar la grabación."""
+    _safe_write(lambda: sb.table("sources").update({"progress": p}).eq("id", source_id).execute(),
+                f"escribir el progreso de {source_id}")
 
 
 # ----------------------------------------------------------------------------- Parte 2: directos
@@ -394,11 +411,7 @@ def create_live_source(ch, found):
 
 # ----------------------------------------------------------------------------- Parte 8: cola de publicación (tabla posts, migración 0010)
 def signed_url(path, seconds=3600):
-    r = sb.storage.from_("clips").create_signed_url(path, seconds)
-    u = r.get("signedURL") or r.get("signed_url") or r.get("signedUrl")
-    if u and not u.startswith("http"):
-        u = f"{config.SUPABASE_URL.rstrip('/')}/storage/v1{u if u.startswith('/') else '/' + u}"
-    return u
+    return storage.signed_url("clips", path, seconds)
 
 
 def clips_ready_for_queue(networks, limit=10):
@@ -828,3 +841,147 @@ def discover_on():
 def auto_queue_on():
     """¿Está encendida la Cola automática? Botón de la web, o AUTO_QUEUE del .env si nunca lo tocaste."""
     return switch_on("auto_queue", config.AUTO_QUEUE)
+
+
+# ----------------------------------------------------------------------------- Piloto automático multi-página
+# La config vive en la Supabase de la WEB (donde están las cuentas de Facebook conectadas).
+# Worker y web pueden tener proyectos distintos: el puente se firma con R2_SECRET_ACCESS_KEY.
+_ap = {"at": 0.0, "row": {}}
+
+
+def _normalize_autopilot(d):
+    """Limpia la config que venga de la web (o de la fila local de respaldo)."""
+    if not isinstance(d, dict):
+        return {}
+    ids = []
+    for v in (d.get("page_ids") or []):
+        v = str(v).strip()
+        if v.isdigit() and v not in ids:
+            ids.append(v)
+    try:
+        cap = max(1, min(25, int(d.get("max_per_run") or 5)))
+    except (TypeError, ValueError):
+        cap = 5
+    return {
+        "enabled": str(d.get("enabled", "")).lower() not in ("", "0", "false", "no", "off"),
+        "page_ids": ids,
+        "auto_approve": str(d.get("auto_approve", "1")).lower() not in ("0", "false", "no", "off"),
+        "max_per_run": cap,
+    }
+
+
+def autopilot_config(every=15):
+    """Config del piloto: {enabled, page_ids, auto_approve, max_per_run}. Sin web = apagado."""
+    import hashlib
+    import hmac
+    import json as _json
+    import time as _t
+    import urllib.request as _url
+
+    if _t.time() - _ap["at"] < every:
+        return _ap["row"]
+
+    row = {}
+    secret = config.R2_SECRET_ACCESS_KEY
+    try:
+        if config.WEB_URL and secret:
+            body = _json.dumps({"worker": True}).encode("utf-8")
+            firma = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+            req = _url.Request(
+                f"{config.WEB_URL}/api/autopiloto", data=body, method="POST",
+                headers={"Content-Type": "application/json", "X-Autopiloto": firma},
+            )
+            with _url.urlopen(req, timeout=12) as resp:
+                out = _json.loads(resp.read().decode("utf-8") or "{}")
+            if out.get("ok") and isinstance(out.get("config"), dict):
+                row = _normalize_autopilot(out["config"])
+    except Exception:  # noqa: BLE001  (la web no responde: se usa el respaldo local)
+        row = {}
+
+    if not row:
+        try:
+            rows = sb.table("connections").select("data").eq("network", "autopilot").limit(1).execute().data or []
+            row = _normalize_autopilot((rows[0].get("data") or {}) if rows else {})
+        except Exception:  # noqa: BLE001
+            row = {}
+
+    if row.get("enabled"):
+        # Los interruptores viven en la BD del worker; encender el piloto los activa aquí también.
+        for sql in (
+            lambda: sb.table("app_switches").upsert({"id": 1, "discover": True, "auto_queue": True}).execute(),
+            lambda: sb.table("viral_config").upsert({"id": 1, "require_approval": False}).execute(),
+        ):
+            try:
+                sql()
+            except Exception:  # noqa: BLE001
+                pass
+
+    _ap["at"], _ap["row"] = _t.time(), row
+    return row
+
+
+def autopilot_on():
+    """¿Está encendido el piloto automático? (sin tabla 0013 = no)."""
+    return bool(autopilot_config().get("enabled"))
+
+
+def autopilot_pages():
+    """IDs de páginas de Facebook donde debe publicar el piloto."""
+    return list(autopilot_config().get("page_ids") or [])
+
+
+def clips_ready_for_autopilot(page_ids, limit=10, auto_approve=False):
+    """Clips virales listos/aprobados que aún NO tienen post en ninguna de estas páginas.
+    Con auto_approve=True, los 'ready' pasan a 'approved' solos (piloto 100% automático)."""
+    if not page_ids:
+        return []
+    try:
+        since = (datetime.now(timezone.utc) - timedelta(days=config.QUEUE_CLIP_DAYS)).isoformat()
+        statuses = ["approved"] if (require_approval() and not auto_approve) else ["ready", "approved"]
+        rows = (sb.table("clips").select("id,title,viral,viral_score,viral_status,publish_status,storage_path")
+                .in_("viral_status", statuses).gte("created_at", since).not_.is_("storage_path", "null")
+                .order("created_at", desc=True).limit(60).execute().data or [])
+        rows = [r for r in rows if r.get("publish_status") not in ("scheduled", "published")]
+        if not rows:
+            return []
+        if auto_approve:
+            pending = [r["id"] for r in rows if r.get("viral_status") == "ready"][:limit]
+            if pending:
+                sb.table("clips").update({"viral_status": "approved"}).in_("id", pending).execute()
+                for r in rows:
+                    if r["id"] in pending:
+                        r["viral_status"] = "approved"
+        nets = [f"facebook:{p}" for p in page_ids]
+        have = {}
+        for p in sb.table("posts").select("clip_id,network").in_("network", nets).in_("clip_id", [r["id"] for r in rows]).execute().data or []:
+            have.setdefault(p["clip_id"], set()).add(p["network"])
+        return [r for r in rows if set(nets) - have.get(r["id"], set()) == set(nets)][:limit]
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def autopilot_taken(page_ids):
+    """Fechas ya ocupadas, por red con prefijo facebook:<id> (para no pegar todos los posts a la vez)."""
+    out = {}
+    if not page_ids:
+        return out
+    try:
+        nets = [f"facebook:{p}" for p in page_ids]
+        for p in sb.table("posts").select("network,scheduled_at").in_("network", nets).eq("status", "queued").execute().data or []:
+            out.setdefault(p["network"], []).append(p["scheduled_at"])
+    except Exception:  # noqa: BLE001
+        pass
+    return out
+
+
+def autopilot_pending(page_ids):
+    out = {}
+    if not page_ids:
+        return out
+    try:
+        nets = [f"facebook:{p}" for p in page_ids]
+        for p in sb.table("posts").select("network").in_("network", nets).eq("status", "queued").execute().data or []:
+            out[p["network"]] = out.get(p["network"], 0) + 1
+    except Exception:  # noqa: BLE001
+        pass
+    return out

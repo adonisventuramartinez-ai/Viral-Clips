@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, DragEvent } from "react";
+import { useEffect, useMemo, useRef, useState, DragEvent } from "react";
 import { TipoContenido, validarArchivo } from "@/lib/facebook";
 
 interface Theme {
@@ -47,7 +47,8 @@ export default function FileDropzone({ tipo, archivo, onFileSelect, theme }: Fil
     procesarArchivo(file);
   }
 
-  const previewUrl = archivo ? URL.createObjectURL(archivo) : null;
+  const previewUrl = useMemo(() => (archivo ? URL.createObjectURL(archivo) : null), [archivo]);
+  useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl); }, [previewUrl]);
 
   return (
     <div>

@@ -7,7 +7,7 @@ import { useBrand } from "@/lib/useBrand";
 import { ASPECT_VERT, DEFAULT_CAM, DEFAULT_CROP, aspectCam, boxH, isSplit, parseEmbed, round2, toSeconds, type Box } from "@/lib/embed";
 
 type Src = "twitch" | "kick" | "archivo" | "transform";
-const LAYOUTS: [Layout, string][] = [["crop", "Vertical"], ["split_eq", "Dividido"], ["duo", "Dos personas"], ["blur", "Fondo difuminado"]];
+const LAYOUTS: [Layout, string][] = [["crop", "Vertical"], ["casa", "La Casa (reality)"], ["split_eq", "Dividido"], ["duo", "Dos personas"], ["blur", "Fondo difuminado"]];
 const PROPS: [Layout, string][] = [["split", "Cara grande"], ["split_eq", "Equilibrado"], ["split_game", "Juego grande"]];
 const FX_DEFAULT: Record<string, string> = { bleep: "auto", loudnorm: "auto", zoom: "auto", slowmo: "auto", tighten: "auto" };
 const FX_OPTIONS: [string, string, string][] = [
