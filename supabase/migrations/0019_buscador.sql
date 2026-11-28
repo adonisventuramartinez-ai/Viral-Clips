@@ -1,8 +1,6 @@
--- ClipForge 2.0 · Buscador de clips virales en TikTok / Instagram Reels.
--- Ejecútalo en Supabase > SQL Editor. Se puede correr varias veces.
-
--- 0) Los trabajos de búsqueda no tienen una fuente de video: source_id puede ser null.
 alter table public.jobs alter column source_id drop not null;
+-- 0) Los trabajos de búsqueda no tienen una fuente de video: source_id puede ser null.
+-- Buscador de clips virales. Se puede correr varias veces.
 
 -- 1) El worker necesita un tipo de trabajo nuevo: 'search'.
 do $$

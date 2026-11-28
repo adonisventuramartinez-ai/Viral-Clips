@@ -1,10 +1,6 @@
--- ClipForge · Piloto automático multi-página. Ejecútalo UNA VEZ en Supabase > SQL Editor.
--- Quita el CHECK viejo que solo permitía 3 redes y abre:
---   connections.network = 'autopilot'  (config del piloto, misma tabla 0013)
---   posts.network       = 'facebook:<id_de_página>'  (una fila por página)
--- Se puede correr varias veces. No toca datos existentes.
-
 DO $$
+-- Piloto automático: abre los CHECK de connections/posts para 'autopilot' y 'facebook:<id>'.
+-- Se puede correr varias veces. No toca datos existentes.
 DECLARE
   c record;
 BEGIN

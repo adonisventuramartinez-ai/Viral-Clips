@@ -19,7 +19,7 @@ No son el mismo proyecto. Por eso el puente va firmado con `R2_SECRET_ACCESS_KEY
 
 ## Pasos (una vez)
 
-1. **SQL**: corre `supabase/migrations/0020_autopiloto.sql` en **las dos Supabase** (la de la web y la del worker). Se puede correr varias veces; el error `column "conoid" does not exist` ya está corregido.
+1. **SQL**: pega `supabase/PEGAR-AHORA.sql` en **las dos Supabase** (la de la web y la del worker) y dale Run. Empieza con SQL válido (sin encabezados que rompan el editor) y arregla el buscador + el piloto de una vez. Se puede correr varias veces.
 2. **Vercel**: confirma las 6 variables R2/Tigris en **Production** (`STORAGE_DRIVER`, `R2_ENDPOINT`, `R2_REGION`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_CLIPS_BUCKET`) y redeploy **sin caché**. Abre `/almacenamiento`: debe decir **Conexión OK**.
 3. **Worker**: `worker/.env` ya tiene `STORAGE_DRIVER=r2`, `WEB_URL` y la misma llave R2. Reconstruido con `docker compose -f worker/docker-compose.yml build worker && docker compose -f worker/docker-compose.yml up -d --force-recreate worker`.
 4. **Cuenta**: en el menú **Facebook**, conecta tu cuenta (si ya está, no la toques). La página **🤖 Piloto automático** lee ahí los proyectos y páginas.
