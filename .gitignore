@@ -13,3 +13,4 @@ worker/logs/
 !.env.example
 *.pem
 cookies*.txt
+viral-clips-1/
