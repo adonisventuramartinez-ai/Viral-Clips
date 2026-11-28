@@ -14,7 +14,18 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next(); // en tu PC (desarrollo) pasa sin contraseña
   }
 
-  if (pathname === "/login" || pathname === "/api/login" || pathname === "/api/registro" || pathname === "/api/logout") return NextResponse.next();
+  // Rutas que se llaman sin sesión de la app: el cron de Supabase usa Bearer CRON_SECRET
+  // y el login del panel de Facebook usa ADMIN_PASSWORD. Cada una valida su propio secreto.
+  const publicas = [
+    "/login",
+    "/api/login",
+    "/api/registro",
+    "/api/logout",
+    "/api/cron",
+    "/api/fb/cron",
+    "/api/fb/admin/login",
+  ];
+  if (publicas.includes(pathname)) return NextResponse.next();
 
   // Sesión de cuenta (usuario + contraseña) o, como antes, solo la clave de acceso.
   if (await verifySession(req.cookies.get("cf_session")?.value, sessionSecret())) return NextResponse.next();
