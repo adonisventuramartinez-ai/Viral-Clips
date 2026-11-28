@@ -26,6 +26,8 @@ export async function middleware(req: NextRequest) {
     "/api/fb/admin/login",
   ];
   if (publicas.includes(pathname)) return NextResponse.next();
+  // El panel admin valida su propia cookie firmada dentro de cada ruta.
+  if (pathname.startsWith("/api/fb/admin/")) return NextResponse.next();
 
   // Sesión de cuenta (usuario + contraseña) o, como antes, solo la clave de acceso.
   if (await verifySession(req.cookies.get("cf_session")?.value, sessionSecret())) return NextResponse.next();
